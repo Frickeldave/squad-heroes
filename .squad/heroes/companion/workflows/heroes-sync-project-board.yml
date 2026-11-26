@@ -1,0 +1,46 @@
+# <!-- squad-heroes:workflow:heroes-sync-project-board:begin -->
+name: Heroes optional project sync
+
+on:
+  issues:
+    types: [opened, edited, reopened, closed, labeled, unlabeled]
+  pull_request:
+    types: [opened, edited, reopened, closed, labeled, unlabeled]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        type: boolean
+        default: true
+      initial_sync:
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    if: ${{ vars.HEROES_BOARD_SYNC == 'enabled' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate complete opt-in before project access
+        env:
+          GH_TOKEN: ${{ {{projectSecret}} }}
+          HEROES_PROJECT_OWNER: "{{projectOwner}}"
+          HEROES_PROJECT_NUMBER: "{{projectNumber}}"
+          HEROES_PROJECT_STATUS_FIELD: "{{projectStatusField}}"
+          HEROES_PROJECT_STATUS_MAP: '{{projectStatusMap}}'
+        run: |
+          test -n "$GH_TOKEN"
+          test "{{projectOwner}}" = "{{projectOwner}}"
+          test "{{projectNumber}}" = "{{projectNumber}}"
+          test "{{projectStatusField}}" = "{{projectStatusField}}"
+          test '{{projectStatusMap}}' != '{}'
+          args=""
+          if [ "${{ inputs.initial_sync || false }}" = "true" ]; then args="$args --initial-sync"; fi
+          if [ "${{ inputs.dry_run || false }}" = "true" ]; then args="$args --dry-run"; fi
+          node scripts/sync-project-board.mjs $args
+# <!-- squad-heroes:workflow:heroes-sync-project-board:end -->

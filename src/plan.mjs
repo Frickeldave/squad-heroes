@@ -1,0 +1,147 @@
+import { readFileSync, existsSync, lstatSync } from 'node:fs';
+import path from 'node:path';
+import { createHash } from 'node:crypto';
+import { fail } from './errors.mjs';
+import { assertSafeTarget, readUtf8, safeRelativePath } from './io.mjs';
+
+export function sha256(source) {
+  return createHash('sha256').update(source).digest('hex');
+}
+
+export const DECISIONS = new Set(['use', 'keep', 'merge', 'abort']);
+
+function managedSection(source, key) {
+  const start = `<!-- squad-heroes:${key}:begin -->`;
+  const end = `<!-- squad-heroes:${key}:end -->`;
+  const startIndex = source.indexOf(start);
+  const endIndex = source.indexOf(end);
+  if (startIndex === -1 && endIndex === -1) return null;
+  if (startIndex === -1 || endIndex === -1 || endIndex <= startIndex ||
+      source.indexOf(start, startIndex + start.length) !== -1 ||
+      source.indexOf(end, endIndex + end.length) !== -1) {
+    fail('ambiguous_markers', `Missing, duplicate or reversed markers for ${key}`);
+  }
+  return {
+    startIndex,
+    endIndex: endIndex + end.length,
+    content: source.slice(startIndex, endIndex + end.length),
+  };
+}
+
+export function mergeManagedSection(existing, incoming, key, decision) {
+  const current = managedSection(existing, key);
+  const next = managedSection(incoming, key);
+  if (!current || !next) fail('section_marker', `Managed section markers are missing or ambiguous for ${key}`);
+  if (decision === 'keep') return existing;
+  if (decision === 'abort') fail('conflict_aborted', `Conflict aborted for ${key}`);
+  if (decision === 'merge') {
+    const retained = existing.slice(0, current.startIndex) + next.content + existing.slice(current.endIndex);
+    if (!managedSection(retained, key)) fail('merge_invalid', `Merged section is invalid for ${key}`);
+    return retained;
+  }
+  if (decision === 'use') {
+    return existing.slice(0, current.startIndex) + next.content + existing.slice(current.endIndex);
+  }
+  fail('decision', `Invalid conflict decision for ${key}`);
+}
+
+export function classifyOperation(repoRoot, item, decisions = {}) {
+  const target = assertSafeTarget(repoRoot, item.target);
+  const exists = existsSync(target);
+  if (exists && lstatSync(target).isSymbolicLink()) {
+    fail('unsafe_symlink', `Target is a symlink: ${item.target}`);
+  }
+  const incoming = item.rendered;
+  if (!exists) return { ...item, action: 'create', content: incoming, before: null };
+  const before = readUtf8(target, { maxBytes: item.maxBytes ?? 262_144 });
+  if (before === incoming) return { ...item, action: 'noop', content: before, before };
+  if (item.mode === 'append-only') {
+    const entry = item.appendId ? `\n${item.appendId}\n` : incoming;
+    if (before.includes(item.appendId ?? incoming)) return { ...item, action: 'noop', content: before, before };
+    return { ...item, action: 'append', content: `${before}${entry}`, before };
+  }
+  if (item.mode === 'package-json') {
+    let parsed;
+    let scripts;
+    try {
+      parsed = JSON.parse(before);
+      scripts = JSON.parse(incoming);
+    } catch {
+      fail('package_json', 'package.json and managed script definitions must be valid JSON');
+    }
+    const differences = Object.entries(scripts).filter(
+      ([name, command]) => parsed.scripts?.[name] && parsed.scripts[name] !== command
+    );
+    if (differences.length > 0 && !decisions[item.target]) {
+      return {
+        ...item,
+        action: 'conflict',
+        before,
+        base: item.baseline ?? '',
+        incoming,
+        options: [...DECISIONS],
+      };
+    }
+    const decision = decisions[item.target];
+    if (decision === 'keep') return { ...item, action: 'noop', content: before, before, decision };
+    if (decision === 'abort') fail('conflict_aborted', `Conflict aborted for ${item.target}`);
+    if (decision && !['use', 'merge'].includes(decision)) {
+      fail('decision', `Invalid package script decision: ${decision}`);
+    }
+    const merged = { ...parsed, scripts: { ...(parsed.scripts ?? {}), ...scripts } };
+    const content = `${JSON.stringify(merged, null, 2)}\n`;
+    return { ...item, action: content === before ? 'noop' : 'merge', content, before };
+  }
+  if (item.mode === 'managed-section') {
+    const decision = decisions[item.target];
+    if (!decision) {
+      return {
+        ...item,
+        action: 'conflict',
+        before,
+        base: item.baseline ?? '',
+        incoming,
+        options: [...DECISIONS],
+      };
+    }
+    if (!DECISIONS.has(decision)) fail('decision', `Invalid decision ${decision} for ${item.target}`);
+    return {
+      ...item,
+      action: decision === 'keep' ? 'noop' : 'merge',
+      content: mergeManagedSection(before, incoming, item.section, decision),
+      before,
+      decision,
+    };
+  }
+  const currentHash = sha256(before);
+  const previousHash = item.baselineHash;
+  if (previousHash && currentHash === previousHash) {
+    return { ...item, action: 'update', content: incoming, before };
+  }
+  const decision = decisions[item.target];
+  if (!decision) {
+    return { ...item, action: 'conflict', before, base: item.baseline ?? '', incoming, options: [...DECISIONS] };
+  }
+  if (!DECISIONS.has(decision)) fail('decision', `Invalid decision ${decision} for ${item.target}`);
+  if (decision === 'keep') return { ...item, action: 'noop', content: before, before, decision };
+  if (decision === 'abort') fail('conflict_aborted', `Conflict aborted for ${item.target}`);
+  if (decision === 'use') return { ...item, action: 'update', content: incoming, before, decision };
+  fail('whole_file_merge', `A whole-file merge is not supported for ${item.target}`);
+}
+
+export function summarizePlan(operations) {
+  return operations.map(({ target, action, owner, options, base, before, incoming, section }) => ({
+    target,
+    action,
+    owner,
+    ...(options ? { options, section, preview: { base, local: before, incoming } } : {}),
+  }));
+}
+
+export function assertPlanSafe(operations) {
+  for (const operation of operations) {
+    if (!safeRelativePath(operation.target)) fail('unsafe_target', `Unsafe target ${operation.target}`);
+    if (operation.action === 'conflict') continue;
+    if (typeof operation.content !== 'string') fail('plan_content', `Plan missing content for ${operation.target}`);
+  }
+}

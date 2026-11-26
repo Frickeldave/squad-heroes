@@ -1,0 +1,37 @@
+# Recovery und Troubleshooting
+
+## Kein globales Rollback
+
+Der Installer tauscht einzelne Dateien atomar im Dateisystem aus, behauptet aber
+keine globale Mehrdateien-Transaktion. Ein Plan ist idempotent und ein
+unterbrochener Lauf lässt sich mit gleichem Input fortsetzen. Vorhandene lokale
+Dateien bleiben erhalten, sofern kein bestätigter verwalteter Bereich geändert wird.
+
+## Konflikt auflösen
+
+`--dry-run` zeigt alle Operationen und Konflikte. Entscheidungen werden in einer
+JSON-Datei je Zielpfad dokumentiert und mit `--decisions` übergeben:
+
+```json
+{
+  ".squad/team.md": "use",
+  ".github/workflows/heroes-ci.yml": "merge"
+}
+```
+
+Erlaubt sind `use`, `keep`, `merge`, `abort` (deutsche Entsprechungen:
+verwenden, behalten, zusammenführen, abbrechen). `merge` wird vor dem Write
+erneut auf Marker und UTF-8 validiert.
+
+## Typische Fehler
+
+- `detected "missing"`: Markerdatei oder Marker fehlt.
+- Exit-Code 2: negative Squad-Version.
+- `gh_permission`: Push-Recht nicht beweisbar.
+- `conflicts`: Dry-run und Dateien unverändert; Entscheidung erforderlich.
+- `ambiguous_markers`: doppelte, fehlende oder vertauschte Marker.
+- `deployment_branch`: Ref ungültig oder nicht eindeutig.
+- `model_default`: explizite Flow-Modell-ID fehlt.
+
+Bei Authentifizierungsfehlern nur den offiziellen `gh auth login`-Browser-/Device-Flow
+nutzen. Tokens nicht kopieren oder im Terminal eingeben.

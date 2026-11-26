@@ -1,0 +1,55 @@
+import { createHash } from 'node:crypto';
+import { readdirSync, readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fail } from './errors.mjs';
+import { readUtf8, safeRelativePath } from './io.mjs';
+
+export function sha256Bytes(bytes) {
+  return createHash('sha256').update(bytes).digest('hex');
+}
+
+export function walkFiles(root, relative = '') {
+  const current = path.join(root, relative);
+  const files = [];
+  for (const entry of readdirSync(current, { withFileTypes: true })) {
+    const entryPath = path.posix.join(relative, entry.name);
+    if (entry.isSymbolicLink()) fail('manifest_symlink', `Manifest source cannot be a symlink: ${entryPath}`);
+    if (entry.isDirectory()) files.push(...walkFiles(root, entryPath));
+    else if (entry.isFile()) files.push(entryPath);
+    else fail('manifest_file_type', `Unsupported source file type: ${entryPath}`);
+  }
+  return files.sort();
+}
+
+export function validateManifest(productRoot, manifest) {
+  if (manifest.schemaVersion !== 1 || manifest.plugin !== 'squad-heroes') {
+    fail('manifest_header', 'Invalid plugin manifest header');
+  }
+  const entries = Array.isArray(manifest.files) ? manifest.files : [];
+  const ids = new Set();
+  const targets = new Set();
+  for (const entry of entries) {
+    for (const key of ['id', 'source', 'target', 'owner', 'sha256']) {
+      if (typeof entry[key] !== 'string' || !entry[key]) fail('manifest_field', `Manifest field ${key} is required`);
+    }
+    if (ids.has(entry.id)) fail('manifest_duplicate_id', `Duplicate manifest ID: ${entry.id}`);
+    ids.add(entry.id);
+    if (targets.has(entry.target)) fail('manifest_duplicate_target', `Duplicate target: ${entry.target}`);
+    targets.add(entry.target);
+    if (!safeRelativePath(entry.source) || !entry.source.startsWith('.squad/heroes/')) {
+      fail('manifest_source', `Plugin source must stay below .squad/heroes: ${entry.source}`);
+    }
+    if (!safeRelativePath(entry.target)) fail('manifest_target', `Unsafe manifest target: ${entry.target}`);
+    if (entry.owner !== 'plugin' && entry.owner !== 'companion') {
+      fail('manifest_owner', `Unknown ownership for ${entry.id}`);
+    }
+    const file = path.join(productRoot, entry.source);
+    readUtf8(file);
+    const actual = sha256Bytes(readFileSync(file));
+    if (actual !== entry.sha256) fail('manifest_checksum', `Checksum mismatch for ${entry.source}`);
+    if (entry.owner === 'plugin' && !entry.target.startsWith('.squad/')) {
+      fail('plugin_boundary', `Plugin-owned target must be below .squad/: ${entry.target}`);
+    }
+  }
+  return manifest;
+}
