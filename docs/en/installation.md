@@ -14,13 +14,18 @@ version. They are not four separate installation products.
 ## Preflight
 
 The installer reads `.github/agents/squad.agent.md` before planning and
-immediately before the first write. Exactly one `2.0.0` marker is accepted.
-Otherwise it exits with code 2 and exactly:
+immediately before the first write. Exactly one valid stable SemVer marker at
+least `2.0.0` is accepted, including versions such as `2.0.1` and `3.0.0`.
+Build metadata is ignored for precedence; prerelease markers are rejected.
+Otherwise it exits with code 2 and reports:
 
-`ERROR: squad-heroes requires Squad 2.0.0 exactly; detected
+`ERROR: squad-heroes minimum Squad version 2.0.0 is required; detected
 "<value|missing|multiple|invalid>". Installation aborted before mutation.`
 
 No backup, journal, lock or partial installation is created.
+
+The diagnosis tells the operator to run `squad upgrade --self`, then
+`squad upgrade` in the target repository and verify the marker before retrying.
 
 It then runs `gh auth status` and a non-mutating repository query. Failure only
 refers to the host-side `gh auth login` flow.

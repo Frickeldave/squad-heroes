@@ -29,6 +29,9 @@ bleibt append-only; `team.md` ändert nur Markerbereiche.
 Tokens und PATs werden weder abgefragt noch als Argument, stdin, Datei, Log oder
 Test-Fixture akzeptiert. Zulässig sind nur der sichere Host-Credential-Store und
 der offizielle Browser-/Device-Flow.
+Bei einer nicht unterstützten Squad-Version ist `squad upgrade --self` und
+anschließend im Ziel-Repository `squad upgrade` das dokumentierte manuelle
+Vorgehen; dafür darf kein Token ins Terminal eingefügt werden.
 
 ## Supply-chain-Verifikation
 

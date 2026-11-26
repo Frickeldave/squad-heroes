@@ -55,10 +55,10 @@ Klon ist der aktivierte SSH-Transport zu prüfen; alternativ den bereits von
 `gh` konfigurierten HTTPS-Transport verwenden. Abbruch, wenn das Repository
 existiert und nicht als eigens freigegebenes, leeres Testrepo bestätigt ist.
 
-## 3. Squad exakt installieren
+## 3. Unterstützte Squad-Version prüfen
 
-Squad wird im Consumer-Repository nur nach dem Produktvertrag installiert. Die
-autoritative Produktquelle ist der Marker der installierten Datei:
+Squad wird ausschließlich im Consumer-Repository initialisiert. Die autoritative
+Produktquelle ist der Marker in der installierten Datei:
 
 ```bash
 cd {snake-dir}
@@ -68,10 +68,17 @@ grep '<!-- version:' .github/agents/squad.agent.md
 squad --version
 ```
 
-Erwartet: genau ein Marker `<!-- version: 2.0.0 -->`; `grep -c` liefert `1`.
-`squad --version` dokumentiert die verwendete CLI zusätzlich, ersetzt aber
-nicht den Marker. Fehlt, vervielfacht oder weicht der Marker ab, endet die
-Prüfung mit Exit 2 am Produktgate und vor jeder Mutation.
+Erwartet werden `1` von `grep -c` und genau ein Marker
+`<!-- version: X.Y.Z -->` mit gültigem stabilem SemVer mindestens `2.0.0`
+(beispielsweise `2.0.0`, `2.0.1` oder `3.0.0`). `squad --version` dokumentiert
+die CLI zusätzlich, ersetzt die Markerprüfung aber nicht. Prereleases wie
+`2.0.0-rc.1` werden fail-closed abgewiesen.
+
+Wird `0.13.1` erkannt, ist das ein Abbruchkriterium: Die Installation darf
+nicht fortgesetzt werden. Die installierte CLI mit `squad upgrade --self`
+aktualisieren, in `{snake-dir}` `squad upgrade` ausführen, die Markerbefehle
+wiederholen und erst danach
+`node {heroes-dir}/scripts/plugin-preflight.mjs --target "$PWD"` erneut starten.
 
 ## 4. Squad-Plugin installieren und aktualisieren
 

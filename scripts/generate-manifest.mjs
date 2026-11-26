@@ -41,7 +41,7 @@ const marketplace = {
   version: '0.1.0',
   description: 'Generic TypeScript Squad overlay with static agent and prompt sources.',
   license: 'MIT',
-  squad: '2.0.0',
+  squad: '>=2.0.0',
   repository: { type: 'github', url: 'https://github.com/Frickeldave/squad-heroes.git' },
   components: { templates: true },
   files: marketplaceFiles,

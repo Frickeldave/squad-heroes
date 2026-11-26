@@ -6,6 +6,7 @@ import path from 'node:path';
 import { applyPlan, buildInstallPlan } from '../src/installer.mjs';
 import { cleanup, commandResult, fixture, write } from './helpers.mjs';
 
+const product = path.resolve(import.meta.dirname, '..');
 const injected = {
   cwd: '.',
   spawn: (command, args) => args[0] === 'auth' ? commandResult() : commandResult('true\n'),
@@ -24,6 +25,41 @@ function installed() {
   applyPlan(root, buildInstallPlan(root, options, injected), {}, injected);
   return root;
 }
+
+for (const version of ['2.0.0', '2.0.1', '3.0.0']) {
+  test(`materialized companion accepts Squad ${version}`, () => {
+    const root = fixture(version);
+    try {
+      const helper = path.resolve(product, '.squad/heroes/companion/scripts/flow-shared.mjs');
+      const result = spawnSync(process.execPath, [
+        '--input-type=module',
+        '--eval',
+        `import { requireSquad2 } from ${JSON.stringify(new URL(`file://${helper}`).href)}; requireSquad2();`,
+      ], { cwd: root, encoding: 'utf8' });
+      assert.equal(result.status, 0, result.stderr);
+    } finally {
+      cleanup(root);
+    }
+  });
+}
+
+test('materialized companion rejects 0.13.1 with exit 2 and update guidance', () => {
+  const root = fixture('0.13.1');
+  try {
+    const helper = path.resolve(product, '.squad/heroes/companion/scripts/flow-shared.mjs');
+    const result = spawnSync(process.execPath, [
+      '--input-type=module',
+      '--eval',
+      `import { requireSquad2 } from ${JSON.stringify(new URL(`file://${helper}`).href)}; requireSquad2();`,
+    ], { cwd: root, encoding: 'utf8' });
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /minimum Squad version 2\.0\.0 is required; detected "0\.13\.1"/u);
+    assert.match(result.stderr, /squad upgrade --self/u);
+    assert.doesNotMatch(result.stderr, /ghp_|github_pat_|Authorization\s*:\s*Bearer/iu);
+  } finally {
+    cleanup(root);
+  }
+});
 
 test('badge generator changes only the single managed marker and check is read-only', () => {
   const root = installed();

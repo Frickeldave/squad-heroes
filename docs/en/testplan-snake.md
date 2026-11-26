@@ -51,10 +51,10 @@ Expect an empty repository with only the Git directory. Verify SSH access before
 cloning or use the HTTPS transport already configured by `gh`. Stop if the name
 exists and is not explicitly confirmed as this run's empty test repository.
 
-## 3. Install Squad exactly as required
+## 3. Verify a supported Squad version
 
-Install Squad only in the consumer repository. The authoritative product source
-is the marker in the installed file:
+Initialize Squad only in the consumer repository. The authoritative product
+source is the marker in the installed file:
 
 ```bash
 cd {snake-dir}
@@ -64,10 +64,15 @@ grep '<!-- version:' .github/agents/squad.agent.md
 squad --version
 ```
 
-Expect exactly one `<!-- version: 2.0.0 -->` marker and `1` from `grep -c`.
-`squad --version` records the CLI too, but does not replace the marker check.
-A missing, duplicate, or different marker stops with product-gate exit 2 before
-mutation.
+Expect `1` from `grep -c` and exactly one `<!-- version: X.Y.Z -->` marker whose
+valid stable SemVer is at least `2.0.0` (for example `2.0.0`, `2.0.1` or
+`3.0.0`). `squad --version` records the CLI too, but does not replace the marker
+check. Prereleases, including `2.0.0-rc.1`, are rejected fail-closed.
+
+If the detected version is `0.13.1`, this is a stop condition: do not continue
+the installation. Update the installed CLI with `squad upgrade --self`, run
+`squad upgrade` inside `{snake-dir}`, repeat the marker commands, and only then
+rerun `node {heroes-dir}/scripts/plugin-preflight.mjs --target "$PWD"`.
 
 ## 4. Install and update the Squad plugin
 

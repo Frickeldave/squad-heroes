@@ -176,7 +176,7 @@
       "source": ".squad/heroes/companion/scripts/flow-shared.mjs",
       "target": ".squad/heroes/companion/scripts/flow-shared.mjs",
       "owner": "companion",
-      "sha256": "d3b6324b3a1cd8d9eeea29f1450771ab2d7c187359135a63436a6f5fa0cd4990"
+      "sha256": "81a597cd6fda38c67c0580e6090c0a74d6c40c8a7d16b50465b91dfdb0257c21"
     },
     {
       "id": ".squad:heroes:companion:scripts:heroes-configure.mjs",
@@ -295,14 +295,14 @@
       "source": ".squad/heroes/prompts/startreqeng.de.md",
       "target": ".squad/heroes/prompts/startreqeng.de.md",
       "owner": "plugin",
-      "sha256": "f6e31a096b5bcb9019c11cd5bfbf1fac0caa4d95eeb4c16ccde63e147757c1f8"
+      "sha256": "25f7ce8742c989cc78a583d24ae6b05846a62b2f58ec397f4d69cda3f2e81ebb"
     },
     {
       "id": ".squad:heroes:prompts:startreqeng.en.md",
       "source": ".squad/heroes/prompts/startreqeng.en.md",
       "target": ".squad/heroes/prompts/startreqeng.en.md",
       "owner": "plugin",
-      "sha256": "0d1f3da44f0a0caa207eba30db4b49f00688e7d1ee3ec29ff40cab4f3d08e284"
+      "sha256": "ddb55aebe2abaa35451895ba210d1f3767743a03e779feb239bd5efdc3ac39f5"
     },
     {
       "id": ".squad:heroes:prompts:startreview.de.md",
@@ -337,7 +337,7 @@
       "source": ".squad/heroes/skills/squad-heroes-flow-safety/SKILL.md",
       "target": ".squad/heroes/skills/squad-heroes-flow-safety/SKILL.md",
       "owner": "plugin",
-      "sha256": "1b55c84b157443617078af1c4440d37d4c43ae7fe56c7345fe66d26fa58c516c"
+      "sha256": "7ec061abef56a210b9d50a7a9e343eb04cd8ce766fc8250fa9399e8824206b69"
     }
   ]
 }

@@ -28,6 +28,9 @@ are only `use`, `keep`, `merge` and `abort`. A merge is revalidated.
 Tokens and PATs are never requested or accepted as arguments, stdin, files,
 logs or test fixtures. Only the host credential store and official
 browser/device flow are supported.
+For an unsupported Squad version, the documented operator-only remedy is
+`squad upgrade --self` followed by `squad upgrade` in the target repository;
+neither command requires pasting a token into the terminal.
 
 ## Supply-chain verification
 

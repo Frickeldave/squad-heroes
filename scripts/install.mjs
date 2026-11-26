@@ -8,7 +8,7 @@ const HELP = `Usage:
   node scripts/install.mjs --target /path/to/repository --repository owner/name --deployment-branches N \\
     --deployment-branch-1 main [--deployment-branch-2 int ...] [--language de|en] [--dry-run]
 
-Squad 2.0.0 must be the installed version in the target repository. The installer
+Squad 2.0.0 or higher must be installed in the target repository. The installer
 is human-triggered, performs two version checks, never calls plugin installation
 as a substitute for companion materialization, and does not ask for credentials.
 

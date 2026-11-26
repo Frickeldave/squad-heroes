@@ -1,15 +1,33 @@
-import { mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 const FLOWS = new Set(['reqeng', 'work', 'review']);
 
 export function requireSquad2() {
-  const source = readFileSync('.github/agents/squad.agent.md', 'utf8');
+  let source = '';
+  try {
+    if (existsSync('.github/agents/squad.agent.md')) {
+      source = readFileSync('.github/agents/squad.agent.md', 'utf8');
+    }
+  } catch {
+    source = '';
+  }
   const matches = [...source.matchAll(/<!--\s*version:\s*([^>\s]+)\s*-->/gu)];
-  const version = matches.length === 1 ? matches[0][1] : matches.length ? 'multiple' : 'missing';
-  if (version !== '2.0.0') {
-    console.error(`ERROR: squad-heroes requires Squad 2.0.0 exactly; detected "${version}". Installation aborted before mutation.`);
+  const raw = matches.length === 1 ? matches[0][1] : matches.length ? 'multiple' : 'missing';
+  const match = raw.match(
+    /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/u
+  );
+  const version = ['missing', 'multiple'].includes(raw) ? raw : !match || match[4] ? 'invalid' : raw;
+  const supported = Boolean(match) && !match[4] && (
+    BigInt(match[1]) > 2n ||
+    (BigInt(match[1]) === 2n && (
+      BigInt(match[2]) > 0n ||
+      (BigInt(match[2]) === 0n && BigInt(match[3]) >= 0n)
+    ))
+  );
+  if (!supported) {
+    console.error(`ERROR: squad-heroes minimum Squad version 2.0.0 is required; detected "${version}". Installation aborted before mutation. Update the installed CLI with \`squad upgrade --self\`, then run \`squad upgrade\` in the target repository and verify the marker before retrying.`);
     process.exit(2);
   }
 }

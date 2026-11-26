@@ -64,11 +64,11 @@ test('conflicting local team blocks installation before its first write', () => 
   }
 });
 
-test('version changed between plan and write aborts before mutation', () => {
+test('unsupported version changed between plan and write aborts before mutation', () => {
   const root = fixture();
   try {
     const plan = buildInstallPlan(root, options, injected);
-    write(root, '.github/agents/squad.agent.md', '<!-- version: 3.0.0 -->\n');
+    write(root, '.github/agents/squad.agent.md', '<!-- version: 0.13.1 -->\n');
     assert.throws(() => applyPlan(root, plan, {}, injected), /Installation aborted before mutation/);
     assert.equal(existsSync(path.join(root, '.squad/heroes.json')), false);
   } finally {

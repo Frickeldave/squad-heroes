@@ -21,15 +21,16 @@ Vier Lieferbestandteile — Agent-/Prompt-Quellen, Companion-Adapter,
 Launcher/Automatisierung und Dokumentation/Qualität — bilden dabei **ein**
 versioniertes Overlay-Produkt. Sie sind keine vier unabhängigen Installate.
 
-Der Installer unterstützt ausschließlich ein bereits installiertes Squad
-`2.0.0`. Die Version kommt genau aus einem einzelnen Marker
-`<!-- version: X.Y.Z -->` in `.github/agents/squad.agent.md`.
+Der Installer unterstützt ein bereits installiertes Squad `2.0.0` oder höher.
+Die Version kommt genau aus einem einzelnen gültigen SemVer-Marker
+`<!-- version: X.Y.Z -->` in `.github/agents/squad.agent.md`. Prerelease-Marker
+werden fail-closed abgewiesen.
 
 ## Voraussetzungen
 
 - Linux
 - Node.js 20+ und npm
-- Squad exakt `2.0.0`
+- Squad `2.0.0` oder höher (keine Prereleases)
 - `gh` mit authentifizierter Host-Konfiguration und Push-Recht
 - lokal ausgechecktes Zielrepository
 

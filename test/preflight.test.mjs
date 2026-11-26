@@ -1,14 +1,36 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { assertGithubWriteAccess, assertSquadCompatibility, detectSquadVersion } from '../src/preflight.mjs';
 import { cleanup, fixture, write } from './helpers.mjs';
 
-test('accepts exactly one Squad 2.0.0 marker', () => {
-  const root = fixture();
+for (const version of ['2.0.0', '2.0.1', '3.0.0', '3.0.0+build.7']) {
+  test(`accepts supported stable Squad ${version} marker`, () => {
+    const root = fixture(version);
+    try {
+      assert.equal(assertSquadCompatibility(root), version);
+    } finally {
+      cleanup(root);
+    }
+  });
+}
+
+test('0.13.1 plugin preflight exits 2 with safe update guidance', () => {
+  const root = fixture('0.13.1');
   try {
-    assert.equal(assertSquadCompatibility(root), '2.0.0');
+    const result = spawnSync(process.execPath, [
+      path.resolve(import.meta.dirname, '../scripts/plugin-preflight.mjs'),
+      '--target',
+      root,
+    ], { encoding: 'utf8' });
+    const output = `${result.stdout}\n${result.stderr}`;
+    assert.equal(result.status, 2);
+    assert.match(output, /minimum Squad version 2\.0\.0 is required; detected "0\.13\.1"/u);
+    assert.match(output, /squad upgrade --self/u);
+    assert.match(output, /squad upgrade/u);
+    assert.doesNotMatch(output, /ghp_|github_pat_|Authorization\s*:\s*Bearer/iu);
   } finally {
     cleanup(root);
   }
@@ -36,11 +58,10 @@ for (const [label, source, detected] of [
   ['multiple', '<!-- version: 2.0.0 --><!-- version: 2.0.0 -->', 'multiple'],
   ['invalid', '<!-- version: nope -->', 'invalid'],
   ['older', '<!-- version: 1.9.0 -->', '1.9.0'],
-  ['newer', '<!-- version: 2.0.1 -->', '2.0.1'],
   ['prerelease', '<!-- version: 2.0.0-rc.1 -->', 'invalid'],
-  ['build', '<!-- version: 2.0.0+build -->', 'invalid'],
   ['range', '<!-- version: ^2.0.0 -->', 'invalid'],
   ['latest', '<!-- version: latest -->', 'invalid'],
+  ['legacy', '<!-- version: 0.13.1 -->', '0.13.1'],
 ]) {
   test(`rejects ${label} version without mutation`, () => {
     const root = fixture('invalid-placeholder');
@@ -49,7 +70,8 @@ for (const [label, source, detected] of [
     try {
       assert.equal(detectSquadVersion(root), detected);
       assert.throws(() => assertSquadCompatibility(root), (error) =>
-        error.message === `ERROR: squad-heroes requires Squad 2.0.0 exactly; detected "${detected}". Installation aborted before mutation.` &&
+        error.message.includes(`ERROR: squad-heroes minimum Squad version 2.0.0 is required; detected "${detected}".`) &&
+        error.message.includes('`squad upgrade --self`') &&
         error.details.exitCode === 2
       );
       assert.deepEqual(readdirSync(root).sort(), before);

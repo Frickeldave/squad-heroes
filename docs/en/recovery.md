@@ -32,7 +32,11 @@ markers and UTF-8 before write.
 ## Common errors
 
 - `detected "missing"`: marker file or marker is absent.
-- Exit code 2: negative Squad version.
+- `detected "0.13.1"` or another lower version: exit code 2. Stop without
+  mutation, run `squad upgrade --self`, then `squad upgrade` in the target
+  repository, verify one stable SemVer marker at least `2.0.0`, and retry.
+- Exit code 2 also covers missing, duplicate, invalid or prerelease Squad
+  versions; `2.0.0-rc.1` is not accepted.
 - `gh_permission`: push permission cannot be proven.
 - `conflicts`: dry run and files unchanged; decision required.
 - `ambiguous_markers`: duplicate, absent or reversed markers.

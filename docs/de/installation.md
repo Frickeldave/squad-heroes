@@ -14,11 +14,16 @@ zusammen versioniert; es gibt keine vier separaten Installationsprodukte.
 ## Vorprüfung
 
 Der Installer liest vor jeder Planung und unmittelbar vor dem ersten Write den
-Marker aus `.github/agents/squad.agent.md`. Genau eine syntaktische Version
-`2.0.0` ist erlaubt. Andernfalls endet der Lauf mit Exit-Code 2 und exakt der
-Meldung `ERROR: squad-heroes requires Squad 2.0.0 exactly; detected
+Marker aus `.github/agents/squad.agent.md`. Genau ein gültiger stabiler
+SemVer-Marker ab `2.0.0` ist erlaubt, also auch `2.0.1` oder `3.0.0`.
+Build-Metadaten beeinflussen die Rangfolge nicht; Prerelease-Marker werden
+abgewiesen. Andernfalls endet der Lauf mit Exit-Code 2 und der Meldung
+`ERROR: squad-heroes minimum Squad version 2.0.0 is required; detected
 "<value|missing|multiple|invalid>". Installation aborted before mutation.`
 Ohne Backup, Journal, Lock oder Teilinstallation.
+
+Die Diagnose weist an, `squad upgrade --self` und danach im Ziel-Repository
+`squad upgrade` auszuführen sowie den Marker vor einem erneuten Versuch zu prüfen.
 
 Danach läuft `gh auth status` und eine nicht mutierende Repository-Abfrage. Bei
 Fehlern wird ausschließlich zum hostseitigen `gh auth login` verwiesen.

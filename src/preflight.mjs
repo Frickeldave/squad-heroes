@@ -4,8 +4,24 @@ import path from 'node:path';
 import { HeroesError, INCOMPATIBLE_SQUAD_EXIT, fail } from './errors.mjs';
 import { readUtf8 } from './io.mjs';
 
-export const SQUAD_VERSION = '2.0.0';
+export const SQUAD_MIN_VERSION = '2.0.0';
 export const SQUAD_AGENT_PATH = '.github/agents/squad.agent.md';
+
+function stableSemVer(value) {
+  const match = value.match(
+    /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/u
+  );
+  if (!match || match[4]) return null;
+  return [BigInt(match[1]), BigInt(match[2]), BigInt(match[3])];
+}
+
+function compareVersions(left, right) {
+  for (let index = 0; index < 3; index += 1) {
+    if (left[index] > right[index]) return 1;
+    if (left[index] < right[index]) return -1;
+  }
+  return 0;
+}
 
 export function detectSquadVersion(repoRoot) {
   const filePath = path.join(repoRoot, SQUAD_AGENT_PATH);
@@ -20,15 +36,18 @@ export function detectSquadVersion(repoRoot) {
   if (matches.length === 0) return 'missing';
   if (matches.length > 1) return 'multiple';
   const value = matches[0][1];
-  return /^\d+\.\d+\.\d+$/u.test(value) ? value : 'invalid';
+  return stableSemVer(value) ? value : 'invalid';
 }
 
 export function assertSquadCompatibility(repoRoot) {
   const detected = detectSquadVersion(repoRoot);
-  if (detected === SQUAD_VERSION) return detected;
+  const version = stableSemVer(detected);
+  if (version && compareVersions(version, stableSemVer(SQUAD_MIN_VERSION)) >= 0) return detected;
   throw new HeroesError(
     'squad_version',
-    `ERROR: squad-heroes requires Squad 2.0.0 exactly; detected "${detected}". Installation aborted before mutation.`,
+    `ERROR: squad-heroes minimum Squad version 2.0.0 is required; detected "${detected}". ` +
+    'Installation aborted before mutation. Update the installed CLI with `squad upgrade --self`, ' +
+    'then run `squad upgrade` in the target repository and verify the marker before retrying.',
     { detected, exitCode: INCOMPATIBLE_SQUAD_EXIT }
   );
 }

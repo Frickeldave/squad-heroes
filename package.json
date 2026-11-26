@@ -2,7 +2,7 @@
   "name": "squad-heroes",
   "version": "0.1.0",
   "private": true,
-  "description": "Marketplace assets and companion installer for Squad 2.0.0",
+  "description": "Marketplace assets and companion installer for Squad 2.0.0 or higher",
   "type": "module",
   "engines": {
     "node": ">=20"

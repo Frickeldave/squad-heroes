@@ -14,6 +14,7 @@ test('manifest is static, checksummed and plugin files never target outside .squ
   for (const file of manifest.files) assert.ok(file.target.startsWith('.squad/'));
   assert.ok(!manifest.files.some(({ source }) => /scripts\/install\.mjs$/u.test(source)));
   const marketplace = parseJsonFile(path.join(root, 'plugin.manifest.json'));
+  assert.equal(marketplace.squad, '>=2.0.0');
   assert.ok(marketplace.files.length > 10);
   assert.ok(marketplace.files.every(({ source }) => !/\.(?:mjs|js|sh|ts)$/u.test(source)));
 });

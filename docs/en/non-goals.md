@@ -1,6 +1,7 @@
 # Non-goals
 
-- Installing, upgrading or downgrading Squad.
+- Product-managed or automatic installation, upgrade or downgrade of Squad;
+  operator-run `squad upgrade` guidance is diagnostic only.
 - A proprietary Squad/plugin/overlay CLI or global installer.
 - Executable plugin hooks or plugin writes outside `.squad/`.
 - Automatic Copilot, MCP, provider or package-manager installation.
