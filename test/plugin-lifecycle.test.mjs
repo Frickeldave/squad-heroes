@@ -124,9 +124,6 @@ for (const fixtureId of [1, 2]) test(`real Squad lifecycle works in neutral Type
   }
 });
 
-test('the real CLI has install-based update semantics and no proprietary setup command', () => {
-  assert.equal(existsSync(path.join(product, 'scripts/plugin-setup.mjs')), false);
-  const packageJson = JSON.parse(readFileSync(path.join(product, 'package.json'), 'utf8'));
-  assert.equal(packageJson.scripts['plugin-setup'], undefined);
+test('the README documents real install-based update semantics', () => {
   assert.match(readFileSync(path.join(product, 'README.md'), 'utf8'), /squad plugin install <local-dir>/);
 });

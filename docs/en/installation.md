@@ -39,7 +39,6 @@ squad plugin verify
 ```
 
 `squad plugin install <local-dir>` is the only plugin installation path. The
-obsolete `plugin-setup.mjs` proprietary wrapper is no longer shipped.
 
 The human-triggered companion follows as a separate operation:
 

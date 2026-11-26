@@ -37,8 +37,6 @@ squad plugin verify
 ```
 
 `squad plugin install <local-dir>` ist der einzige Plugin-Installationsweg.
-Das entfernte `plugin-setup.mjs`-Skript war eine nicht benötigte proprietäre
-Zwischenschicht und wird nicht mehr ausgeliefert.
 
 Anschließend führt der Mensch den Companion separat aus:
 
