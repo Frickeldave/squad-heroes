@@ -26,6 +26,23 @@ Fehlern wird ausschließlich zum hostseitigen `gh auth login` verwiesen.
 ## Erstinstallation
 
 ```bash
+git clone https://github.com/Frickeldave/squad-heroes.git
+cd /repo
+squad plugin validate /pfad/zum/squad-heroes
+squad plugin dry-run /pfad/zum/squad-heroes
+squad plugin install /pfad/zum/squad-heroes
+squad plugin enable squad-heroes
+squad plugin list --json
+squad plugin verify
+```
+
+`squad plugin install <local-dir>` ist der einzige Plugin-Installationsweg.
+Das entfernte `plugin-setup.mjs`-Skript war eine nicht benötigte proprietäre
+Zwischenschicht und wird nicht mehr ausgeliefert.
+
+Anschließend führt der Mensch den Companion separat aus:
+
+```bash
 node scripts/install.mjs --target /repo --repository owner/repository \
   --deployment-branches 1 --deployment-branch-1 prd \
   --language de --dry-run
@@ -39,6 +56,24 @@ aktive `charter.md` und die aktuelle Ausgabe.
 Fehlende, doppelte oder mehrdeutige Branch-Eingaben stoppen vor dem ersten Write.
 
 ## Aktualisierung
+
+Der installierte Squad CLI hat kein `plugin update`. Für ein Update wird der
+neue Checkout validiert und erneut mit `squad plugin install` installiert:
+
+```bash
+squad plugin verify &&
+squad plugin install /pfad/zum/aktuelleren/squad-heroes &&
+squad plugin verify
+squad plugin list --json
+```
+
+`verify` vor `install` verhindert, dass eine lokale Änderung an Squad-eigenen
+Zielen still von einem Update überschrieben wird. Squad verwaltet Version,
+Manifest- und Dateiprüfsummen unter `.squad/plugins/*`; ein neuer Source,
+Manifest, Checkout oder Prüfsummenstand wird dort beim erneuten `install`
+registriert. Die Companion-Dateien bleiben davon unberührt. Ein erneutes
+`install` derselben Quelle ist idempotent in den gelieferten Zielen, auch wenn
+Squad neue Installationszeitstempel/Audit-Ereignisse schreibt.
 
 `.squad/heroes.json` hält die einmalige Profilidentität. Ein Profilwechsel
 erfordert Uninstall/Reinstall. Bestehende Charters, Team-Bereiche und Workflows

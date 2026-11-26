@@ -8,7 +8,7 @@ Der Companion verteilt fünf strikt getrennte Consumer-Vorlagen:
 - `heroes-update-badges.yml`: einzelner README-Markerblock, Bot-/Skip-/Stale-Schutz.
 - `heroes-sync-project-board.yml`: optionaler Lifecycle-Sync nach vollständigem Opt-in.
 
-Alle Vorlagen laufen auf `ubuntu-latest` mit Minimalpermissions. CRAFT-Owner,
+Alle Vorlagen laufen auf `ubuntu-latest` mit Minimalpermissions. Owner,
 Repository, Project, Runner, Status, Branches, Badge-Quellen und Release-Linie
 sind keine Defaults.
 

@@ -8,8 +8,8 @@ The companion distributes five strictly separate consumer templates:
 - `heroes-update-badges.yml`: one README marker block with bot/skip/stale guards.
 - `heroes-sync-project-board.yml`: optional lifecycle sync after full opt-in.
 
-All use `ubuntu-latest` and least privilege. CRAFT owner, repository, Project,
-runner, statuses, branches, badge sources and release line are not defaults.
+All use `ubuntu-latest` and least privilege. Owner, repository, Project, runner,
+statuses, branches, badge sources and release line are not defaults.
 
 ## README badges
 

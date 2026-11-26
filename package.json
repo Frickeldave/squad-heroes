@@ -12,7 +12,6 @@
     "check": "node scripts/generate-manifest.mjs && node scripts/validate-product.mjs && npm test && git diff --exit-code -- .squad/heroes/manifest.json",
     "manifest": "node scripts/generate-manifest.mjs",
     "plugin-preflight": "node scripts/plugin-preflight.mjs",
-    "plugin-setup": "node scripts/plugin-setup.mjs",
     "smoke": "node scripts/validate-product.mjs && node scripts/install.mjs --help"
   },
   "license": "MIT"

@@ -9,6 +9,14 @@ Dateien bleiben erhalten, sofern kein bestätigter verwalteter Bereich geändert
 
 ## Konflikt auflösen
 
+Bei Plugin-Artefakten wird zuerst `squad plugin verify` ausgeführt. Ein
+Prüfsummenfehler stoppt die dokumentierte Update-Kette vor
+`squad plugin install <neuer-local-dir>`; Squad selbst bietet keine automatische
+3-Way-Zusammenführung für Plugin-Dateien. Der Konflikt wird bewusst behalten,
+der installierte Zustand wiederhergestellt oder nach dokumentiertem Einverständnis
+neu installiert. `verify` und `list --json` liefern den nachweisbaren aktuellen
+Stand. Dieser Konfliktschutz gilt nur für Squad-eigene Plugin-Ziele.
+
 `--dry-run` zeigt alle Operationen und Konflikte. Entscheidungen werden in einer
 JSON-Datei je Zielpfad dokumentiert und mit `--decisions` übergeben:
 
@@ -32,6 +40,8 @@ erneut auf Marker und UTF-8 validiert.
 - `ambiguous_markers`: doppelte, fehlende oder vertauschte Marker.
 - `deployment_branch`: Ref ungültig oder nicht eindeutig.
 - `model_default`: explizite Flow-Modell-ID fehlt.
+- `Plugin verification failed: checksum mismatch ...`: lokale Änderung an
+  einem Squad-eigenen Plugin-Ziel; `install` nicht ausführen.
 
 Bei Authentifizierungsfehlern nur den offiziellen `gh auth login`-Browser-/Device-Flow
 nutzen. Tokens nicht kopieren oder im Terminal eingeben.

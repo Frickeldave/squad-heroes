@@ -38,7 +38,39 @@ Der Installer unterstützt ausschließlich ein bereits installiertes Squad
 ```bash
 git clone https://github.com/Frickeldave/squad-heroes.git
 cd squad-heroes
-node scripts/plugin-setup.mjs --target /pfad/zum/projekt --repository owner/repository
+cd /pfad/zum/projekt
+squad plugin validate /pfad/zum/squad-heroes
+squad plugin dry-run /pfad/zum/squad-heroes
+squad plugin install /pfad/zum/squad-heroes
+squad plugin enable squad-heroes
+squad plugin list --json
+squad plugin verify
+```
+
+`squad plugin install <local-dir>` ist der **primäre Squad-native
+Plugin-Lifecycle**. Aktualisierungen erfolgen
+nicht über `plugin update` (dieses Kommando existiert in der unterstützten
+CLI nicht), sondern durch erneutes Ausführen von:
+
+```bash
+squad plugin verify && squad plugin install /pfad/zum/aktuelleren/squad-heroes
+squad plugin list --json
+squad plugin verify
+```
+
+`squad plugin verify` vor der Aktualisierung ist verpflichtend: Squad überschreibt
+bei `install` seine verwalteten Ziele. Bei einer lokalen Änderung meldet
+`verify` einen Checksum-Fehler und `&&` verhindert den Update-Aufruf; erst nach
+bewusster Lösung des Konflikts darf `install` erneut laufen. Derselbe Stand ist
+idempotent. Alle Plugin-Ziele und der Plugin-State liegen unter `.squad/`;
+`.squad/plugins/*` ist ausschließlich autoritativ.
+
+Danach materialisiert der separate, menschlich gestartete Companion seine
+eigenen aktiven Ziele. Er ist kein Plugin-Installer, verwaltet keine
+`.squad/plugins/*`-Daten und ist kein Ersatz für `squad plugin install`:
+
+```bash
+cd /pfad/zum/squad-heroes
 node scripts/install.mjs --target /pfad/zum/projekt \
   --repository owner/repository \
   --deployment-branches 2 \
@@ -54,11 +86,9 @@ ausgeführt. Der Installer fragt nie nach Tokens und persistiert keine Credentia
 ## Dokumentation
 
 - Deutsch: [Installation](docs/de/installation.md), [Konfiguration](docs/de/konfiguration.md),
-  [Sicherheit](docs/de/sicherheit.md), [Recovery](docs/de/recovery.md),
-  [Akzeptanzmatrix](docs/de/akzeptanzmatrix.md)
+  [Sicherheit](docs/de/sicherheit.md), [Recovery](docs/de/recovery.md)
 - English: [Installation](docs/en/installation.md), [Configuration](docs/en/configuration.md),
-  [Security](docs/en/security.md), [Recovery](docs/en/recovery.md),
-  [Acceptance matrix](docs/en/acceptance-matrix.md)
+  [Security](docs/en/security.md), [Recovery](docs/en/recovery.md)
 
 ## Grenzen
 

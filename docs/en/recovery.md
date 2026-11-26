@@ -9,6 +9,13 @@ section changes.
 
 ## Resolving conflicts
 
+For plugin artifacts, run `squad plugin verify` first. A checksum error stops the
+documented update chain before `squad plugin install <newer-local-dir>`; Squad
+does not provide automatic three-way merging for plugin files. Deliberately
+keep the local state, restore the installed state, or explicitly reinstall after
+review. `verify` and `list --json` expose the authoritative state. This guard
+applies only to Squad-owned plugin targets.
+
 `--dry-run` shows every operation and conflict. Record one decision per target in
 JSON and pass it with `--decisions`:
 
@@ -31,6 +38,8 @@ markers and UTF-8 before write.
 - `ambiguous_markers`: duplicate, absent or reversed markers.
 - `deployment_branch`: ref is invalid or ambiguous.
 - `model_default`: explicit flow model ID is missing.
+- `Plugin verification failed: checksum mismatch ...`: a Squad-owned installed
+  plugin target changed locally; do not run `install`.
 
 For authentication failures, use only the official `gh auth login`
 browser/device flow. Do not copy tokens or type them into a terminal.
