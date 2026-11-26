@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { assertSquadCompatibility, assertGithubWriteAccess } from './preflight.mjs';
 import { buildHeroesConfig, validateHeroesConfig } from './config.mjs';
-import { classifyOperation, assertPlanSafe, summarizePlan } from './plan.mjs';
+import { classifyOperation, assertPlanSafe, summarizePlan, recoveryBaselines } from './plan.mjs';
 import { parseJsonFile, readUtf8, assertSafeTarget } from './io.mjs';
 import { fail } from './errors.mjs';
 import { resolveLanguage, translate, validateMessageCatalogs } from './messages.mjs';
@@ -20,7 +20,7 @@ export function parseInstallArguments(argv) {
     repository: null,
     profile: null,
     language: null,
-    models: { reqeng: 'mai-code-2', work: 'claude-sonnet-5.5', review: 'claude-opus-5.5' },
+    models: { reqeng: 'mai-code-2', work: 'claude-sonnet-5.5', review: 'gpt-6.1-terra' },
     explicitModels: {},
     branches: null,
   };
@@ -77,7 +77,7 @@ function render(source, values) {
   );
 }
 
-function operationsFromCatalog(repoRoot, config) {
+function operationsFromCatalog(repoRoot, config, baselines = {}) {
   const catalog = parseJsonFile(path.join(ROOT, '.squad/heroes/companion-targets.json'));
   return catalog.targets.filter((entry) => !entry.extension || config.extensions?.[entry.extension]?.enabled).map((entry) => {
     const sourcePath = render(entry.source, { language: config.language });
@@ -101,11 +101,17 @@ function operationsFromCatalog(repoRoot, config) {
     if (target.includes('{{agent}}')) {
       fail('catalog_render', 'Unresolved agent placeholder in companion target catalog');
     }
-    return { ...entry, target, rendered, owner: 'companion' };
+    return {
+      ...entry,
+      target,
+      rendered,
+      owner: 'companion',
+      baselineHash: baselines[target],
+    };
   });
 }
 
-function addAgentOperations(config) {
+function addAgentOperations(config, baselines = {}) {
   const profile = parseJsonFile(path.join(ROOT, '.squad/heroes/profiles/typescript-development.json'));
   const operations = [];
   for (const agent of profile.agents) {
@@ -118,6 +124,7 @@ function addAgentOperations(config) {
         rendered: content,
         mode: 'managed-section',
         section: `charter:${agent.id}`,
+        baselineHash: baselines[`.squad/agents/${agent.id}/charter.${language}.md`],
       });
     }
     const selected = readUtf8(
@@ -130,6 +137,7 @@ function addAgentOperations(config) {
       rendered: selected,
       mode: 'managed-section',
       section: `charter:${agent.id}`,
+      baselineHash: baselines[`.squad/agents/${agent.id}/charter.md`],
     });
     operations.push({
       id: `history-${agent.id}`,
@@ -194,8 +202,11 @@ export function buildInstallPlan(repoRoot, options = {}, injected = {}) {
       });
   const decisions = options.decisionFile ? parseJsonFile(path.resolve(options.decisionFile)) : {};
   const operations = [
-    ...operationsFromCatalog(repoRoot, config),
-    ...addAgentOperations({ ...config, selectedLanguage: language }),
+    ...operationsFromCatalog(repoRoot, config, existing?.recovery?.targets),
+    ...addAgentOperations(
+      { ...config, selectedLanguage: language },
+      existing?.recovery?.targets
+    ),
   ];
   operations.push({
     id: 'heroes-state',
@@ -219,7 +230,15 @@ export function buildInstallPlan(repoRoot, options = {}, injected = {}) {
   });
   const planned = operations.map((entry) => classifyOperation(repoRoot, entry, decisions));
   const fingerprint = createHash('sha256').update(JSON.stringify(summarizePlan(planned))).digest('hex');
-  const completed = { ...config, recovery: { planVersion: 1, lastCompletedPlan: fingerprint, decisions } };
+  const completed = {
+    ...config,
+    recovery: {
+      planVersion: 1,
+      lastCompletedPlan: fingerprint,
+      targets: recoveryBaselines(planned),
+      decisions,
+    },
+  };
   const stateOperation = planned.find((entry) => entry.target === '.squad/heroes.json');
   if (stateOperation) stateOperation.content = `${JSON.stringify(completed, null, 2)}\n`;
   assertPlanSafe(planned);
@@ -236,7 +255,8 @@ export function applyPlan(repoRoot, plan, { dryRun = false, verify = false } = {
   assertSquadCompatibility(repoRoot);
   if (plan.config.repository) assertGithubWriteAccess(plan.config.repository, injected);
   let changed = 0;
-  for (const operation of plan.operations) {
+  for (const operation of [...plan.operations.filter(({ id }) => id !== 'heroes-state'),
+                           ...plan.operations.filter(({ id }) => id === 'heroes-state')]) {
     if (operation.action === 'noop') continue;
     const target = assertSafeTarget(repoRoot, operation.target);
     mkdirSync(path.dirname(target), { recursive: true });

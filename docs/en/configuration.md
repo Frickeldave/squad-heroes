@@ -7,11 +7,19 @@ profile identity, branches, language, flow models, repository, ownership,
 recovery and registered extensions. Unknown keys, models, extension values or
 type errors stop fail-closed.
 
+`recovery.targets` stores only SHA-256 baselines for the last confirmed managed
+targets. An unchanged upstream state can update automatically, while local
+drift remains a conflict until an explicit decision. Decisions remain in that
+same recovery structure and never replace `.squad/plugins/*`.
+
 ## Models
 
 Each flow uses only `--model ID` > its matching `modelDefaults` value > stop.
 There is no `auto`, cache, family, team, prompt or cross-flow fallback. The model
 is resolved once and passed unchanged.
+Before launch, the Companion probes the ID with an isolated
+`copilot config model` query against the authorized host catalog. Credential
+values are neither read nor emitted.
 
 ## Prompt layers
 

@@ -50,9 +50,12 @@ if (yes) {
   if (!process.env.GITHUB_REPOSITORY || !process.env.RELEASE_TAG_PREFIX) {
     throw new Error('positive release gate requires repository and release tag prefix');
   }
-  const result = spawnSync('gh', ['api', `repos/${process.env.GITHUB_REPOSITORY}/releases?per_page=100`, '--paginate'], { encoding: 'utf8' });
+  const result = spawnSync('gh', [
+    'api', `repos/${process.env.GITHUB_REPOSITORY}/releases?per_page=100`,
+    '--paginate', '--slurp',
+  ], { encoding: 'utf8' });
   if (result.status !== 0) throw new Error(`cannot read releases: ${result.stderr.trim()}`);
-  const releases = JSON.parse(result.stdout);
+  const releases = JSON.parse(result.stdout).flat();
   const versions = releases
     .map(({ tag_name }) => tag_name?.startsWith(process.env.RELEASE_TAG_PREFIX) ? tag_name.slice(process.env.RELEASE_TAG_PREFIX.length) : null)
     .filter(semver);

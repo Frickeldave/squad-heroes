@@ -1,0 +1,141 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import path from 'node:path';
+import { applyPlan, buildInstallPlan } from '../src/installer.mjs';
+import { cleanup, commandResult, fixture } from './helpers.mjs';
+
+const injected = {
+  cwd: '.',
+  spawn: (command, args) => args[0] === 'auth' ? commandResult() : commandResult('true\n'),
+};
+
+function options(extra = {}) {
+  return {
+    repository: 'owner/repository',
+    profile: 'typescript-development',
+    language: 'en',
+    branches: ['main', 'int'],
+    models: { reqeng: 'mai-code-2', work: 'claude-sonnet-5.5', review: 'gpt-6.1-terra' },
+    boardSync: false,
+    locale: 'en_US',
+    ...extra,
+  };
+}
+
+test('installed launchers provide help without auth, config or Copilot mutation', () => {
+  const root = fixture();
+  try {
+    applyPlan(root, buildInstallPlan(root, options(), injected), {}, injected);
+    for (const script of ['start-reqeng.mjs', 'start-work.mjs', 'start-review.mjs']) {
+      const result = spawnSync(process.execPath, [`scripts/${script}`, '--help'], {
+        cwd: root,
+        encoding: 'utf8',
+        env: { ...process.env, PATH: '/definitely-missing' },
+      });
+      assert.equal(result.status, 0, `${script}: ${result.stderr}`);
+      assert.match(result.stdout, /Usage:/u);
+    }
+  } finally {
+    cleanup(root);
+  }
+});
+
+test('all five rendered workflow contracts keep separation and least privilege', () => {
+  const root = fixture();
+  try {
+    applyPlan(root, buildInstallPlan(root, options(), injected), {}, injected);
+    const ci = readFileSync(path.join(root, '.github/workflows/heroes-ci.yml'), 'utf8');
+    const configure = readFileSync(path.join(root, '.github/workflows/heroes-configure.yml'), 'utf8');
+    const release = readFileSync(path.join(root, '.github/workflows/heroes-release-label.yml'), 'utf8');
+    const badges = readFileSync(path.join(root, '.github/workflows/heroes-update-badges.yml'), 'utf8');
+    assert.match(ci, /branches: \["main","int"\]/u);
+    assert.match(ci, /contents: read/u);
+    assert.match(configure, /issues: write/u);
+    assert.doesNotMatch(configure, /project-sync|pull-requests: write/u);
+    assert.match(release, /types: \[opened, synchronize, reopened, labeled, unlabeled\]/u);
+    assert.match(release, /pull-requests: read/u);
+    assert.match(badges, /contents: write/u);
+    assert.match(badges, /\[skip ci\]/u);
+    assert.match(badges, /START_SHA/u);
+  } finally {
+    cleanup(root);
+  }
+});
+
+test('board workflow and script are absent without opt-in and complete when enabled', () => {
+  const root = fixture();
+  try {
+    applyPlan(root, buildInstallPlan(root, options(), injected), {}, injected);
+    assert.throws(
+      () => readFileSync(path.join(root, '.github/workflows/heroes-sync-project-board.yml')),
+      /ENOENT/u
+    );
+    const enabled = options({
+      boardSync: true,
+      board: {
+        owner: 'owner',
+        number: '7',
+        statusField: 'Status',
+        statusMap: { 'go:yes': 'Ready', 'go:done': 'Done' },
+        secret: 'secrets.HEROES_PROJECT_TOKEN',
+      },
+    });
+
+    test('prompt resolver rejects traversal, duplicates, symlinks and credential-shaped content', () => {
+      const root = fixture();
+      try {
+        applyPlan(root, buildInstallPlan(root, options(), injected), {}, injected);
+        const invoke = () => spawnSync(process.execPath, ['-e', [
+          "import { resolvePrompt } from './scripts/resolve-heroes-prompt.mjs';",
+          "console.log(resolvePrompt('reqeng', 'en'));",
+        ].join(' ')], { cwd: root, encoding: 'utf8' });
+        assert.equal(invoke().status, 0);
+
+        const config = path.join(root, '.github/prompts/addon.config.json');
+        const parsed = JSON.parse(readFileSync(config, 'utf8'));
+        parsed.flows.reqeng.push(parsed.flows.reqeng[0]);
+        process.getBuiltinModule('node:fs').writeFileSync(config, `${JSON.stringify(parsed)}\n`);
+        assert.notEqual(invoke().status, 0);
+
+        parsed.flows.reqeng = ['.github/prompts/../outside.md'];
+        process.getBuiltinModule('node:fs').writeFileSync(config, `${JSON.stringify(parsed)}\n`);
+        assert.notEqual(invoke().status, 0);
+
+        process.getBuiltinModule('node:fs').writeFileSync(
+          path.join(root, '.github/prompts/addon.config.json'),
+          readFileSync(path.resolve('.squad/heroes/companion/addon.config.json'), 'utf8')
+        );
+        process.getBuiltinModule('node:fs').appendFileSync(
+          path.join(root, '.github/prompts/addon-layers/common.md'),
+          '\nghp_abcdefghijklmnopqrstuvwxyz1234567890\n'
+        );
+        assert.notEqual(invoke().status, 0);
+      } finally {
+        cleanup(root);
+      }
+    });
+    const planned = buildInstallPlan(root, enabled, injected);
+    assert.ok(planned.conflicts.some(({ target }) => target === '.squad/heroes.json'));
+    const decisionFile = path.join(root, 'board-decisions.json');
+    const fs = awaitImport();
+    fs.writeFileSync(decisionFile, JSON.stringify({
+      '.squad/heroes.json': 'use',
+    }));
+    applyPlan(root, buildInstallPlan(root, { ...enabled, decisionFile }, injected), {}, injected);
+    const workflow = readFileSync(
+      path.join(root, '.github/workflows/heroes-sync-project-board.yml'),
+      'utf8'
+    );
+    assert.match(workflow, /vars\.HEROES_BOARD_SYNC == 'enabled'/u);
+    assert.match(workflow, /HEROES_PROJECT_STATUS_FIELD: "Status"/u);
+    assert.doesNotMatch(workflow, /HEROES_BOARD_SYNC == 'enabled'.*Project-Write/u);
+  } finally {
+    cleanup(root);
+  }
+});
+
+function awaitImport() {
+  return process.getBuiltinModule('node:fs');
+}

@@ -75,8 +75,10 @@ Fresh lifecycle:
 
 ```bash
 cd {snake-dir}
+node {heroes-dir}/scripts/plugin-preflight.mjs --target "$PWD"
 squad plugin validate {heroes-dir}
 squad plugin dry-run {heroes-dir}
+node {heroes-dir}/scripts/plugin-preflight.mjs --target "$PWD"
 squad plugin install {heroes-dir}
 squad plugin enable squad-heroes
 squad plugin list --json
@@ -107,8 +109,10 @@ Idempotency and actual update behavior:
    version or source content differs:
 
    ```bash
+   node {heroes-new-dir}/scripts/plugin-preflight.mjs --target "$PWD"
    squad plugin validate {heroes-new-dir}
    squad plugin verify &&
+   node {heroes-new-dir}/scripts/plugin-preflight.mjs --target "$PWD" &&
    squad plugin install {heroes-new-dir} &&
    squad plugin verify
    squad plugin list --json

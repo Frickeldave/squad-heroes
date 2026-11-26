@@ -28,15 +28,21 @@ Fehlern wird ausschließlich zum hostseitigen `gh auth login` verwiesen.
 ```bash
 git clone https://github.com/Frickeldave/squad-heroes.git
 cd /repo
+node /pfad/zum/squad-heroes/scripts/plugin-preflight.mjs --target "$PWD"
 squad plugin validate /pfad/zum/squad-heroes
 squad plugin dry-run /pfad/zum/squad-heroes
+node /pfad/zum/squad-heroes/scripts/plugin-preflight.mjs --target "$PWD"
 squad plugin install /pfad/zum/squad-heroes
 squad plugin enable squad-heroes
 squad plugin list --json
 squad plugin verify
 ```
 
-`squad plugin install <local-dir>` ist der einzige Plugin-Installationsweg.
+`plugin-preflight.mjs` ist nur ein read-only Kompatibilitäts- und
+Manifest-Gate; es installiert nichts und besitzt keinen Plugin-Lifecycle.
+Die zweimalige Prüfung belegt frühe und letzte Prüfung vor dem realen
+Squad-Befehl. `squad plugin install <local-dir>` ist der einzige
+Plugin-Installationsweg.
 
 Anschließend führt der Mensch den Companion separat aus:
 

@@ -39,8 +39,11 @@ Der Installer unterstützt ausschließlich ein bereits installiertes Squad
 git clone https://github.com/Frickeldave/squad-heroes.git
 cd squad-heroes
 cd /pfad/zum/projekt
+squad-plugin-preflight=/pfad/zum/squad-heroes/scripts/plugin-preflight.mjs
+node "$squad-plugin-preflight" --target "$PWD"
 squad plugin validate /pfad/zum/squad-heroes
 squad plugin dry-run /pfad/zum/squad-heroes
+node "$squad-plugin-preflight" --target "$PWD"
 squad plugin install /pfad/zum/squad-heroes
 squad plugin enable squad-heroes
 squad plugin list --json

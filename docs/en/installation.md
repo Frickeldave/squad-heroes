@@ -30,15 +30,20 @@ refers to the host-side `gh auth login` flow.
 ```bash
 git clone https://github.com/Frickeldave/squad-heroes.git
 cd /repo
+node /path/to/squad-heroes/scripts/plugin-preflight.mjs --target "$PWD"
 squad plugin validate /path/to/squad-heroes
 squad plugin dry-run /path/to/squad-heroes
+node /path/to/squad-heroes/scripts/plugin-preflight.mjs --target "$PWD"
 squad plugin install /path/to/squad-heroes
 squad plugin enable squad-heroes
 squad plugin list --json
 squad plugin verify
 ```
 
-`squad plugin install <local-dir>` is the only plugin installation path. The
+`plugin-preflight.mjs` is only a read-only compatibility and manifest gate; it
+does not install anything and owns no plugin lifecycle. Running it twice proves
+the early and final check immediately around the verified dry-run. `squad
+plugin install <local-dir>` is the only plugin installation path.
 
 The human-triggered companion follows as a separate operation:
 

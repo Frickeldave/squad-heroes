@@ -111,3 +111,27 @@ test('confirmed deployment branch update changes workflow and state as one visib
     cleanup(root);
   }
 });
+
+test('unchanged managed baselines update without conflict while local drift fails closed', () => {
+  const root = fixture();
+  try {
+    applyPlan(root, buildInstallPlan(root, options, injected), {}, injected);
+    const oldConfig = JSON.parse(readFileSync(path.join(root, '.squad/heroes.json'), 'utf8'));
+    assert.ok(Object.keys(oldConfig.recovery.targets).length > 30);
+    const same = buildInstallPlan(root, options, injected);
+    assert.equal(same.conflicts.length, 0);
+
+    const team = path.join(root, '.squad/team.md');
+    write(root, '.squad/team.md', readFileSync(team, 'utf8').replace(
+      '<!-- squad-heroes:team:end -->',
+      'local managed drift\n<!-- squad-heroes:team:end -->'
+    ));
+    const drift = buildInstallPlan(root, options, injected);
+    const conflict = drift.conflicts.find(({ target }) => target === '.squad/team.md');
+    assert.ok(conflict);
+    assert.deepEqual(conflict.options, ['use', 'keep', 'merge', 'abort']);
+    assert.throws(() => applyPlan(root, drift, {}, injected), /unresolved conflicts/);
+  } finally {
+    cleanup(root);
+  }
+});

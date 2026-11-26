@@ -169,63 +169,63 @@
       "source": ".squad/heroes/companion/scripts/check-release-label.mjs",
       "target": ".squad/heroes/companion/scripts/check-release-label.mjs",
       "owner": "companion",
-      "sha256": "4d5e21f7a725b436d9228fbd022c42d3ab3167afac443f8739ae8997750ffae4"
+      "sha256": "da657488a26b09fe63801236912fd9012535d4ef8b0ddb75583398065f3ce02a"
     },
     {
       "id": ".squad:heroes:companion:scripts:flow-shared.mjs",
       "source": ".squad/heroes/companion/scripts/flow-shared.mjs",
       "target": ".squad/heroes/companion/scripts/flow-shared.mjs",
       "owner": "companion",
-      "sha256": "e9ba7040f60429f07b37422589e8791671005d58843b2c846eaf6126f85b79ff"
+      "sha256": "d3b6324b3a1cd8d9eeea29f1450771ab2d7c187359135a63436a6f5fa0cd4990"
     },
     {
       "id": ".squad:heroes:companion:scripts:heroes-configure.mjs",
       "source": ".squad/heroes/companion/scripts/heroes-configure.mjs",
       "target": ".squad/heroes/companion/scripts/heroes-configure.mjs",
       "owner": "companion",
-      "sha256": "7e931cfde36fd108dd5181d9a9fec4627a55fcc61c9fd4348682826921545de2"
+      "sha256": "2ac7869d6fc2e7e9217a9c26e30d33b1d8849daee58223c0622d9840305ac11b"
     },
     {
       "id": ".squad:heroes:companion:scripts:reqeng-block.mjs",
       "source": ".squad/heroes/companion/scripts/reqeng-block.mjs",
       "target": ".squad/heroes/companion/scripts/reqeng-block.mjs",
       "owner": "companion",
-      "sha256": "e22ac2d50cefc6a53acf478258973e52faacd2b441c3004a3ba1f13a66eed640"
+      "sha256": "e883de2949a14ad451aea9be54fb90297c0f67ec77e13d5cbc3877eb74cd9902"
     },
     {
       "id": ".squad:heroes:companion:scripts:resolve-prompt.mjs",
       "source": ".squad/heroes/companion/scripts/resolve-prompt.mjs",
       "target": ".squad/heroes/companion/scripts/resolve-prompt.mjs",
       "owner": "companion",
-      "sha256": "ff77535468a74203976db4137dbfbea2f4e42c4ea3e28bd152b9a2d33f99a05b"
+      "sha256": "c7c3b6cdb5926640337001d92410c2738ed31ab29cf0efa7fbd9f2d0f4e941cf"
     },
     {
       "id": ".squad:heroes:companion:scripts:start-reqeng.mjs",
       "source": ".squad/heroes/companion/scripts/start-reqeng.mjs",
       "target": ".squad/heroes/companion/scripts/start-reqeng.mjs",
       "owner": "companion",
-      "sha256": "c305eb5a7befd235567b6ef2290c59d505d356ccb6e8155457a77d62b591942f"
+      "sha256": "a767b71da32b8c2d37d0167cccf6e1081d3bdda9bb24372d1e256309d031e058"
     },
     {
       "id": ".squad:heroes:companion:scripts:start-review.mjs",
       "source": ".squad/heroes/companion/scripts/start-review.mjs",
       "target": ".squad/heroes/companion/scripts/start-review.mjs",
       "owner": "companion",
-      "sha256": "6349ccb12708cca1e9972a5cdb9a73f5c41378f4972ab139a24fe1706ecf2227"
+      "sha256": "4cb638bd2934391a0b83ddb112c7b25ee77240ada566b4543221eb208ed51046"
     },
     {
       "id": ".squad:heroes:companion:scripts:start-work.mjs",
       "source": ".squad/heroes/companion/scripts/start-work.mjs",
       "target": ".squad/heroes/companion/scripts/start-work.mjs",
       "owner": "companion",
-      "sha256": "39f7f3338246149e252e8ad3e1dc1b37c338ed143582e6cab86dff17522d3d96"
+      "sha256": "89720eea3c0bc0fc304a15c10463d2b00032f3d7cf453c4aee8f9030934e5807"
     },
     {
       "id": ".squad:heroes:companion:scripts:sync-project-board.mjs",
       "source": ".squad/heroes/companion/scripts/sync-project-board.mjs",
       "target": ".squad/heroes/companion/scripts/sync-project-board.mjs",
       "owner": "companion",
-      "sha256": "1f594c17e14261ed808c06f5ff749134a17853d1554193f79d906a5801716a22"
+      "sha256": "5fe37d173b4f2ca5d21a24494224e5b02da7e4e146eff3fcb8572e0932d1b982"
     },
     {
       "id": ".squad:heroes:companion:scripts:update-badges.mjs",
@@ -260,7 +260,7 @@
       "source": ".squad/heroes/companion/workflows/heroes-configure.yml",
       "target": ".squad/heroes/companion/workflows/heroes-configure.yml",
       "owner": "companion",
-      "sha256": "8c25f5c2121db2189b3291cae2f7df39018d42f23a0fc968e7d82266dc4de374"
+      "sha256": "c4635c65d4ddd697d27eb845da2c293a148a2711f1abfaf1ed850fa19a19950a"
     },
     {
       "id": ".squad:heroes:companion:workflows:heroes-release-label.yml",

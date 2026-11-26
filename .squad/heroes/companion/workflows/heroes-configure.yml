@@ -32,10 +32,16 @@ jobs:
       - name: Require explicit project opt-in
         if: inputs.configure_project
         env:
-          PROJECT_TOKEN: ${{ secrets.HEROES_PROJECT_TOKEN }}
+          GH_TOKEN: ${{ secrets.HEROES_PROJECT_TOKEN }}
+          HEROES_CHECK_ONLY: ${{ inputs.check_only || false }}
+          HEROES_CONFIGURE_PROJECT: "true"
+          HEROES_PROJECT_OWNER: ${{ vars.HEROES_PROJECT_OWNER }}
+          HEROES_PROJECT_NUMBER: ${{ vars.HEROES_PROJECT_NUMBER }}
+          HEROES_PROJECT_STATUS_FIELD: ${{ vars.HEROES_PROJECT_STATUS_FIELD }}
+          HEROES_PROJECT_STATUS_MAP: ${{ vars.HEROES_PROJECT_STATUS_MAP }}
         run: |
-          test -n "$PROJECT_TOKEN"
+          test -n "$GH_TOKEN"
           test -n "$HEROES_PROJECT_OWNER"
           test -n "$HEROES_PROJECT_NUMBER"
-          echo "Project schema must be configured by the consumer-specific board adapter."
+          node scripts/heroes-configure.mjs
 # <!-- squad-heroes:workflow:heroes-configure:end -->

@@ -37,6 +37,17 @@ test('distributed source contains no CRAFT, SupplierPulse or credential literals
   }
 });
 
+test('launchers never extract or pass authentication tokens', () => {
+  const helper = readFileSync(
+    path.join(root, '.squad/heroes/companion/scripts/flow-shared.mjs'),
+    'utf8'
+  );
+  assert.doesNotMatch(helper, /gh['"]?\s*,\s*\[['"]auth['"]\s*,\s*['"]token/u);
+  assert.doesNotMatch(helper, /Authorization\s*:\s*`?Bearer/u);
+  assert.match(helper, /COPILOT_HOME/u);
+  assert.match(helper, /copilot['"]\s*,\s*\[['"]config['"]\s*,\s*['"]model/u);
+});
+
 test('consumer workflow set is separate and least-privileged', () => {
   const catalog = parseJsonFile(path.join(root, '.squad/heroes/companion-targets.json'));
   const workflows = catalog.targets.filter(({ target }) => target.endsWith('.yml'));

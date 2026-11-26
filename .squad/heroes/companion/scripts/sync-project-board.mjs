@@ -73,10 +73,16 @@ for (const item of queued) {
   if (!status) continue;
   console.log(`${dryRun ? 'would sync' : 'syncing'} ${key} -> ${status}`);
   if (dryRun) continue;
-  gh(['project', 'item-add', number, '--owner', owner, '--url', key]);
   const option = fieldDefinition.options.find((candidate) => candidate.name === status);
-  const items = JSON.parse(gh(['project', 'item-list', number, '--owner', owner, '--limit', '10000', '--format', 'json']));
-  const projectItem = items.items.find((candidate) => candidate.content?.url === key);
+  let items = JSON.parse(gh(['project', 'item-list', number, '--owner', owner, '--limit', '10000', '--format', 'json']));
+  let projectItem = items.items.find((candidate) => candidate.content?.url === key);
+  if (!projectItem) {
+    gh(['project', 'item-add', number, '--owner', owner, '--url', key]);
+    items = JSON.parse(gh(['project', 'item-list', number, '--owner', owner, '--limit', '10000', '--format', 'json']));
+    projectItem = items.items.find((candidate) => candidate.content?.url === key);
+  }
   if (!projectItem) throw new Error(`Project item not found after add: ${key}`);
+  const currentStatus = projectItem.fieldValues?.[field]?.name ?? projectItem.fieldValues?.[field];
+  if (currentStatus === status) continue;
   gh(['project', 'item-edit', '--id', projectItem.id, '--project-id', project.id, '--field-id', fieldDefinition.id, '--single-select-option-id', option.id]);
 }

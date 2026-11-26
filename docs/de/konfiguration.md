@@ -7,12 +7,21 @@ Profilidentität, Branches, Sprache, Flow-Modelle, Repository, Ownership, Recove
 und registrierte Extensions. Unbekannte Schlüssel, Modelle, Extension-Werte oder
 Typfehler stoppen fail-closed.
 
+`recovery.targets` hält ausschließlich SHA-256-Baselines der zuletzt bestätigten
+verwalteten Ziele. So wird ein unveränderter Upstream-Stand automatisch
+aktualisierbar, während lokaler Drift bis zur expliziten Entscheidung als
+Konflikt bleibt. Entscheidungen liegen in derselben Recovery-Struktur; sie
+ersetzen niemals `.squad/plugins/*`.
+
 ## Modelle
 
 Je Flow gilt ausschließlich `--model ID` > zugehöriger Wert in
 `modelDefaults` > Abbruch. Es gibt keinen `auto`-, Cache-, Family-, Team-,
 Prompt- oder Cross-Flow-Fallback. Das Modell wird einmal aufgelöst und unverändert
 weitergegeben.
+Vor dem Start prüft das Companion-Profil die ID mit einer isolierten
+`copilot config model`-Abfrage gegen den autorisierten Host-Katalog. Credential-
+Werte werden dabei weder gelesen noch ausgegeben.
 
 ## Prompt-Layer
 

@@ -11,13 +11,14 @@ export function sha256(source) {
 export const DECISIONS = new Set(['use', 'keep', 'merge', 'abort']);
 
 function managedSection(source, key) {
-  const start = `<!-- squad-heroes:${key}:begin -->`;
+  const startPattern = new RegExp(`<!--\\s*squad-heroes:${key}:begin(?:\\s+[^>]*)?\\s*-->`, 'gu');
   const end = `<!-- squad-heroes:${key}:end -->`;
-  const startIndex = source.indexOf(start);
+  const starts = [...source.matchAll(startPattern)];
+  const startIndex = starts.length === 1 ? starts[0].index : -1;
   const endIndex = source.indexOf(end);
+  if (starts.length > 1) fail('ambiguous_markers', `Duplicate start markers for ${key}`);
   if (startIndex === -1 && endIndex === -1) return null;
-  if (startIndex === -1 || endIndex === -1 || endIndex <= startIndex ||
-      source.indexOf(start, startIndex + start.length) !== -1 ||
+  if (startIndex === -1 || starts.length !== 1 || endIndex === -1 || endIndex <= startIndex ||
       source.indexOf(end, endIndex + end.length) !== -1) {
     fail('ambiguous_markers', `Missing, duplicate or reversed markers for ${key}`);
   }
@@ -26,6 +27,10 @@ function managedSection(source, key) {
     endIndex: endIndex + end.length,
     content: source.slice(startIndex, endIndex + end.length),
   };
+}
+
+function managedChecksum(source, key) {
+  return sha256(managedSection(source, key)?.content ?? '');
 }
 
 export function mergeManagedSection(existing, incoming, key, decision) {
@@ -93,6 +98,23 @@ export function classifyOperation(repoRoot, item, decisions = {}) {
     return { ...item, action: content === before ? 'noop' : 'merge', content, before };
   }
   if (item.mode === 'managed-section') {
+    let local = null;
+    try {
+      local = managedSection(before, item.section);
+    } catch {
+      local = null;
+    }
+    const next = managedSection(incoming, item.section);
+    if (!next) fail('section_marker', `Incoming managed section markers are missing or ambiguous for ${item.section}`);
+    if (item.baselineHash && managedChecksum(before, item.section) === item.baselineHash) {
+      return {
+        ...item,
+        action: 'merge',
+        content: mergeManagedSection(before, incoming, item.section, 'use'),
+        before,
+        decision: 'use',
+      };
+    }
     const decision = decisions[item.target];
     if (!decision) {
       return {
@@ -136,6 +158,19 @@ export function summarizePlan(operations) {
     owner,
     ...(options ? { options, section, preview: { base, local: before, incoming } } : {}),
   }));
+}
+
+export function recoveryBaselines(operations) {
+  const targets = {};
+  for (const operation of operations) {
+    if (operation.action === 'conflict' || operation.target === '.squad/heroes.json') continue;
+    if (operation.mode === 'managed-section') {
+      targets[operation.target] = managedChecksum(operation.content, operation.section);
+    } else {
+      targets[operation.target] = sha256(operation.content);
+    }
+  }
+  return targets;
 }
 
 export function assertPlanSafe(operations) {

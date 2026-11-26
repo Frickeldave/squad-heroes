@@ -50,6 +50,17 @@ export function validateHeroesConfig(config) {
   if (!config.recovery || typeof config.recovery.planVersion !== 'number') {
     fail('recovery', 'recovery.planVersion is required');
   }
+  const recoveryKeys = Object.keys(config.recovery).sort().join(',');
+  if (!['lastCompletedPlan,planVersion',
+       'decisions,lastCompletedPlan,planVersion,targets',
+       'lastCompletedPlan,planVersion,targets'].includes(recoveryKeys)) {
+    fail('recovery', 'recovery contains unsupported keys');
+  }
+  for (const [target, checksum] of Object.entries(config.recovery.targets ?? {})) {
+    if (!safeRelativePath(target) || !/^[0-9a-f]{64}$/u.test(checksum)) {
+      fail('recovery', `invalid recovery baseline: ${target}`);
+    }
+  }
   for (const [name, extension] of Object.entries(config.extensions ?? {})) {
     if (extension?.schemaVersion !== 1 || name !== 'board-sync' || extension.enabled !== true) {
       fail('extension', `Unsupported extension: ${name}`);
