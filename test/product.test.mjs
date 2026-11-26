@@ -55,6 +55,7 @@ test('documentation has parallel chapters and required root entry point', () => 
     ['workflows.md', 'workflows.md'],
     ['recovery.md', 'recovery.md'],
     ['nicht-ziele.md', 'non-goals.md'],
+    ['testplan-snake.md', 'testplan-snake.md'],
   ];
   for (const [de, en] of pairs) {
     const german = readFileSync(path.join(root, 'docs/de', de), 'utf8');

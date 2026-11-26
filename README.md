@@ -86,9 +86,11 @@ ausgeführt. Der Installer fragt nie nach Tokens und persistiert keine Credentia
 ## Dokumentation
 
 - Deutsch: [Installation](docs/de/installation.md), [Konfiguration](docs/de/konfiguration.md),
-  [Sicherheit](docs/de/sicherheit.md), [Recovery](docs/de/recovery.md)
+  [Sicherheit](docs/de/sicherheit.md), [Recovery](docs/de/recovery.md),
+  [End-to-End-Testplan](docs/de/testplan-snake.md)
 - English: [Installation](docs/en/installation.md), [Configuration](docs/en/configuration.md),
-  [Security](docs/en/security.md), [Recovery](docs/en/recovery.md)
+  [Security](docs/en/security.md), [Recovery](docs/en/recovery.md),
+  [End-to-end test plan](docs/en/testplan-snake.md)
 
 ## Grenzen
 
