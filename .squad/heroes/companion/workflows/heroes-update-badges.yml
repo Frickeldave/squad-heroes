@@ -1,0 +1,41 @@
+# <!-- squad-heroes:workflow:heroes-update-badges:begin -->
+name: Heroes update badges
+
+on:
+  push:
+    branches: {{branches}}
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: heroes-badges-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  update:
+    if: github.actor != 'github-actions[bot]' && !contains(github.event.head_commit.message, '[skip ci]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - id: start
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - run: node scripts/update-badges.mjs
+      - name: Commit only managed README
+        env:
+          START_SHA: ${{ steps.start.outputs.sha }}
+        run: |
+          set -euo pipefail
+          git diff --quiet -- README.md && exit 0
+          test "$(git ls-remote origin "refs/heads/${GITHUB_REF_NAME}" | cut -f1)" = "$START_SHA"
+          git add README.md
+          git -c user.name=github-actions -c user.email=github-actions@users.noreply.github.com \
+            commit -m "chore: update badges [skip ci]"
+          git push
+# <!-- squad-heroes:workflow:heroes-update-badges:end -->

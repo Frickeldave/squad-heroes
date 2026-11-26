@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "flows": {
+    "reqeng": [".github/prompts/addon-layers/common.md", ".github/prompts/addon-layers/startreqeng.md"],
+    "work": [".github/prompts/addon-layers/common.md", ".github/prompts/addon-layers/startwork.md"],
+    "review": [".github/prompts/addon-layers/common.md", ".github/prompts/addon-layers/startreview.md"]
+  }
+}

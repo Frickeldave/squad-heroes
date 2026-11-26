@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "typescript-development",
+  "name": "TypeScript Development",
+  "immutable": true,
+  "agents": [
+    { "id": "tony", "role": "Lead Architekt" },
+    { "id": "pepper", "role": "Requirement Engineer" },
+    { "id": "bruce", "role": "Backend Engineer" },
+    { "id": "clint", "role": "Tester" },
+    { "id": "maria", "role": "Dokumentation" },
+    { "id": "natasha", "role": "Frontend Engineer" },
+    { "id": "nick", "role": "DevOps Specialist" }
+  ],
+  "skills": ["squad-heroes-flow-safety"],
+  "workflows": [
+    "heroes-ci.yml",
+    "heroes-configure.yml",
+    "heroes-release-label.yml",
+    "heroes-update-badges.yml",
+    "heroes-sync-project-board.yml"
+  ]
+}

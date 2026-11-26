@@ -1,0 +1,10 @@
+{
+  "plan_heading": "Installation plan",
+  "dry_run_complete": "Dry run complete. No files were changed.",
+  "install_complete": "Installation complete: {count} files written.",
+  "conflicts_block": "Installation stopped: {count} unresolved conflicts.",
+  "incompatible": "Squad version is incompatible.",
+  "gate_ok": "Preflight passed.",
+  "external_approval_required": "Externally visible actions require explicit confirmation.",
+  "fallback_visible": "Translation uses language {language} as a visible fallback."
+}

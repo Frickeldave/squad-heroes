@@ -1,0 +1,127 @@
+{
+  "id": "squad-heroes",
+  "name": "squad-heroes",
+  "version": "0.1.0",
+  "description": "Generic TypeScript Squad overlay with static agent and prompt sources.",
+  "license": "MIT",
+  "squad": "2.0.0",
+  "repository": {
+    "type": "github",
+    "url": "https://github.com/Frickeldave/squad-heroes.git"
+  },
+  "components": {
+    "templates": true
+  },
+  "files": [
+    {
+      "source": ".squad/heroes/agents/bruce.de.md",
+      "target": "templates/squad-heroes/agents/bruce.de.md",
+      "type": "template"
+    },
+    {
+      "source": ".squad/heroes/agents/bruce.en.md",
+      "target": "templates/squad-heroes/agents/bruce.en.md",
+      "type": "template"
+    },
+    {
+      "source": ".squad/heroes/agents/clint.de.md",
+      "target": "templates/squad-heroes/agents/clint.de.md",
+      "type": "template"
+    },
+    {
+      "source": ".squad/heroes/agents/clint.en.md",
+      "target": "templates/squad-heroes/agents/clint.en.md",
+      "type": "template"
+    },
+    {
+      "source": ".squad/heroes/agents/maria.de.md",
+      "target": "templates/squad-heroes/agents/maria.de.md",
+      "type": "template"
+    },
+    {
+      "source": ".squad/heroes/agents/maria.en.md",
+      "target": "templates/squad-heroes/agents/maria.en.md",
+      "type": "template"
+    },
+    {
+      "source": ".squad/heroes/agents/natasha.de.md",
+      "target": "templates/squad-heroes/agents/natasha.de.md",
+      "type": "template"
+    },
+    {
+      "source": ".squad/heroes/agents/natasha.en.md",
+      "target": "templates/squad-heroes/agents/natasha.en.md",
+      "type": "template"
+    },
+    {
+      "source": ".squad/heroes/agents/nick.de.md",
+      "target": "templates/squad-heroes/agents/nick.de.md",
+      "type": "template"
+    },
+    {
+      "source": ".squad/heroes/agents/nick.en.md",
+      "target": "templates/squad-heroes/agents/nick.en.md",
+      "type": "template"
+    },
+    {
+      "source": ".squad/heroes/agents/pepper.de.md",
+      "target": "templates/squad-heroes/agents/pepper.de.md",
+      "type": "template"
+    },
+    {
+      "source": ".squad/heroes/agents/pepper.en.md",
+      "target": "templates/squad-heroes/agents/pepper.en.md",
+      "type": "template"
+    },
+    {
+      "source": ".squad/heroes/agents/tony.de.md",
+      "target": "templates/squad-heroes/agents/tony.de.md",
+      "type": "template"
+    },
+    {
+      "source": ".squad/heroes/agents/tony.en.md",
+      "target": "templates/squad-heroes/agents/tony.en.md",
+      "type": "template"
+    },
+    {
+      "source": ".squad/heroes/profiles/typescript-development.json",
+      "target": "templates/squad-heroes/profiles/typescript-development.json",
+      "type": "template"
+    },
+    {
+      "source": ".squad/heroes/prompts/startreqeng.de.md",
+      "target": "prompts/squad-heroes/prompts/startreqeng.de.md",
+      "type": "prompt"
+    },
+    {
+      "source": ".squad/heroes/prompts/startreqeng.en.md",
+      "target": "prompts/squad-heroes/prompts/startreqeng.en.md",
+      "type": "prompt"
+    },
+    {
+      "source": ".squad/heroes/prompts/startreview.de.md",
+      "target": "prompts/squad-heroes/prompts/startreview.de.md",
+      "type": "prompt"
+    },
+    {
+      "source": ".squad/heroes/prompts/startreview.en.md",
+      "target": "prompts/squad-heroes/prompts/startreview.en.md",
+      "type": "prompt"
+    },
+    {
+      "source": ".squad/heroes/prompts/startwork.de.md",
+      "target": "prompts/squad-heroes/prompts/startwork.de.md",
+      "type": "prompt"
+    },
+    {
+      "source": ".squad/heroes/prompts/startwork.en.md",
+      "target": "prompts/squad-heroes/prompts/startwork.en.md",
+      "type": "prompt"
+    },
+    {
+      "source": ".squad/heroes/skills/squad-heroes-flow-safety/SKILL.md",
+      "target": "templates/squad-heroes/skills/squad-heroes-flow-safety/SKILL.md",
+      "type": "template"
+    }
+  ]
+}
