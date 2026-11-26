@@ -29,8 +29,11 @@ Tokens and PATs are never requested or accepted as arguments, stdin, files,
 logs or test fixtures. Only the host credential store and official
 browser/device flow are supported.
 For an unsupported Squad version, the documented operator-only remedy is
-`squad upgrade --self` followed by `squad upgrade` in the target repository;
-neither command requires pasting a token into the terminal.
+`squad upgrade --self` as the normal user followed by `squad upgrade` in the
+target repository. A root-owned global npm package may require the one-off
+allowlisted repair in the installation guide; `sudo` is scoped to that npm
+installation command and must not be used to run Squad. None of these commands
+requires pasting a token into the terminal.
 
 ## Supply-chain verification
 

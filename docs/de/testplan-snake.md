@@ -9,6 +9,16 @@ oder Protokollen ablegen.
 ## 1. Vorbedingungen
 
 1. Linux, Node.js 20+, npm, `git`, `gh` und `squad` sind installiert.
+   Den Launcher vor jedem Upgrade als normaler Benutzer prüfen:
+
+   ```bash
+   command -v squad
+   ls -l "$(command -v squad)"
+   squad --version
+   ```
+
+   Bei `Permission denied` abbrechen; die CLI weder mit `sudo` starten noch
+   ein rekursives `chmod` ausführen.
 2. Ein leerer GitHub-Owner/Namespace für Testzwecke ist freigegeben. Im Runbook
    steht `{owner}` ausschließlich für diesen Namespace.
 3. Die aktive `gh`-Identität und die Berechtigung werden ohne Credential-Ausgabe
@@ -75,9 +85,19 @@ die CLI zusätzlich, ersetzt die Markerprüfung aber nicht. Prereleases wie
 `2.0.0-rc.1` werden fail-closed abgewiesen.
 
 Wird `0.13.1` erkannt, ist das ein Abbruchkriterium: Die Installation darf
-nicht fortgesetzt werden. Die installierte CLI mit `squad upgrade --self`
-aktualisieren, in `{snake-dir}` `squad upgrade` ausführen, die Markerbefehle
-wiederholen und erst danach
+nicht fortgesetzt werden. Die installierte CLI als normaler Benutzer mit
+`squad upgrade --self` aktualisieren. Bricht ein root-eigenes globales
+npm-Paket mit `EACCES`/`EPERM` ab, genau diese globale Installation reparieren:
+
+```bash
+sudo sh -c 'umask 022 && exec npm install -g --allow-scripts=@bradygaster/squad-cli,node-pty,koffi,protobufjs @bradygaster/squad-cli@latest'
+```
+
+Squad selbst nicht unter `sudo` ausführen, keine dauerhafte globale Allowlist
+speichern und nicht `--dangerously-allow-all-scripts` verwenden. Terminal neu
+starten und `command -v squad`, `ls -l "$(command -v squad)"` sowie
+`squad --version` wiederholen. Erst wenn alle drei Prüfungen gelingen, in
+`{snake-dir}` `squad upgrade` ausführen, die Markerbefehle wiederholen und
 `node {heroes-dir}/scripts/plugin-preflight.mjs --target "$PWD"` erneut starten.
 
 ## 4. Squad-Plugin installieren und aktualisieren
@@ -284,6 +304,12 @@ Manuelle Browserprüfung:
 Bei jedem Fehler: laufende Commands, Workflow-Jobs oder Server stoppen; den
 aktuellen Schritt, Command, Exit-Code und unveränderte Checks protokollieren.
 Nichts weiter mutieren, sobald das Eigentum eines Ressourcennamens unklar ist.
+
+Bei `bash: /usr/bin/squad: Permission denied` Symlink und aufgelösten Pfad
+protokollieren, Dateirechte einzelner Abhängigkeiten nicht verändern und die
+dokumentierte globale Neuinstallation mit `umask 022` wiederholen. Danach
+Terminal neu starten und alle drei Launcher-Prüfungen bestehen, bevor Produkt-
+oder Test-Repository-Upgrade fortgesetzt wird.
 
 Nur nach erfolgreichem oder bewusst abgebrochenem Test:
 

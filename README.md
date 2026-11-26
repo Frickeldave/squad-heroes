@@ -34,6 +34,29 @@ werden fail-closed abgewiesen.
 - `gh` mit authentifizierter Host-Konfiguration und Push-Recht
 - lokal ausgechecktes Zielrepository
 
+Vor der Arbeit muss Squad im normalen Benutzerkontext ausführbar sein:
+
+```bash
+command -v squad
+ls -l "$(command -v squad)"
+squad --version
+```
+
+Falls eine root-eigene globale npm-Installation bei
+`squad upgrade --self` mit `EACCES`/`EPERM` abbricht, nicht `sudo squad`
+verwenden. Unter npm mit `--allow-scripts` wird nur die Installation über diesen
+befehlslokalen, expliziten Script-Allowlist repariert:
+
+```bash
+sudo sh -c 'umask 022 && exec npm install -g --allow-scripts=@bradygaster/squad-cli,node-pty,koffi,protobufjs @bradygaster/squad-cli@latest'
+```
+
+Anschließend das Terminal neu starten und die drei Prüfbefehle wiederholen.
+Erst nach erfolgreicher Ausführung wird im Ziel-Repository `squad upgrade`
+gestartet. Ein `Permission denied` darf nicht mit einem rekursiven
+`chmod` behoben werden; der Installationsbefehl mit `umask 022` stellt die
+Verzeichnis- und Binärrechte kontrolliert wieder her.
+
 ## Schnellstart
 
 ```bash

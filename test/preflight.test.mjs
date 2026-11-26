@@ -29,6 +29,10 @@ test('0.13.1 plugin preflight exits 2 with safe update guidance', () => {
     assert.equal(result.status, 2);
     assert.match(output, /minimum Squad version 2\.0\.0 is required; detected "0\.13\.1"/u);
     assert.match(output, /squad upgrade --self/u);
+    assert.match(output, /sudo sh -c 'umask 022/u);
+    assert.match(output, /--allow-scripts=@bradygaster\/squad-cli,node-pty,koffi,protobufjs/u);
+    assert.match(output, /not by running Squad itself under sudo/u);
+    assert.match(output, /command -v squad/u);
     assert.match(output, /squad upgrade/u);
     assert.doesNotMatch(output, /ghp_|github_pat_|Authorization\s*:\s*Bearer/iu);
   } finally {
@@ -72,6 +76,8 @@ for (const [label, source, detected] of [
       assert.throws(() => assertSquadCompatibility(root), (error) =>
         error.message.includes(`ERROR: squad-heroes minimum Squad version 2.0.0 is required; detected "${detected}".`) &&
         error.message.includes('`squad upgrade --self`') &&
+        error.message.includes('--allow-scripts=@bradygaster/squad-cli,node-pty,koffi,protobufjs') &&
+        error.message.includes('not by running Squad itself under sudo') &&
         error.details.exitCode === 2
       );
       assert.deepEqual(readdirSync(root).sort(), before);

@@ -46,8 +46,8 @@ export function assertSquadCompatibility(repoRoot) {
   throw new HeroesError(
     'squad_version',
     `ERROR: squad-heroes minimum Squad version 2.0.0 is required; detected "${detected}". ` +
-    'Installation aborted before mutation. Update the installed CLI with `squad upgrade --self`, ' +
-    'then run `squad upgrade` in the target repository and verify the marker before retrying.',
+    'Installation aborted before mutation. Run `squad upgrade --self` as your normal user; if a root-owned global npm install fails with EACCES or EPERM, repair it with `sudo sh -c \'umask 022 && exec npm install -g --allow-scripts=@bradygaster/squad-cli,node-pty,koffi,protobufjs @bradygaster/squad-cli@latest\'`, not by running Squad itself under sudo. ' +
+    'Restart the terminal, run `command -v squad`, `ls -l "$(command -v squad)"`, and `squad --version`, then run `squad upgrade` in the target repository and verify its marker before retrying.',
     { detected, exitCode: INCOMPATIBLE_SQUAD_EXIT }
   );
 }

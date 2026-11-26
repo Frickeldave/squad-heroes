@@ -22,8 +22,10 @@ abgewiesen. Andernfalls endet der Lauf mit Exit-Code 2 und der Meldung
 "<value|missing|multiple|invalid>". Installation aborted before mutation.`
 Ohne Backup, Journal, Lock oder Teilinstallation.
 
-Die Diagnose weist an, `squad upgrade --self` und danach im Ziel-Repository
-`squad upgrade` auszuführen sowie den Marker vor einem erneuten Versuch zu prüfen.
+Die Diagnose weist an, `squad upgrade --self` als normaler Benutzer
+auszuführen, bei Bedarf eine root-eigene globale npm-Installation zu reparieren
+und danach das Ziel-Repository zu aktualisieren. Squad selbst darf dafür nicht
+unter `sudo` laufen.
 
 Danach läuft `gh auth status` und eine nicht mutierende Repository-Abfrage. Bei
 Fehlern wird ausschließlich zum hostseitigen `gh auth login` verwiesen.
@@ -63,6 +65,42 @@ Beide Sprachvarianten werden immer materialisiert; `--language` steuert nur die
 aktive `charter.md` und die aktuelle Ausgabe.
 
 Fehlende, doppelte oder mehrdeutige Branch-Eingaben stoppen vor dem ersten Write.
+
+## Root-eigene globale Squad-Installation reparieren
+
+`squad upgrade --self` wird zuerst als normaler Benutzer ausgeführt. Meldet npm
+bei einem root-eigenen globalen Paket `EACCES` oder `EPERM` beim Umbenennen, darf
+die CLI nicht unter `sudo` erneut gestartet werden. Bei npm mit
+`--allow-scripts` wird die globale Installation einmal mit der verifizierten,
+befehlslokalen Allowlist repariert:
+
+```bash
+sudo sh -c 'umask 022 && exec npm install -g --allow-scripts=@bradygaster/squad-cli,node-pty,koffi,protobufjs @bradygaster/squad-cli@latest'
+```
+
+Das explizite `umask 022` ist erforderlich: Eine geerbte restriktive umask kann
+Paket und Launcher-Ziel als nur für den Besitzer ausführbar (`750`) neu
+erzeugen. Dadurch kann `/usr/bin/squad` für root funktionieren, während normale
+Benutzer `Permission denied` erhalten. Die Allowlist umfasst genau die vier
+Pakete dieses Abhängigkeitsbaums mit Install-Skripten
+(`@bradygaster/squad-cli`, `node-pty`, `koffi` und `protobufjs`) und verändert
+keine dauerhafte globale npm-Richtlinie.
+
+Danach das Terminal oder die Shell neu starten und vor jedem Projekt-Upgrade den
+reparierten Launcher prüfen:
+
+```bash
+command -v squad
+ls -l "$(command -v squad)"
+squad --version
+```
+
+Erst wenn diese Befehle erfolgreich sind, im Ziel-Repository `squad upgrade`
+ausführen und prüfen, dass genau ein stabiler SemVer-Marker ab `2.0.0`
+vorhanden bleibt. Für `Permission denied` niemals ein rekursives `chmod` auf dem
+globalen npm-Verzeichnis oder `--dangerously-allow-all-scripts` verwenden.
+Symlink mit `ls -l` prüfen, dann den Reparaturbefehl mit expliziter `umask`
+wiederholen; keine Dateirechte von einzelnen Abhängigkeiten erraten.
 
 ## Aktualisierung
 

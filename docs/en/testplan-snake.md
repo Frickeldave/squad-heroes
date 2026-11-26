@@ -8,6 +8,16 @@ PATs, or credentials in commands, files, or evidence.
 ## 1. Prerequisites
 
 1. Linux, Node.js 20+, npm, `git`, `gh`, and `squad` are installed.
+   Verify the launcher as the normal user before upgrading anything:
+
+   ```bash
+   command -v squad
+   ls -l "$(command -v squad)"
+   squad --version
+   ```
+
+   If this fails with `Permission denied`, stop; do not run the CLI under
+   `sudo` or apply a recursive chmod.
 2. An empty approved GitHub owner/namespace is available. `{owner}` means only
    this namespace.
 3. Verify the active `gh` identity and permissions without exposing credentials:
@@ -70,9 +80,19 @@ valid stable SemVer is at least `2.0.0` (for example `2.0.0`, `2.0.1` or
 check. Prereleases, including `2.0.0-rc.1`, are rejected fail-closed.
 
 If the detected version is `0.13.1`, this is a stop condition: do not continue
-the installation. Update the installed CLI with `squad upgrade --self`, run
-`squad upgrade` inside `{snake-dir}`, repeat the marker commands, and only then
-rerun `node {heroes-dir}/scripts/plugin-preflight.mjs --target "$PWD"`.
+the installation. Update the installed CLI with `squad upgrade --self` as the
+normal user. If a root-owned global npm package fails with `EACCES`/`EPERM`,
+repair that one global install with:
+
+```bash
+sudo sh -c 'umask 022 && exec npm install -g --allow-scripts=@bradygaster/squad-cli,node-pty,koffi,protobufjs @bradygaster/squad-cli@latest'
+```
+
+Do not run Squad itself under `sudo`, persist a global allowlist, or use
+`--dangerously-allow-all-scripts`. Restart the terminal and repeat `command -v
+squad`, `ls -l "$(command -v squad)"`, and `squad --version`. After all three
+checks pass, run `squad upgrade` inside `{snake-dir}`, repeat the marker commands,
+and rerun `node {heroes-dir}/scripts/plugin-preflight.mjs --target "$PWD"`.
 
 ## 4. Install and update the Squad plugin
 
@@ -271,6 +291,12 @@ Manual browser checks:
 On failure: stop active commands, jobs, or local servers; record the step,
 command, exit code, and unchanged checks; mutate nothing once ownership of a
 resource is unclear.
+
+For `bash: /usr/bin/squad: Permission denied`, record the launcher symlink and
+its resolved path, do not patch individual dependency permissions, and repeat
+the documented global reinstall with `umask 022`. Restart the terminal and
+repeat the three launcher checks before resuming a product or test-repository
+upgrade.
 
 After a successful or intentionally aborted run:
 

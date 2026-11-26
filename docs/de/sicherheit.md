@@ -29,9 +29,12 @@ bleibt append-only; `team.md` ändert nur Markerbereiche.
 Tokens und PATs werden weder abgefragt noch als Argument, stdin, Datei, Log oder
 Test-Fixture akzeptiert. Zulässig sind nur der sichere Host-Credential-Store und
 der offizielle Browser-/Device-Flow.
-Bei einer nicht unterstützten Squad-Version ist `squad upgrade --self` und
-anschließend im Ziel-Repository `squad upgrade` das dokumentierte manuelle
-Vorgehen; dafür darf kein Token ins Terminal eingefügt werden.
+Bei einer nicht unterstützten Squad-Version wird `squad upgrade --self` als
+normaler Benutzer und anschließend im Ziel-Repository `squad upgrade`
+ausgeführt. Ein root-eigenes globales npm-Paket kann den einmaligen,
+allowlist-beschränkten Reparaturbefehl aus der Installation erfordern; `sudo`
+gilt nur für diesen npm-Installationsbefehl, niemals für Squad selbst. Kein
+dieser Befehle erfordert, dass ein Token ins Terminal eingefügt wird.
 
 ## Supply-chain-Verifikation
 

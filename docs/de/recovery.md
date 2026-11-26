@@ -35,9 +35,11 @@ erneut auf Marker und UTF-8 validiert.
 
 - `detected "missing"`: Markerdatei oder Marker fehlt.
 - `detected "0.13.1"` oder eine andere niedrigere Version: Exit-Code 2. Ohne
-  Mutation stoppen, `squad upgrade --self`, danach im Ziel-Repository
-  `squad upgrade` ausführen, einen stabilen SemVer-Marker ab `2.0.0` prüfen und
-  erneut starten.
+  Mutation stoppen und `squad upgrade --self` als normaler Benutzer ausführen.
+  Bei `EACCES`/`EPERM` einer root-eigenen globalen npm-Installation den
+  sicheren Reparaturbefehl unter
+  [Installation](installation.md#root-eigene-globale-squad-installation-reparieren)
+  nutzen; Squad selbst nicht unter `sudo` starten.
 - Exit-Code 2 gilt ebenso für fehlende, doppelte, ungültige oder Prerelease-
   Squad-Versionen; `2.0.0-rc.1` wird nicht akzeptiert.
 - `gh_permission`: Push-Recht nicht beweisbar.
@@ -47,6 +49,11 @@ erneut auf Marker und UTF-8 validiert.
 - `model_default`: explizite Flow-Modell-ID fehlt.
 - `Plugin verification failed: checksum mismatch ...`: lokale Änderung an
   einem Squad-eigenen Plugin-Ziel; `install` nicht ausführen.
+- `Permission denied` beim Auflösen oder Ausführen von `squad`: nach der
+  globalen Reparatur Terminal neu starten und `command -v squad`,
+  `ls -l "$(command -v squad)"` sowie `squad --version` prüfen. Nicht
+  rekursiv am globalen npm-Baum `chmod` ausführen. Erst nach erfolgreicher
+  Prüfung im Ziel-Repository `squad upgrade` starten und den Marker prüfen.
 
 Bei Authentifizierungsfehlern nur den offiziellen `gh auth login`-Browser-/Device-Flow
 nutzen. Tokens nicht kopieren oder im Terminal eingeben.
