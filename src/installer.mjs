@@ -495,6 +495,7 @@ export function applyPlan(
   const externalBoard = { ...plan.config.extensions?.['board-sync'] };
   if (plan.projectCreate) {
     let phase = plan.config.language === 'de' ? 'Erstellung' : 'creation';
+    let projectEstablished = false;
     try {
       const created = createBoardProject(plan.config.repository, plan.projectCreate, {
         ...injected,
@@ -502,6 +503,7 @@ export function applyPlan(
         authentication: access,
         account: access.account,
       });
+      projectEstablished = true;
       phase = plan.config.language === 'de' ? 'Schreibzugriffprüfung' : 'write-access verification';
       const verified = assertProjectWriteAccess(plan.config.repository, created, {
         ...injected,
@@ -556,11 +558,13 @@ export function applyPlan(
         owner: plan.projectCreate.owner,
       }).text;
       const original = error instanceof Error ? error.message : String(error);
+      const includeManualCreate = !projectEstablished &&
+        error?.details?.existingProject !== true;
       throw new HeroesError(
         error instanceof HeroesError ? error.code : 'gh_project_apply_failed',
         original.includes(`gh project create --owner ${plan.projectCreate.owner}`)
           ? `${original}\n\n${recovery}`
-          : `${original}\n\n${recovery}\n\n${manual}`,
+          : `${original}\n\n${recovery}${includeManualCreate ? `\n\n${manual}` : ''}`,
         {
           category: 'project_recovery',
           owner: plan.projectCreate.owner,

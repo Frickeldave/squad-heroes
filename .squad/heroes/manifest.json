@@ -183,7 +183,7 @@
       "source": ".squad/heroes/companion/scripts/heroes-configure.mjs",
       "target": ".squad/heroes/companion/scripts/heroes-configure.mjs",
       "owner": "companion",
-      "sha256": "6ac99e59cdc8995cd9975181512a88c176406c366537d12320fe8a3247b3e464"
+      "sha256": "a8537a6b0954694ee4bf1cec1f41de7611d3fc007db99b301bd3c15317e8c655"
     },
     {
       "id": ".squad:heroes:companion:scripts:reqeng-block.mjs",

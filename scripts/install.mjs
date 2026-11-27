@@ -42,7 +42,9 @@ available.
 
 With --enable-board-sync, Project owner is derived from --repository. The
 write-capable project scope is proved from the active account's sanitized
-gh auth status output, followed by a non-mutating Project API probe. CI may use
+gh auth status output. Owner type from gh project output is reused when present;
+otherwise a non-mutating identity query resolves User versus Organization before
+the Project API probe. CI may use
 --project-number for a deterministic validated override. Use --disable-board-sync
 to make the board-off choice explicit without a prompt. When no Project exists,
 interactive use offers explicit Companion creation or cancellation. CI must use

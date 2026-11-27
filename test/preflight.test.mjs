@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import {
   assertGithubAuthentication,
+  assertProjectWriteAccess,
   assertGithubWriteAccess,
   assertSquadCompatibility,
   detectSquadVersion,
@@ -229,6 +230,110 @@ test('GitHub Project scope and access failures are actionable and localized', ()
     assert.match(error.message, /Active gh account: octocat/u);
     assert.doesNotMatch(error.message, /token=secret/u);
     return true;
+  });
+
+  const projectAuthentication = {
+    account: 'frickeldave-test',
+    projectScope: true,
+    scopes: ['project'],
+    scopeStatus: 'project granted',
+  };
+
+  test('Project write verification accepts only matching partial GraphQL NOT_FOUND data', () => {
+    const cases = [
+      {
+        ownerType: 'User',
+        branch: 'user',
+        opposite: 'organization',
+        oppositeName: 'Organization',
+      },
+      {
+        ownerType: 'Organization',
+        branch: 'organization',
+        opposite: 'user',
+        oppositeName: 'User',
+      },
+    ];
+    for (const item of cases) {
+      const payload = {
+        data: {
+          [item.opposite]: null,
+          [item.branch]: { projectV2: {
+            id: 'PVT_fixture',
+            number: 3,
+            viewerCanUpdate: true,
+          } },
+        },
+        errors: [{
+          type: 'NOT_FOUND',
+          path: [item.opposite],
+          message: `Could not resolve to a ${item.oppositeName} with the login of 'frickeldave-test'.`,
+        }],
+      };
+      const result = assertProjectWriteAccess('frickeldave-test/repository', {
+        number: 3,
+        ownerType: item.ownerType,
+      }, {
+        authentication: projectAuthentication,
+        projectCatalog: [{ number: 3, owner: { type: item.ownerType } }],
+        spawn: () => ({
+          status: 1,
+          stdout: JSON.stringify(payload),
+          stderr: `gh: ${payload.errors[0].message}\n`,
+        }),
+      });
+      assert.equal(result.id, 'PVT_fixture');
+      assert.equal(result.number, 3);
+      assert.equal(result.ownerType, item.ownerType);
+      assert.equal(result.viewerCanUpdate, true);
+    }
+  });
+
+  test('Project write verification rejects partial status without a valid writable node', () => {
+    const deniedPayloads = [
+      {
+        status: 1,
+        stdout: JSON.stringify({
+          data: { user: { projectV2: null } },
+          errors: [{
+            type: 'NOT_FOUND',
+            path: ['organization'],
+            message: "Could not resolve to an Organization with the login of 'frickeldave-test'.",
+          }],
+        }),
+        stderr: "gh: Could not resolve to an Organization with the login of 'frickeldave-test'.",
+      },
+      {
+        status: 1,
+        stdout: JSON.stringify({
+          data: { user: { projectV2: {
+            id: 'PVT_fixture', number: 3, viewerCanUpdate: true,
+          } } },
+          errors: [{ type: 'UNAUTHORIZED', path: ['user'], message: 'Bad credentials' }],
+        }),
+        stderr: 'Bad credentials',
+      },
+      {
+        status: 1,
+        stdout: JSON.stringify({
+          data: { user: { projectV2: {
+            id: 'PVT_fixture', number: 3, viewerCanUpdate: true,
+          } } },
+          errors: [{ type: 'RATE_LIMITED', message: 'API rate limit exceeded' }],
+        }),
+        stderr: 'API rate limit exceeded',
+      },
+    ];
+    for (const denied of deniedPayloads) {
+      assert.throws(() => assertProjectWriteAccess('frickeldave-test/repository', {
+        number: 3,
+        ownerType: 'User',
+      }, {
+        authentication: projectAuthentication,
+        projectCatalog: [{ number: 3, owner: { type: 'User' } }],
+        spawn: () => denied,
+      }), /Project access failed|Project write access|non-owner error/iu);
+    }
   });
   assert.throws(() => listBoardProjects('owner/repository', {
     account: 'octocat',

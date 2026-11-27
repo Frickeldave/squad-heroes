@@ -139,6 +139,85 @@ esac
   }
 });
 
+test('configure command accepts partial User and Organization GraphQL owner errors only', () => {
+  const root = installed();
+  try {
+    const gh = path.join(root, 'bin/gh');
+    write(root, 'bin/gh', `#!/usr/bin/env node
+const args = process.argv.slice(2);
+const text = args.join(' ');
+const kind = process.env.FIXTURE_KIND;
+if (args[0] === 'auth') {
+  console.log("- Token scopes: 'project'");
+} else if (text.includes('repositoryOwner')) {
+  console.log(JSON.stringify({ data: { repositoryOwner: {
+    id: kind === 'organization' ? 'O_OWNER' : 'U_OWNER',
+    login: 'frickeldave-test',
+    __typename: kind === 'organization' ? 'Organization' : 'User',
+  } } }));
+} else if (text.includes('projectV2(number:')) {
+  const valid = kind === 'user' || kind === 'organization';
+  const branch = kind === 'organization' ? 'organization' : 'user';
+  const opposite = branch === 'user' ? 'organization' : 'user';
+  const oppositeName = branch === 'user' ? 'Organization' : 'User';
+  const payload = {
+    data: {
+      [opposite]: null,
+      [branch]: { projectV2: valid ? {
+        id: 'PVT_fixture', number: 3, viewerCanUpdate: true,
+      } : null },
+    },
+    errors: [{
+      type: kind === 'auth-error' ? 'UNAUTHORIZED' : 'NOT_FOUND',
+      path: kind === 'auth-error' ? [branch] : [opposite],
+      message: kind === 'auth-error'
+        ? 'Bad credentials'
+        : \`Could not resolve to a \${oppositeName} with the login of frickeldave-test.\`,
+    }],
+  };
+  console.log(JSON.stringify(payload));
+  console.error(payload.errors[0].message);
+  process.exitCode = 1;
+} else if (args[0] === 'label' && args[1] === 'list') {
+  console.log('[]');
+} else if (args[0] === 'project' && args[1] === 'view') {
+  console.log('{"id":"PVT_fixture","number":3}');
+} else if (args[0] === 'project' && args[1] === 'field-list') {
+  console.log('{"fields":[{"id":"F1","name":"Status","options":[{"name":"Ready"},{"name":"Done"}]}]}');
+}
+`);
+    chmodSync(gh, 0o755);
+    for (const kind of ['user', 'organization', 'missing', 'auth-error']) {
+      const result = spawnSync(process.execPath, ['scripts/heroes-configure.mjs'], {
+        cwd: root,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${path.dirname(gh)}:${process.env.PATH}`,
+          FIXTURE_KIND: kind,
+          GH_REPOSITORY_TOKEN: 'repository-token',
+          GH_PROJECT_TOKEN: 'project-only-token',
+          HEROES_CHECK_ONLY: 'true',
+          HEROES_CONFIGURE_PROJECT: 'true',
+          HEROES_PROJECT_OWNER: 'frickeldave-test',
+          HEROES_PROJECT_NUMBER: '3',
+          HEROES_PROJECT_STATUS_FIELD: 'Status',
+          HEROES_PROJECT_STATUS_MAP: JSON.stringify({ 'go:yes': 'Ready', 'go:done': 'Done' }),
+        },
+      });
+      if (kind === 'missing' || kind === 'auth-error') {
+        assert.notEqual(result.status, 0);
+        assert.match(result.stderr, /not writable or visible/u);
+      } else {
+        assert.equal(result.status, 0, result.stderr);
+        assert.match(result.stdout, /Project configuration validated/u);
+      }
+    }
+  } finally {
+    cleanup(root);
+  }
+});
+
 test('badge generator changes only the single managed marker and check is read-only', () => {
   const root = installed();
   try {
@@ -201,7 +280,8 @@ test('release gate enforces exactly one label and validates a greater positive v
         write(root, 'bin/gh', `#!/bin/sh
     case "$*" in
           *"auth status"*) printf '%s\n' "- Token scopes: 'project'" ;;
-          *"api graphql"*) printf '%s\n' '{"data":{"organization":{"projectV2":{"id":"P1","viewerCanUpdate":true}}}}' ;;
+          *"repositoryOwner"*) printf '%s\n' '{"data":{"repositoryOwner":{"id":"O1","login":"owner","__typename":"Organization"}}}' ;;
+          *"api graphql"*) printf '%s\n' '{"data":{"organization":{"projectV2":{"id":"P1","number":7,"viewerCanUpdate":true}}}}' ;;
       *"label list"*) printf '[]\\n' ;;
       *"project field-list"*) printf '{"fields":[]}\\n' ;;
       *"project view"*) printf '{"id":"P1"}\\n' ;;

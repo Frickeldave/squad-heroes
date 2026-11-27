@@ -142,6 +142,13 @@ mit `${{ github.token }}` und den deklarierten `permissions`. Installer und
 lokale Metadaten konfigurieren nur den festen Secret-Ausdruck und fragen,
 lesen, speichern oder loggen niemals den Token-Wert.
 
+Beim Verifizieren wird der Owner-Typ aus der `gh project`-Ausgabe wiederverwendet
+oder vorab als GitHub User bzw. Organization aufgelöst; nur der passende
+GraphQL-Zweig wird abgefragt. Ein partielles GraphQL-Ergebnis ist nur akzeptabel,
+wenn ausschließlich der nicht passende Owner-Zweig `NOT_FOUND` meldet, während
+Project-ID, Nummer und `viewerCanUpdate: true` gültig sind. Andere Auth-, Scope-,
+Schema-, Rate- oder Netzwerkfehler bleiben hart fehlschlagend.
+
 ## Update und Entfernung
 
 Squad 2.0.0 besitzt keinen `plugin update`-Befehl. Ein neuer Checkout wird

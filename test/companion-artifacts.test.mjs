@@ -19,14 +19,20 @@ const injected = {
         return commandResult(JSON.stringify({ data: { node: { repositories: { nodes: [{ id: 'R1' }] } } } }));
       }
       return commandResult(JSON.stringify({
-        data: { organization: { projectV2: { id: 'P1', viewerCanUpdate: true } } },
+        data: { organization: { projectV2: {
+          id: 'P1', number: Number(args.find((arg) => arg.startsWith('number='))?.slice(7) ?? 7),
+          viewerCanUpdate: true,
+        } } },
       }));
     }
     if (args[0] === 'api' && args[1].startsWith('repos/')) {
       return commandResult('{"pull":true,"push":true,"admin":false,"triage":false}\n');
     }
     if (args[0] === 'project' && args[1] === 'view') {
-      return commandResult(JSON.stringify({ number: Number(args[2]) }));
+      return commandResult(JSON.stringify({
+        number: Number(args[2]),
+        owner: { type: 'Organization' },
+      }));
     }
     if (args[0] === 'project' && args[1] === 'list') {
       return commandResult(JSON.stringify({ projects: [] }));

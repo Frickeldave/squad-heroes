@@ -92,7 +92,7 @@ test('interactive Companion wizard collects required and opt-in configuration', 
         return commandResult('{"pull":true,"push":true}\n');
       }
       if (args[0] === 'api' && args[1] === 'graphql') {
-        return commandResult('{"data":{"user":{"projectV2":{"id":"P7","viewerCanUpdate":true}}}}\n');
+        return commandResult('{"data":{"user":{"projectV2":{"id":"P7","number":7,"viewerCanUpdate":true}}}}\n');
       }
       return commandResult();
     },
@@ -491,7 +491,9 @@ test('dry-run board opt-in uses only read checks and writes no active targets', 
           return commandResult(JSON.stringify({ number: 7 }));
         }
         if (args[0] === 'project' && args[1] === 'list') {
-          return commandResult(JSON.stringify({ projects: [{ number: 7, title: 'Snake' }] }));
+          return commandResult(JSON.stringify({
+            projects: [{ number: 7, title: 'Snake', owner: { type: 'User' } }],
+          }));
         }
         if (args[0] === 'project' && args[1] === 'field-list') {
           return commandResult('{"fields":[{"id":"F7","name":"Status","options":[{"name":"Ready"},{"name":"Done"}]}]}\n');
@@ -500,7 +502,7 @@ test('dry-run board opt-in uses only read checks and writes no active targets', 
           return commandResult('{"pull":true,"push":true}\n');
         }
         if (args[0] === 'api' && args[1] === 'graphql') {
-          return commandResult('{"data":{"user":{"projectV2":{"id":"P7","viewerCanUpdate":true}}}}\n');
+          return commandResult('{"data":{"user":{"projectV2":{"id":"P7","number":7,"viewerCanUpdate":true}}}}\n');
         }
         return commandResult();
       },
@@ -569,13 +571,13 @@ test('mutating board installation rechecks Project access immediately before wri
         views += 1;
         return denyProject
           ? { status: 1, stdout: '', stderr: 'forbidden' }
-          : commandResult(JSON.stringify({ number: 9 }));
+          : commandResult(JSON.stringify({ number: 9, owner: { type: 'User' } }));
       }
       if (args[0] === 'api' && args[1] === 'graphql') {
         permissionChecks += 1;
         return denyProject
           ? { status: 0, stdout: '{"data":{"user":{"projectV2":null}}}\n', stderr: '' }
-          : commandResult('{"data":{"user":{"projectV2":{"id":"P9","viewerCanUpdate":true}}}}\n');
+          : commandResult('{"data":{"user":{"projectV2":{"id":"P9","number":9,"viewerCanUpdate":true}}}}\n');
       }
       return commandResult();
     },
@@ -612,12 +614,12 @@ test('Project board activation verifies write rights before any file mutation', 
       }
       if (args[0] === 'project' && args[1] === 'list') return commandResult('{"projects":[]}\n');
       if (args[0] === 'project' && args[1] === 'view') {
-        return commandResult('{"number":9}\n');
+        return commandResult('{"number":9,"owner":{"type":"Organization"}}\n');
       }
       if (args[0] === 'api' && args[1] === 'graphql') {
         writes += 1;
         return commandResult(JSON.stringify({
-          data: { organization: { projectV2: { id: 'P1', viewerCanUpdate: false } } },
+          data: { organization: { projectV2: { id: 'P1', number: 9, viewerCanUpdate: false } } },
         }));
       }
       return commandResult();

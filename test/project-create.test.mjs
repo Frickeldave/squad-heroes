@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { applyPlan, buildInstallPlan, parseInstallArguments } from '../src/installer.mjs';
 import { completeInteractiveOptions } from '../scripts/install.mjs';
-import { validateProjectTitle } from '../src/preflight.mjs';
+import { resolveProjectOwnerForCreate, validateProjectTitle } from '../src/preflight.mjs';
 import { cleanup, commandResult, fixture } from './helpers.mjs';
 
 const base = {
@@ -40,8 +40,13 @@ function githubFixture({
     if (args[0] === 'api' && args[1] === 'user') return commandResult('octocat\n');
     if (args[0] === 'api' && String(args[1]).startsWith('repos/')) return commandResult('{"id":123,"pull":true,"push":true}\n');
     if (args[0] === 'project' && args[1] === 'list') {
-      return commandResult(JSON.stringify({ projects: created ? [{ number: 42, title: 'squad-heroes-snake' }] : projects }));
+      return commandResult(JSON.stringify({
+        projects: created
+          ? [{ number: 42, title: 'squad-heroes-snake', owner: { type: 'User' } }]
+          : projects.map((project) => ({ ...project, owner: project.owner ?? { type: 'User' } })),
+      }));
     }
+
     if (args[0] === 'project' && args[1] === 'view') return commandResult('{"number":42,"id":"P42"}\n');
     if (args[0] === 'api' && args[1] === 'graphql') {
       const text = args.join(' ');
@@ -57,9 +62,14 @@ function githubFixture({
           id: 'P42', number: 42, title: 'squad-heroes-snake', viewerCanUpdate: true,
         } } } }));
       }
-      if (text.includes('projectV2(number:')) return commandResult(JSON.stringify({
-        data: { user: { projectV2: missingAfterCreate ? null : { id: 'P42', viewerCanUpdate: true } } },
-      }));
+      if (text.includes('projectV2(number:')) {
+        const requested = Number(args.find((arg) => arg.startsWith('number='))?.slice(7) ?? 42);
+        return commandResult(JSON.stringify({
+        data: { user: { projectV2: missingAfterCreate ? null : {
+          id: `P${requested}`, number: requested, viewerCanUpdate: true,
+        } } },
+        }));
+      }
       if (text.includes('repository(owner:')) return commandResult('{"data":{"repository":{"id":"R123"}}}\n');
       if (text.includes('repositories(first:100)')) return commandResult('{"data":{"node":{"repositories":{"nodes":[]}}}}\n');
       if (text.includes('linkProjectV2ToRepository')) return commandResult('{"data":{"linkProjectV2ToRepository":{"clientMutationId":"1"}}}\n');
@@ -74,6 +84,66 @@ function githubFixture({
   };
   return { spawn, calls };
 }
+
+test('Project creation owner resolution accepts user and organization partial GraphQL output', () => {
+  for (const item of [
+    ['User', 'user', 'organization', 'Organization', true, undefined],
+    ['Organization', 'organization', 'user', 'User', undefined, true],
+  ]) {
+    const [type, branch, opposite, oppositeName, isViewer, viewerCanAdminister] = item;
+    const identity = {
+      id: `${type}_OWNER`,
+      login: 'frickeldave-test',
+      __typename: type,
+      ...(isViewer !== undefined ? { isViewer } : {}),
+      ...(viewerCanAdminister !== undefined ? { viewerCanAdminister } : {}),
+    };
+    const result = resolveProjectOwnerForCreate('frickeldave-test/repository', 'fixture', {
+      authentication: {
+        account: 'frickeldave-test',
+        projectScope: true,
+        scopes: ['project'],
+      },
+      spawn: () => ({
+        status: 1,
+        stdout: JSON.stringify({
+          data: { [opposite]: null, [branch]: identity },
+          errors: [{
+            type: 'NOT_FOUND',
+            path: [opposite],
+            message: `Could not resolve to a ${oppositeName} with the login of 'frickeldave-test'.`,
+          }],
+        }),
+        stderr: `gh: Could not resolve to a ${oppositeName} with the login of 'frickeldave-test'.`,
+      }),
+    });
+    assert.equal(result.ownerType, type);
+    assert.equal(result.ownerId, `${type}_OWNER`);
+  }
+});
+
+test('Project creation owner resolution rejects auth errors despite valid partial data', () => {
+  assert.throws(() => resolveProjectOwnerForCreate('frickeldave-test/repository', 'fixture', {
+    authentication: {
+      account: 'frickeldave-test',
+      projectScope: true,
+      scopes: ['project'],
+    },
+    spawn: () => ({
+      status: 1,
+      stdout: JSON.stringify({
+        data: { user: {
+          id: 'U_OWNER',
+          login: 'frickeldave-test',
+          __typename: 'User',
+          isViewer: true,
+        } },
+        errors: [{ type: 'FORBIDDEN', path: ['user'], message: 'Bad credentials' }],
+      }),
+      stderr: 'Bad credentials',
+    }),
+  }), /GitHub Project access failed/u);
+});
 
 test('zero Project dry-run plans explicit create and all follow-up operations without mutation', () => {
   const root = fixture();
@@ -250,6 +320,7 @@ test('denied create and partial schema failure fail closed with recovery guidanc
     assert.throws(() => applyPlan(partial, plan, {}, partialGh), (error) => {
       assert.match(error.message, /partially|schema|field|recover/iu);
       assert.match(error.message, /gh project list --owner frickeldave-test --limit 100 --format json/u);
+      assert.doesNotMatch(error.message, /gh project create --owner/u);
       assert.match(error.message, /No local Companion state was written/u);
       assert.doesNotMatch(error.message, /ghp_|token=/u);
       return true;

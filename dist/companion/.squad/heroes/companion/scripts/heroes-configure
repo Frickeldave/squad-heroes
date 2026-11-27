@@ -21,6 +21,47 @@ function gh(args) {
   return result.stdout.trim();
 }
 
+function graphqlErrorBranch(error) {
+  const path = Array.isArray(error?.path) ? error.path[0] : null;
+  if (path === 'organization' || path === 'user') return path;
+  if (/organization/iu.test(String(error?.message ?? ''))) return 'organization';
+  if (/\buser\b/iu.test(String(error?.message ?? ''))) return 'user';
+  return null;
+}
+
+function validPartialGraphql(result, payload, matchingBranch) {
+  const errors = Array.isArray(payload?.errors) ? payload.errors : [];
+  if (result.status === 0) return errors.length === 0;
+  if (matchingBranch === 'repositoryOwner') return false;
+  if (errors.length === 0 || errors.some((error) => {
+    const code = String(error?.extensions?.code ?? error?.type ?? '').toUpperCase();
+    const notFound = code === 'NOT_FOUND' ||
+      /could not resolve to an? (organization|user)/iu.test(String(error?.message ?? ''));
+    return !notFound || !graphqlErrorBranch(error) || graphqlErrorBranch(error) === matchingBranch;
+  })) return false;
+  const stderr = String(result.stderr ?? '').trim();
+  return !stderr || stderr.split(/\r?\n/u).every((line) =>
+    !line.trim() ||
+    /^(?:gh:\s*)?(?:GraphQL:\s*)?Could not resolve to an? (?:Organization|User)\b.*$/iu.test(line.trim())
+  );
+}
+
+function graphql(args) {
+  const token = process.env.GH_PROJECT_TOKEN;
+  if (!token) throw new Error('Missing Project Actions token');
+  const result = spawnSync('gh', args, {
+    encoding: 'utf8',
+    env: { ...process.env, GH_TOKEN: token },
+  });
+  let payload;
+  try {
+    payload = JSON.parse(String(result.stdout));
+  } catch {
+    throw new Error(`gh api graphql failed (exit status ${result.status}).`);
+  }
+  return { result, payload };
+}
+
 function requireProjectScope() {
   if (!process.env.GH_PROJECT_TOKEN) throw new Error('Missing Project Actions token');
   const result = spawnSync('gh', ['auth', 'status', '--hostname', 'github.com'], {
@@ -41,17 +82,49 @@ function requireProjectScope() {
 }
 
 function requireProjectWriteAccess() {
-  const query = 'query($login:String!,$number:Int!){organization(login:$login){projectV2(number:$number){id viewerCanUpdate}}user(login:$login){projectV2(number:$number){id viewerCanUpdate}}}';
   const owner = process.env.HEROES_PROJECT_OWNER;
   const number = process.env.HEROES_PROJECT_NUMBER;
-  const payload = JSON.parse(gh([
+  const identityQuery = 'query($login:String!){repositoryOwner(login:$login){id login __typename}}';
+  const identityResult = graphql([
+    'api', 'graphql', '-f', `query=${identityQuery}`, '-F', `login=${owner}`,
+  ]);
+  const directIdentity = identityResult.payload.data?.repositoryOwner;
+  const organizationIdentity = identityResult.payload.data?.organization;
+  const userIdentity = identityResult.payload.data?.user;
+  const identity = directIdentity ?? organizationIdentity ?? userIdentity;
+  const identityType = identity?.__typename === 'Organization' || identity?.__typename === 'User'
+    ? identity.__typename
+    : organizationIdentity ? 'Organization' : userIdentity ? 'User' : null;
+  const identityBranch = directIdentity ? 'repositoryOwner' :
+    organizationIdentity ? 'organization' : 'user';
+  if (
+    (organizationIdentity && userIdentity) ||
+    !identity ||
+    !identityType ||
+    typeof identity.id !== 'string' ||
+    !identity.id ||
+    identity.login?.toLowerCase() !== String(owner).toLowerCase() ||
+    !validPartialGraphql(identityResult.result, identityResult.payload, identityBranch)
+  ) {
+    throw new Error(`GitHub Project owner "${owner}" could not be resolved as a User or Organization.`);
+  }
+  const branch = identityType === 'Organization' ? 'organization' : 'user';
+  const query = `query($login:String!,$number:Int!){${branch}(login:$login){projectV2(number:$number){id number viewerCanUpdate}}}`;
+  const verification = graphql([
     'api', 'graphql',
     '-f', `query=${query}`,
     '-F', `login=${owner}`,
     '-F', `number=${number}`,
-  ]));
-  const project = payload.data?.organization?.projectV2 ?? payload.data?.user?.projectV2;
-  if (project?.viewerCanUpdate !== true) {
+  ]);
+  const project = verification.payload.data?.[branch]?.projectV2;
+  if (
+    !validPartialGraphql(verification.result, verification.payload, branch) ||
+    !project ||
+    typeof project.id !== 'string' ||
+    !project.id ||
+    Number(project.number) !== Number(number) ||
+    project.viewerCanUpdate !== true
+  ) {
     throw new Error(
       `GitHub Project #${number} for "${owner}" is not writable or visible (403/404). ` +
       'Ask a Project owner/admin for write access and verify organization policy. No Project mutation started.'

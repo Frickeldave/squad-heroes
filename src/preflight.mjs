@@ -314,6 +314,121 @@ function parseProjects(result) {
   }
 }
 
+function normalizeOwnerType(value) {
+  const type = String(value ?? '').toLowerCase();
+  if (type === 'organization') return 'Organization';
+  if (type === 'user') return 'User';
+  return null;
+}
+
+function projectOwnerType(project) {
+  return normalizeOwnerType(
+    project?.owner?.type ??
+    project?.ownerType ??
+    project?.owner_type
+  );
+}
+
+function graphqlErrorCode(error) {
+  return String(error?.extensions?.code ?? error?.type ?? '').toUpperCase();
+}
+
+function graphqlErrorBranch(error) {
+  const path = Array.isArray(error?.path) ? error.path[0] : null;
+  if (path === 'organization' || path === 'user') return path;
+  const message = String(error?.message ?? '');
+  if (/organization/iu.test(message)) return 'organization';
+  if (/\buser\b/iu.test(message)) return 'user';
+  return null;
+}
+
+function isOwnerNotFound(error) {
+  return graphqlErrorCode(error) === 'NOT_FOUND' ||
+    /could not resolve to an? (organization|user)/iu.test(String(error?.message ?? ''));
+}
+
+function partialGraphqlIsSafe(result, payload, matchingBranch) {
+  const errors = Array.isArray(payload?.errors) ? payload.errors : [];
+  if (result.status === 0) return errors.length === 0;
+  if (matchingBranch === 'repositoryOwner') return false;
+  if (
+    errors.length === 0 ||
+    errors.some((error) =>
+      !isOwnerNotFound(error) ||
+      !graphqlErrorBranch(error) ||
+      graphqlErrorBranch(error) === matchingBranch
+    )
+  ) return false;
+  const stderr = String(result?.stderr ?? '').trim();
+  if (!stderr) return true;
+  return stderr.split(/\r?\n/u).every((line) =>
+    !line.trim() ||
+    /^(?:gh:\s*)?(?:GraphQL:\s*)?Could not resolve to an? (?:Organization|User)\b.*$/iu.test(line.trim())
+  );
+}
+
+function parseGraphqlResult(result, { matchingBranch, summary } = {}) {
+  let payload;
+  try {
+    payload = JSON.parse(String(result.stdout));
+  } catch {
+    return null;
+  }
+  if (!partialGraphqlIsSafe(result, payload, matchingBranch)) {
+    fail('gh_project', `${summary ?? 'GitHub GraphQL response'} failed or included a non-owner error. No mutation was started.`);
+  }
+  return payload;
+}
+
+function identityFromPayload(payload) {
+  const repositoryOwner = payload?.data?.repositoryOwner;
+  if (repositoryOwner) return { identity: repositoryOwner, branch: 'repositoryOwner' };
+  const organization = payload?.data?.organization;
+  const user = payload?.data?.user;
+  if (organization && user) return null;
+  if (organization) return { identity: organization, branch: 'organization' };
+  if (user) return { identity: user, branch: 'user' };
+  return null;
+}
+
+function resolveProjectOwnerIdentity(repository, options = {}, ownerHint = null) {
+  const owner = repositoryOwner(repository);
+  const hinted = normalizeOwnerType(ownerHint);
+  if (hinted) return { owner, ownerType: hinted };
+  const query = 'query($login:String!){repositoryOwner(login:$login){id login __typename ... on Organization{viewerCanAdminister} ... on User{isViewer}}}';
+  const result = run('gh', [
+    'api', 'graphql', '-f', `query=${query}`, '-F', `login=${owner}`,
+  ], options);
+  assertGhInstalled(result, options);
+  let payload;
+  try {
+    payload = JSON.parse(String(result.stdout));
+  } catch {
+    payload = null;
+  }
+  const selected = identityFromPayload(payload);
+  if (!selected || !partialGraphqlIsSafe(result, payload, selected.branch)) {
+    projectScopeFailure(owner, repository, options, result);
+  }
+  const identity = selected.identity;
+  const ownerType = normalizeOwnerType(identity?.__typename);
+  if (
+    ownerType === null ||
+    typeof identity.id !== 'string' ||
+    !identity.id ||
+    identity.login?.toLowerCase() !== owner.toLowerCase()
+  ) {
+    fail('gh_project_owner', `GitHub could not resolve a valid User or Organization identity for "${owner}". No mutation was started.`);
+  }
+  return {
+    owner,
+    ownerId: identity.id,
+    ownerType,
+    viewerCanAdminister: identity.viewerCanAdminister,
+    isViewer: identity.isViewer,
+  };
+}
+
 function projectScopeFailure(owner, repository, options, result, number) {
   const active = safeGhAccount(options.account) ?? 'unknown';
   const summary = safeStatusSummary(result);
@@ -381,6 +496,9 @@ export function resolveBoardProject(repository, board = {}, options = {}) {
     fail('project_number', 'The selected GitHub Project does not have a valid project number.');
   }
   const cached = options.projectCatalog?.find((candidate) => Number(candidate?.number) === number);
+  let ownerType = normalizeOwnerType(board.ownerType) ??
+    projectOwnerType(selected) ??
+    projectOwnerType(cached);
   if (!cached) {
     const viewed = run('gh', [
       'project', 'view', String(number), '--owner', owner, '--format', 'json',
@@ -392,12 +510,13 @@ export function resolveBoardProject(repository, board = {}, options = {}) {
     try {
       const value = JSON.parse(String(viewed.stdout));
       if (Number(value.number ?? number) !== number) throw new Error('number mismatch');
+      ownerType ??= projectOwnerType(value);
     } catch {
       fail('gh_project', `GitHub Project #${number} for "${owner}" returned an invalid response. No mutation was started.`);
     }
   }
   board.number = number;
-  return { ...board, owner, number };
+  return { ...board, owner, number, ...(ownerType ? { ownerType } : {}) };
 }
 
 export function validateProjectTitle(value) {
@@ -419,30 +538,33 @@ export function resolveProjectOwnerForCreate(repository, title, options = {}) {
   const safeTitle = validateProjectTitle(title);
   const authentication = options.authentication ?? assertGithubAuthentication({ ...options, repository });
   assertGithubProjectScope(authentication, { ...options, repository, owner });
-  const query = 'query($login:String!){organization(login:$login){id login __typename viewerCanAdminister}user(login:$login){id login __typename isViewer}}';
+  const query = 'query($login:String!){repositoryOwner(login:$login){id login __typename ... on Organization{viewerCanAdminister} ... on User{isViewer}}}';
   const result = run('gh', [
     'api', 'graphql', '-f', `query=${query}`, '-F', `login=${owner}`,
   ], options);
-  if (result.status !== 0) {
-    assertGhInstalled(result, options);
-    projectScopeFailure(owner, repository, options, result);
-  }
+  assertGhInstalled(result, options);
   let payload;
   try {
     payload = JSON.parse(String(result.stdout));
   } catch {
     fail('gh_project_owner', `GitHub owner "${owner}" returned an invalid identity response. No mutation was started.`);
   }
-  const organization = payload?.data?.organization;
-  const user = payload?.data?.user;
-  const identity = organization ?? user;
-  if (!identity || (organization && user) || typeof identity.id !== 'string' || !identity.id) {
+  const selected = identityFromPayload(payload);
+  if (!selected || !partialGraphqlIsSafe(result, payload, selected.branch)) {
+    projectScopeFailure(owner, repository, options, result);
+  }
+  const identity = selected.identity;
+  const ownerType = normalizeOwnerType(identity.__typename ?? (
+    selected.branch === 'organization' ? 'Organization' :
+      selected.branch === 'user' ? 'User' : null
+  ));
+  if (!identity || !ownerType || typeof identity.id !== 'string' || !identity.id) {
     fail('gh_project_owner', `GitHub could not resolve exactly one owner identity for "${owner}". No mutation was started.`);
   }
   if (identity.login?.toLowerCase() !== owner.toLowerCase()) {
     fail('gh_project_owner', `GitHub owner identity does not match derived owner "${owner}". No mutation was started.`);
   }
-  const ownerMutable = organization
+  const ownerMutable = ownerType === 'Organization'
     ? identity.viewerCanAdminister === true
     : identity.isViewer === true;
   if (!ownerMutable) {
@@ -455,7 +577,7 @@ export function resolveProjectOwnerForCreate(repository, title, options = {}) {
       active: authentication.account,
       owner,
       host: GITHUB_HOST,
-      kind: identity.__typename ?? (organization ? 'Organization' : 'User'),
+      kind: ownerType,
       summary: 'owner update capability is false (403)',
       manual,
     }, {
@@ -469,7 +591,7 @@ export function resolveProjectOwnerForCreate(repository, title, options = {}) {
   return {
     owner,
     ownerId: identity.id,
-    ownerType: identity.__typename ?? (organization ? 'Organization' : 'User'),
+    ownerType,
     title: safeTitle,
     ownerMutable: true,
   };
@@ -501,11 +623,18 @@ export function createBoardProject(repository, ownerIdentity, options = {}) {
     if (!Number.isInteger(number) || number <= 0) {
       fail('project_number', 'The matching recovery Project has no valid number.');
     }
-    return assertProjectWriteAccess(repository, { owner: verifiedOwner.owner, number }, {
-      ...options,
-      authentication,
-      projectCatalog: current,
-    });
+    try {
+      return assertProjectWriteAccess(repository, { owner: verifiedOwner.owner, number }, {
+        ...options,
+        authentication,
+        projectCatalog: current,
+      });
+    } catch (error) {
+      if (error instanceof HeroesError && error.details && typeof error.details === 'object') {
+        error.details.existingProject = true;
+      }
+      throw error;
+    }
   }
   const query = 'mutation($ownerId:ID!,$title:String!){createProjectV2(input:{ownerId:$ownerId,title:$title}){projectV2{id number title viewerCanUpdate}}}';
   const result = run('gh', [
@@ -693,7 +822,13 @@ export function assertProjectWriteAccess(repository, board, options = {}) {
     account: authentication.account,
     authentication,
   });
-  const query = 'query($login:String!,$number:Int!){organization(login:$login){projectV2(number:$number){id viewerCanUpdate}}user(login:$login){projectV2(number:$number){id viewerCanUpdate}}}';
+  const ownerIdentity = resolveProjectOwnerIdentity(
+    repository,
+    { ...options, authentication, account: authentication.account },
+    resolved.ownerType ?? board.ownerType
+  );
+  const branch = ownerIdentity.ownerType === 'Organization' ? 'organization' : 'user';
+  const query = `query($login:String!,$number:Int!){${branch}(login:$login){projectV2(number:$number){id number viewerCanUpdate}}}`;
   const verification = run('gh', [
     'api', 'graphql',
     '-f', `query=${query}`,
@@ -702,7 +837,14 @@ export function assertProjectWriteAccess(repository, board, options = {}) {
   ], options);
   assertGhInstalled(verification, options);
   const summary = safeStatusSummary(verification);
-  if (verification.status !== 0) {
+  if (verification.status !== 0 && !(() => {
+    try {
+      const payload = JSON.parse(String(verification.stdout));
+      return partialGraphqlIsSafe(verification, payload, branch);
+    } catch {
+      return false;
+    }
+  })()) {
     stop('project_access', options, 'gh_project_write_access', {
       active: authentication.account,
       owner: resolved.owner,
@@ -718,14 +860,18 @@ export function assertProjectWriteAccess(repository, board, options = {}) {
       projectNumber: resolved.number,
     });
   }
-  let payload;
-  try {
-    payload = JSON.parse(String(verification.stdout));
-  } catch {
-    payload = null;
-  }
-  const project = payload?.data?.organization?.projectV2 ?? payload?.data?.user?.projectV2;
-  if (!project || project.viewerCanUpdate !== true) {
+  const payload = parseGraphqlResult(verification, {
+    matchingBranch: branch,
+    summary: 'GitHub Project write verification',
+  });
+  const project = payload?.data?.[branch]?.projectV2;
+  if (
+    !project ||
+    typeof project.id !== 'string' ||
+    !project.id ||
+    Number(project.number) !== resolved.number ||
+    project.viewerCanUpdate !== true
+  ) {
     stop('project_write_denied', options, 'gh_project_write_access', {
       active: authentication.account,
       owner: resolved.owner,
@@ -741,7 +887,12 @@ export function assertProjectWriteAccess(repository, board, options = {}) {
       projectNumber: resolved.number,
     });
   }
-  return { ...resolved, id: project.id, viewerCanUpdate: project.viewerCanUpdate };
+  return {
+    ...resolved,
+    ownerType: ownerIdentity.ownerType,
+    id: project.id,
+    viewerCanUpdate: project.viewerCanUpdate,
+  };
 }
 
 export function preflightGithubAccess(repository, options = {}) {
