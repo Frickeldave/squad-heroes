@@ -596,6 +596,38 @@ export function configureBoardProject(repository, board, options = {}) {
   return { number, fieldId: field.id, fieldName, statuses };
 }
 
+export function inspectBoardProjectSchema(repository, board, options = {}) {
+  const owner = repositoryOwner(repository);
+  const number = Number(board.number);
+  const fieldName = String(board.statusField ?? '').trim();
+  const statuses = [...new Set(Object.values(board.statusMap ?? {}))];
+  if (!Number.isInteger(number) || number <= 0 || !fieldName ||
+      statuses.length === 0 || statuses.some((status) => typeof status !== 'string' || !status.trim())) {
+    fail('project_schema', 'Project schema requires an existing number, status field and status option names.');
+  }
+  const listed = run('gh', [
+    'project', 'field-list', String(number), '--owner', owner, '--format', 'json',
+  ], options);
+  if (listed.status !== 0) {
+    assertGhInstalled(listed, options);
+    projectScopeFailure(owner, repository, options, listed, number);
+  }
+  let fields;
+  try {
+    fields = JSON.parse(String(listed.stdout)).fields;
+  } catch {
+    fail('project_schema', 'GitHub Project field discovery returned an invalid response.');
+  }
+  if (!Array.isArray(fields)) fail('project_schema', 'GitHub Project field discovery returned no fields array.');
+  const field = fields.find((candidate) => candidate.name === fieldName);
+  const present = new Set(field?.options?.map((option) => option.name) ?? []);
+  return {
+    fieldExists: Boolean(field),
+    fieldId: field?.id ?? null,
+    missingOptions: statuses.filter((status) => !present.has(status)),
+  };
+}
+
 export function linkBoardProject(repository, project, options = {}) {
   const repositoryNode = run('gh', [
     'api', 'graphql', '-f',

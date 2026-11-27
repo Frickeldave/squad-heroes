@@ -118,7 +118,18 @@ node .squad/templates/squad-heroes/companion/scripts/install --target "$PWD" \
   --create-project --project-title squad-heroes-snake --dry-run
 ```
 
-Derselbe Befehl ohne `--dry-run` ist die explizite CI-Freigabe. Erst im Apply werden Owner-ID, Project-Nummer und Node-ID über authentifiziertes `gh api graphql` ermittelt; Feld/Statusoptionen und Repository-Link folgen. `viewerCanUpdate` wird geprüft. Im Terminal muss der angezeigte Plan zusätzlich bestätigt werden. Fehler nach der Erstellung werden als manuell zu bereinigende Teilzustände gemeldet; es wird kein automatisches Rollback behauptet. Ein gespeicherter Project-Eintrag verhindert Dubletten beim Wiederholen.
+Derselbe Befehl ohne `--dry-run` ist die explizite CI-Freigabe. Erst im Apply werden Owner-ID, Project-Nummer und Node-ID über authentifiziertes `gh api graphql` ermittelt; Feld/Statusoptionen und Repository-Link folgen. `viewerCanUpdate` wird geprüft. Geplante Follow-ups tragen `PLANNED_CREATE` und werden beim Dry-run nie gegen die unbekannte Nummer aufgelöst. Beim Apply werden sie unmittelbar nach der Erstellung mit der echten Nummer erneut geprüft und ausgeführt. Im Terminal muss der angezeigte Plan zusätzlich bestätigt werden. Fehler nach der Erstellung werden als manuell zu bereinigende Teilzustände gemeldet; es wird kein automatisches Rollback behauptet. Ein gespeicherter Project-Eintrag verhindert Dubletten beim Wiederholen.
+
+Für die laufenden Actions-Workflows ist `secrets.HEROES_PROJECT_TOKEN` fest
+verdrahtet: GitHub Projects v2 gehört dem Benutzer beziehungsweise der
+Organisation und benötigt für Project-Operationen ausschließlich einen PAT
+(classic mit nur `project`, oder fein abgestufter PAT mit **Projects: Lesen und
+Schreiben**); `repo` ist dafür nicht erforderlich und wird nicht verlangt. Das
+repositorybezogene `github.token`/`GITHUB_TOKEN` kann diese Project-Berechtigung
+nicht erhalten. Repository-Issue-/PR-Lesezugriffe des Workflows laufen getrennt
+mit `${{ github.token }}` und den deklarierten `permissions`. Installer und
+lokale Metadaten konfigurieren nur den festen Secret-Ausdruck und fragen,
+lesen, speichern oder loggen niemals den Token-Wert.
 
 ## Update und Entfernung
 

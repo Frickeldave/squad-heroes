@@ -28,13 +28,15 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate complete opt-in before project access
         env:
-          GH_TOKEN: ${{ {{projectSecret}} }}
+          GH_REPOSITORY_TOKEN: ${{ github.token }}
+          GH_PROJECT_TOKEN: ${{ secrets.HEROES_PROJECT_TOKEN }}
           HEROES_PROJECT_OWNER: "{{projectOwner}}"
           HEROES_PROJECT_NUMBER: "{{projectNumber}}"
           HEROES_PROJECT_STATUS_FIELD: "{{projectStatusField}}"
           HEROES_PROJECT_STATUS_MAP: '{{projectStatusMap}}'
         run: |
-          test -n "$GH_TOKEN"
+          test -n "$GH_REPOSITORY_TOKEN"
+          test -n "$GH_PROJECT_TOKEN"
           test "{{projectOwner}}" = "{{projectOwner}}"
           test "{{projectNumber}}" = "{{projectNumber}}"
           test "{{projectStatusField}}" = "{{projectStatusField}}"

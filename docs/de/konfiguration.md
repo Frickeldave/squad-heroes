@@ -70,11 +70,20 @@ aktivierbar. Der Repository-Owner wird abgeleitet und nie geraten. Fehlen
 `gh project list`-Prüfung einen einzelnen Kandidaten automatisch, zeigt bei
 mehreren denselben Pfeiltasten-Picker und stoppt bei null mit menschlicher
 Einrichtungsanleitung.
-Das gewählte Project wird vor dem Plan mit `gh project view` verifiziert; eine
-explizite Nummer passiert denselben Check. Ohne Opt-in wird weder Workflow
-installiert noch ein Secret gelesen oder eine Project-Permission angefordert.
+Das gewählte Project wird vor dem Plan mit `gh project view` und
+`viewerCanUpdate` verifiziert; eine explizite Nummer passiert dieselben Checks.
+Ohne Opt-in wird kein Board-Workflow installiert.
 Fehlerhafte Teilkonfiguration stoppt.
 
 ## Konfiguration bei null Projects
 
-Der Product-Owner bleibt aus dem Repository abgeleitet. Account-Typ und GraphQL-Node-ID werden aufgelöst, nie geraten. `--create-project` ist ein Freigabe-Flag ohne Boolean-Wert und wird in CI mit einem sicheren, expliziten `--project-title` kombiniert. Generische, leer/Whitespace-gepolsterte, control- oder überlange Titel scheitern vor dem Plan. Ein-/Mehrfach-/Explizitnummer-Flows bleiben unverändert. Der Dry-run nutzt `{{PROJECT_NUMBER}}`; Apply speichert die echte Nummer. Schema- und Repository-Link sind idempotent.
+Der Product-Owner bleibt aus dem Repository abgeleitet. Account-Typ und GraphQL-Node-ID werden aufgelöst, nie geraten. `--create-project` ist ein Freigabe-Flag ohne Boolean-Wert und wird in CI mit einem sicheren, expliziten `--project-title` kombiniert. Generische, leer/Whitespace-gepolsterte, control- oder überlange Titel scheitern vor dem Plan. Ein-/Mehrfach-/Explizitnummer-Flows bleiben unverändert. Der Dry-run nutzt `PLANNED_CREATE` und `{{PROJECT_NUMBER}}` und stellt Schema-/Link-Abfragen zurück. Apply erstellt einmal, verifiziert die echte Nummer und speichert sie. Schema und Repository-Link sind idempotent.
+
+Die Workflows referenzieren fest `HEROES_PROJECT_TOKEN`: Project v2 benötigt
+einen klassischen PAT nur mit `project` oder einen fein abgestuften PAT mit
+Projects-Lese-/Schreibrecht; `repo` ist nicht erforderlich. Repository-Issue-/
+PR-Lesezugriffe bleiben bei `${{ github.token }}` mit deklarierter
+Workflow-Permission. Das repositorybezogene `GITHUB_TOKEN` kann die
+Benutzer-/Organisations-Project-Fähigkeit nicht erhalten. Der Installer
+rendert nur den festen Ausdruck und fragt, liest, speichert oder protokolliert
+keinen Token-Wert.

@@ -22,11 +22,15 @@ const base = {
   board: {
     statusField: 'Status',
     statusMap: { 'go:yes': 'Ready', 'go:done': 'Done' },
-    secret: 'secrets.HEROES_PROJECT_TOKEN',
   },
 };
 
-function githubFixture({ projects = [], denyCreate = false, failAfterCreate = false } = {}) {
+function githubFixture({
+  projects = [],
+  denyCreate = false,
+  failAfterCreate = false,
+  missingAfterCreate = false,
+} = {}) {
   const calls = [];
   let created = false;
   const spawn = (command, args, options = {}) => {
@@ -51,7 +55,9 @@ function githubFixture({ projects = [], denyCreate = false, failAfterCreate = fa
           id: 'P42', number: 42, title: 'squad-heroes-snake', viewerCanUpdate: true,
         } } } }));
       }
-      if (text.includes('projectV2(number:')) return commandResult(JSON.stringify({ data: { user: { projectV2: { id: 'P42', viewerCanUpdate: true } } } }));
+      if (text.includes('projectV2(number:')) return commandResult(JSON.stringify({
+        data: { user: { projectV2: missingAfterCreate ? null : { id: 'P42', viewerCanUpdate: true } } },
+      }));
       if (text.includes('repository(owner:')) return commandResult('{"data":{"repository":{"id":"R123"}}}\n');
       if (text.includes('repositories(first:100)')) return commandResult('{"data":{"node":{"repositories":{"nodes":[]}}}}\n');
       if (text.includes('linkProjectV2ToRepository')) return commandResult('{"data":{"linkProjectV2ToRepository":{"clientMutationId":"1"}}}\n');
@@ -84,6 +90,73 @@ test('zero Project dry-run plans explicit create and all follow-up operations wi
     assert.match(JSON.stringify(result.plan), /\{\{PROJECT_NUMBER\}\}/u);
     assert.equal(existsSync(path.join(root, '.squad/heroes.json')), false);
     assert.equal(gh.calls.filter(({ args }) => args.join(' ').includes('createProjectV2')).length, 0);
+    assert.equal(plan.projectState, 'PLANNED_CREATE');
+    const external = plan.operations.filter((op) => op.mode === 'external');
+    assert.ok(external.every((op) => op.actionDetails.state === 'PLANNED_CREATE'));
+    assert.ok(external.filter((op) => op.externalAction !== 'create-project')
+      .every((op) => op.actionDetails.deferred === true));
+    assert.equal(gh.calls.filter(({ args }) => args[0] === 'project' && args[1] === 'view').length, 0);
+  } finally { cleanup(root); }
+});
+
+test('explicit zero Project flags use safe schema defaults during dry-run', () => {
+  const root = fixture();
+  const gh = githubFixture();
+  try {
+    const options = parseInstallArguments([
+      '--repository', base.repository,
+      '--profile', base.profile,
+      '--language', 'en',
+      '--deployment-branches', '1',
+      '--deployment-branch-1', 'main',
+      '--enable-board-sync',
+      '--model-reqeng', base.models.reqeng,
+      '--model-work', base.models.work,
+      '--model-review', base.models.review,
+      '--create-project',
+      '--project-title', base.projectTitle,
+      '--dry-run',
+    ]);
+    const plan = buildInstallPlan(root, options, gh);
+    const result = applyPlan(root, plan, { dryRun: true }, gh);
+    assert.equal(result.changed, 0);
+    assert.equal(plan.config.extensions['board-sync'].statusField, 'Status');
+    assert.deepEqual(plan.config.extensions['board-sync'].statusMap, {
+      'go:yes': 'Ready',
+      'go:done': 'Done',
+    });
+  } finally { cleanup(root); }
+});
+
+test('zero Project interactive flow collects planned config without a token prompt', async () => {
+  const root = fixture();
+  const gh = githubFixture();
+  const asked = [];
+  const answers = new Map([
+    ['Project status field', 'Status'],
+    ['Project status map JSON', JSON.stringify(base.board.statusMap)],
+  ]);
+  try {
+    const options = await completeInteractiveOptions({
+      ...structuredClone(base),
+      projectTitle: null,
+      createProject: false,
+      createProjectApproved: false,
+      board: {},
+    }, null, async (label, fallback) => {
+      asked.push(label);
+      if (label.includes('owner') && label.includes('frickeldave-test')) return 'y';
+      return answers.get(label) ?? fallback;
+    }, async (_label, choices) => choices[0], gh);
+    assert.ok(gh.calls.some(({ args }) => args[0] === 'project' && args[1] === 'list'));
+    assert.ok(asked.every((label) => !/(token|secret)/iu.test(label)));
+    const plan = buildInstallPlan(root, options, gh);
+    const result = applyPlan(root, plan, { dryRun: true }, gh);
+    assert.equal(result.changed, 0);
+    assert.equal(plan.projectState, 'PLANNED_CREATE');
+    assert.equal(gh.calls.some(({ args }) => args[0] === 'project' && args[1] === 'view'), false);
+    assert.ok(plan.operations.some(({ externalAction, actionDetails }) =>
+      externalAction === 'configure-project-schema' && actionDetails.deferred));
   } finally { cleanup(root); }
 });
 
@@ -95,7 +168,9 @@ test('apply creates once, resolves number, configures and persists recovery stat
     applyPlan(root, plan, {}, gh);
     const config = JSON.parse(readFileSync(path.join(root, '.squad/heroes.json'), 'utf8'));
     assert.equal(config.extensions['board-sync'].number, 42);
+    assert.equal('secret' in config.extensions['board-sync'], false);
     assert.equal(config.recovery.planVersion, 1);
+    assert.equal(plan.projectState, 'APPLY_CREATE');
     assert.equal(gh.calls.filter(({ args }) => args.join(' ').includes('createProjectV2')).length, 1);
     const mutationIndex = gh.calls.findIndex(({ args }) => args.join(' ').includes('createProjectV2'));
     assert.ok(gh.calls.findIndex(({ args }) => args[1] === 'field-create') > mutationIndex);
@@ -135,6 +210,14 @@ test('denied create and partial schema failure fail closed with recovery guidanc
     assert.equal(partialGh.calls.filter(({ args }) => args.join(' ').includes('createProjectV2')).length, 1);
     assert.equal(existsSync(path.join(partial, '.squad/heroes.json')), false);
   } finally { cleanup(partial); }
+  const lookup = fixture();
+  const lookupGh = githubFixture({ missingAfterCreate: true });
+  try {
+    const plan = buildInstallPlan(lookup, structuredClone(base), lookupGh);
+    assert.throws(() => applyPlan(lookup, plan, {}, lookupGh), /404|not visible|owner\/admin/iu);
+    assert.equal(lookupGh.calls.filter(({ args }) => args.join(' ').includes('createProjectV2')).length, 1);
+    assert.equal(existsSync(path.join(lookup, '.squad/heroes.json')), false);
+  } finally { cleanup(lookup); }
 });
 
 test('noninteractive zero-Project mode requires unambiguous create flags', () => {

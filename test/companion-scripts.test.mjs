@@ -96,6 +96,49 @@ test('materialized companion rejects 0.13.1 with exit 2 and update guidance', ()
   }
 });
 
+test('board sync isolates Project token from repository issue reads', () => {
+  const root = installed();
+  try {
+    const gh = path.join(root, 'bin/gh');
+    const log = path.join(root, 'gh.log');
+    write(root, 'bin/gh', `#!/bin/sh
+printf '%s|%s\\n' "$*" "$GH_TOKEN" >> "$GH_LOG"
+case "$*" in
+  *"project view"*) printf '%s\\n' '{"number":7,"id":"P7"}' ;;
+  *"project field-list"*) printf '%s\\n' '{"fields":[{"id":"F1","name":"Status","options":[{"id":"O1","name":"Ready"},{"id":"O2","name":"Done"}]}]}' ;;
+  *"api repos/"*) printf '%s\\n' '[]' ;;
+  *) exit 0 ;;
+esac
+`);
+    chmodSync(gh, 0o755);
+    const script = path.resolve(product, '.squad/heroes/companion/scripts/sync-project-board.mjs');
+    const result = spawnSync(process.execPath, [script, '--dry-run', '--initial-sync'], {
+      cwd: root,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        PATH: `${path.dirname(gh)}:${process.env.PATH}`,
+        GH_LOG: log,
+        GH_REPOSITORY_TOKEN: 'repository-token',
+        GH_PROJECT_TOKEN: 'project-only-token',
+        GITHUB_REPOSITORY: 'owner/repository',
+        HEROES_PROJECT_OWNER: 'owner',
+        HEROES_PROJECT_NUMBER: '7',
+        HEROES_PROJECT_STATUS_FIELD: 'Status',
+        HEROES_PROJECT_STATUS_MAP: JSON.stringify({ 'go:yes': 'Ready', 'go:done': 'Done' }),
+      },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    const calls = readFileSync(log, 'utf8');
+    assert.match(calls, /api repos\/owner\/repository\/issues[^|]*\|repository-token/u);
+    assert.match(calls, /project view[^|]*\|project-only-token/u);
+    assert.match(calls, /project field-list[^|]*\|project-only-token/u);
+    assert.doesNotMatch(calls, /api repos\/[^\n]*project-only-token/u);
+  } finally {
+    cleanup(root);
+  }
+});
+
 test('badge generator changes only the single managed marker and check is read-only', () => {
   const root = installed();
   try {
@@ -157,12 +200,12 @@ test('release gate enforces exactly one label and validates a greater positive v
         const log = path.join(root, 'gh.log');
         write(root, 'bin/gh', `#!/bin/sh
     case "$*" in
-          *"auth status"*) printf '%s\n' "- Token scopes: 'repo', 'project'" ;;
+          *"auth status"*) printf '%s\n' "- Token scopes: 'project'" ;;
           *"api graphql"*) printf '%s\n' '{"data":{"organization":{"projectV2":{"id":"P1","viewerCanUpdate":true}}}}' ;;
       *"label list"*) printf '[]\\n' ;;
       *"project field-list"*) printf '{"fields":[]}\\n' ;;
       *"project view"*) printf '{"id":"P1"}\\n' ;;
-      *) printf '%s\\n' "$*" >> "$GH_LOG" ;;
+      *) printf '%s|%s\\n' "$*" "$GH_TOKEN" >> "$GH_LOG" ;;
     esac
     `);
         chmodSync(gh, 0o755);
@@ -170,6 +213,8 @@ test('release gate enforces exactly one label and validates a greater positive v
           ...process.env,
           PATH: `${path.dirname(gh)}:${process.env.PATH}`,
           GH_LOG: log,
+          GH_REPOSITORY_TOKEN: 'repository-token',
+          GH_PROJECT_TOKEN: 'project-only-token',
           HEROES_CONFIGURE_PROJECT: 'true',
           HEROES_PROJECT_OWNER: 'owner',
           HEROES_PROJECT_NUMBER: '7',
@@ -185,6 +230,7 @@ test('release gate enforces exactly one label and validates a greater positive v
         const writes = readFileSync(log, 'utf8');
         assert.match(writes, /project field-create 7/u);
         assert.match(writes, /--single-select-options Ready,Done/u);
+        assert.match(writes, /project field-create[^|]*\|project-only-token/u);
       } finally {
         cleanup(root);
       }

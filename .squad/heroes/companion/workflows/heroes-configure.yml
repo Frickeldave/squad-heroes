@@ -26,13 +26,14 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate roster and synchronize member labels
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_REPOSITORY_TOKEN: ${{ github.token }}
           HEROES_CHECK_ONLY: ${{ inputs.check_only || false }}
         run: node scripts/heroes-configure.mjs
       - name: Require explicit project opt-in
         if: inputs.configure_project
         env:
-          GH_TOKEN: ${{ secrets.HEROES_PROJECT_TOKEN }}
+          GH_REPOSITORY_TOKEN: ${{ github.token }}
+          GH_PROJECT_TOKEN: ${{ secrets.HEROES_PROJECT_TOKEN }}
           HEROES_CHECK_ONLY: ${{ inputs.check_only || false }}
           HEROES_CONFIGURE_PROJECT: "true"
           HEROES_PROJECT_OWNER: ${{ vars.HEROES_PROJECT_OWNER }}
@@ -40,7 +41,8 @@ jobs:
           HEROES_PROJECT_STATUS_FIELD: ${{ vars.HEROES_PROJECT_STATUS_FIELD }}
           HEROES_PROJECT_STATUS_MAP: ${{ vars.HEROES_PROJECT_STATUS_MAP }}
         run: |
-          test -n "$GH_TOKEN"
+          test -n "$GH_REPOSITORY_TOKEN"
+          test -n "$GH_PROJECT_TOKEN"
           test -n "$HEROES_PROJECT_OWNER"
           test -n "$HEROES_PROJECT_NUMBER"
           node scripts/heroes-configure.mjs

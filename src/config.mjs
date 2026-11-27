@@ -66,17 +66,18 @@ export function validateHeroesConfig(config, { allowProjectPlaceholder = false }
       fail('extension', `Unsupported extension: ${name}`);
     }
     const keys = Object.keys(extension).sort().join(',');
-    if (keys !== 'enabled,number,owner,schemaVersion,secret,statusField,statusMap') {
+    if (keys !== 'enabled,number,owner,schemaVersion,statusField,statusMap') {
       fail('extension', 'board-sync extension must have the complete closed schema');
     }
+    const statuses = Object.values(extension.statusMap ?? {});
     if (!/^[A-Za-z0-9_.-]+$/u.test(extension.owner ?? '') ||
         (!(
           Number.isInteger(extension.number) && extension.number > 0
         ) && !(allowProjectPlaceholder && extension.number === '{{PROJECT_NUMBER}}')) ||
-        !extension.statusField ||
+        typeof extension.statusField !== 'string' || !extension.statusField.trim() ||
         !extension.statusMap || typeof extension.statusMap !== 'object' ||
         Array.isArray(extension.statusMap) || Object.keys(extension.statusMap).length === 0 ||
-        !extension.secret?.startsWith('secrets.')) {
+        statuses.some((status) => typeof status !== 'string' || !status.trim())) {
       fail('extension', 'board-sync extension is incomplete');
     }
   }
@@ -130,7 +131,6 @@ export function buildHeroesConfig({
           : Number(board.number),
         statusField: board.statusField,
         statusMap: board.statusMap,
-        secret: board.secret,
       },
     } : {},
     ...(reviewBaseline ? { reviewBaseline } : {}),

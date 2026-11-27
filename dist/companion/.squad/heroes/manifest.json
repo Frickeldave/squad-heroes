@@ -183,7 +183,7 @@
       "source": ".squad/heroes/companion/scripts/heroes-configure",
       "target": ".squad/heroes/companion/scripts/heroes-configure",
       "owner": "companion",
-      "sha256": "e7f87d18c7dc75aee6f94e1f4ea7fe180da882765ff1516666d3df0f4bda92ab"
+      "sha256": "6ac99e59cdc8995cd9975181512a88c176406c366537d12320fe8a3247b3e464"
     },
     {
       "id": ".squad:heroes:companion:scripts:reqeng-block",
@@ -225,7 +225,7 @@
       "source": ".squad/heroes/companion/scripts/sync-project-board",
       "target": ".squad/heroes/companion/scripts/sync-project-board",
       "owner": "companion",
-      "sha256": "5fe37d173b4f2ca5d21a24494224e5b02da7e4e146eff3fcb8572e0932d1b982"
+      "sha256": "495e5737fa9de997d9236cf612a2be0755e31f3195a96dc2de735e97991c3056"
     },
     {
       "id": ".squad:heroes:companion:scripts:update-badges",
@@ -260,7 +260,7 @@
       "source": ".squad/heroes/companion/workflows/heroes-configure.yml",
       "target": ".squad/heroes/companion/workflows/heroes-configure.yml",
       "owner": "companion",
-      "sha256": "c4635c65d4ddd697d27eb845da2c293a148a2711f1abfaf1ed850fa19a19950a"
+      "sha256": "12c538fc7b7ab61df2812d70c5d568b6bbfb797d40efa750cd8c18c8f9f70e36"
     },
     {
       "id": ".squad:heroes:companion:workflows:heroes-release-label.yml",
@@ -274,7 +274,7 @@
       "source": ".squad/heroes/companion/workflows/heroes-sync-project-board.yml",
       "target": ".squad/heroes/companion/workflows/heroes-sync-project-board.yml",
       "owner": "companion",
-      "sha256": "858677735cb849b3d699a637e07d7c2a9b045ade1f03e5a6cb61f37add88d343"
+      "sha256": "a194ce331694f2471ac63e9de92514fd148e278a5f98e848c1c06b9df1f1f518"
     },
     {
       "id": ".squad:heroes:companion:workflows:heroes-update-badges.yml",

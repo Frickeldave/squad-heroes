@@ -2,14 +2,31 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 
+function projectCommand(args) {
+  return args[0] === 'project' ||
+    (args[0] === 'api' && args[1] === 'graphql' && args.join(' ').includes('ProjectV2'));
+}
+
 function gh(args) {
-  const result = spawnSync('gh', args, { encoding: 'utf8' });
+  const isProject = projectCommand(args);
+  const token = isProject
+    ? process.env.GH_PROJECT_TOKEN
+    : (process.env.GH_REPOSITORY_TOKEN ?? process.env.GH_TOKEN);
+  if (!token) throw new Error(`Missing ${isProject ? 'Project' : 'repository'} Actions token`);
+  const result = spawnSync('gh', args, {
+    encoding: 'utf8',
+    env: { ...process.env, GH_TOKEN: token },
+  });
   if (result.status !== 0) throw new Error(`gh ${args[0]} failed (exit status ${result.status})`);
   return result.stdout.trim();
 }
 
 function requireProjectScope() {
-  const result = spawnSync('gh', ['auth', 'status', '--hostname', 'github.com'], { encoding: 'utf8' });
+  if (!process.env.GH_PROJECT_TOKEN) throw new Error('Missing Project Actions token');
+  const result = spawnSync('gh', ['auth', 'status', '--hostname', 'github.com'], {
+    encoding: 'utf8',
+    env: { ...process.env, GH_TOKEN: process.env.GH_PROJECT_TOKEN },
+  });
   if (result.status !== 0) throw new Error('GitHub authentication is unavailable. Run `gh auth status --hostname github.com`.');
   const output = `${result.stdout ?? ''}\n${result.stderr ?? ''}`.replace(/\x1B\[[0-?]*[ -/]*[@-~]/gu, '');
   const scopeLine = output.match(/Token scopes:\s*([^\r\n]+)/iu)?.[1] ?? '';

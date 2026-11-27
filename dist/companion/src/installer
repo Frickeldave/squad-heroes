@@ -6,6 +6,7 @@ import {
   assertReviewBaseline,
   configureBoardProject,
   createBoardProject,
+  inspectBoardProjectSchema,
   linkBoardProject,
   preflightGithubAccess,
   resolveBoardProject,
@@ -61,7 +62,7 @@ export function parseInstallArguments(argv) {
     else if (arg === '--project-title') options.projectTitle = argv[++index];
     else if (arg === '--project-status-field') options.board.statusField = argv[++index];
     else if (arg === '--project-status-map') options.board.statusMap = parseJsonFile(argv[++index]);
-    else if (arg === '--project-secret') options.board.secret = argv[++index];
+    else if (arg === '--project-secret') fail('argument', '--project-secret is no longer supported; workflows use the fixed Actions secret HEROES_PROJECT_TOKEN');
     else if (arg === '--review-baseline') options.reviewBaseline = argv[++index];
     else if (arg === '--repository') options.repository = argv[++index];
     else if (arg === '--expected-github-account') options.expectedAccount = argv[++index];
@@ -125,7 +126,6 @@ function operationsFromCatalog(repoRoot, config, baselines = {}) {
       projectNumber: config.extensions?.['board-sync']?.number ?? '',
       projectStatusField: config.extensions?.['board-sync']?.statusField ?? '',
       projectStatusMap: JSON.stringify(config.extensions?.['board-sync']?.statusMap ?? {}),
-      projectSecret: config.extensions?.['board-sync']?.secret ?? '',
     });
     if (target.includes('{{agent}}')) {
       fail('catalog_render', 'Unresolved agent placeholder in companion target catalog');
@@ -189,7 +189,9 @@ export function buildInstallPlan(repoRoot, options = {}, injected = {}) {
   validateManifest(ROOT, manifest);
 
   const configPath = path.join(repoRoot, '.squad/heroes.json');
-  const existing = existsSync(configPath) ? parseJsonFile(configPath) : null;
+  const stored = existsSync(configPath) ? parseJsonFile(configPath) : null;
+  const existing = stored ? structuredClone(stored) : null;
+  if (existing?.extensions?.['board-sync']) delete existing.extensions['board-sync'].secret;
   if (existing) validateHeroesConfig(existing);
   const accessRepository = options.repository ?? existing?.repository;
   if (!accessRepository) fail('repository_missing', '--repository owner/name is required for initial installation');
@@ -207,8 +209,16 @@ export function buildInstallPlan(repoRoot, options = {}, injected = {}) {
     expectedAccount: options.expectedAccount ?? injected.expectedAccount,
   });
   let projectCreation = null;
+  let projectState = null;
+  let verifiedProject = null;
+  let projectSchema = null;
   if (options.boardSync) {
     const existingBoard = existing?.extensions?.['board-sync'];
+    options.board.statusField ??= existingBoard?.statusField ?? 'Status';
+    options.board.statusMap ??= existingBoard?.statusMap ?? {
+      'go:yes': 'Ready',
+      'go:done': 'Done',
+    };
     const configuredNumber = options.board.number ?? existingBoard?.number;
     if (
       (configuredNumber === undefined || configuredNumber === null || configuredNumber === '') &&
@@ -236,14 +246,37 @@ export function buildInstallPlan(repoRoot, options = {}, injected = {}) {
         ...identity,
         approved: options.createProjectApproved === true,
       };
+      projectState = 'PLANNED_CREATE';
     } else {
-      resolveBoardProject(accessRepository, options.board, {
+      const resolved = resolveBoardProject(accessRepository, options.board, {
         ...injected,
         language,
         account: access.account,
         configuredNumber,
         projectCatalog: access.projects,
       });
+      verifiedProject = assertProjectWriteAccess(accessRepository, resolved, {
+        ...injected,
+        language,
+        authentication: {
+          account: access.account,
+          scopes: access.projectScope ? ['project'] : [],
+          projectScope: access.projectScope,
+          scopeStatus: access.scopeStatus,
+        },
+        projectCatalog: access.projects,
+      });
+      projectSchema = inspectBoardProjectSchema(accessRepository, {
+        ...resolved,
+        statusField: options.board.statusField,
+        statusMap: options.board.statusMap,
+      }, {
+        ...injected,
+        language,
+        account: access.account,
+      });
+      options.board = { ...resolved, number: verifiedProject.number };
+      projectState = 'EXISTING_PROJECT';
     }
   }
   const reviewBaseline = assertReviewBaseline(
@@ -330,6 +363,7 @@ export function buildInstallPlan(repoRoot, options = {}, injected = {}) {
         mode: 'external',
         externalAction: 'create-project',
         actionDetails: {
+          state: 'PLANNED_CREATE',
           owner: projectCreation.owner,
           ownerType: projectCreation.ownerType,
           ownerId: projectCreation.ownerId,
@@ -348,10 +382,13 @@ export function buildInstallPlan(repoRoot, options = {}, injected = {}) {
         mode: 'external',
         externalAction: 'configure-project-schema',
         actionDetails: {
+          state: projectState,
+          deferred: projectState === 'PLANNED_CREATE',
           owner: config.extensions['board-sync'].owner,
           number: projectCreation ? '{{PROJECT_NUMBER}}' : config.extensions['board-sync'].number,
           field: config.extensions['board-sync'].statusField,
           options: [...new Set(Object.values(config.extensions['board-sync'].statusMap))],
+          ...(projectSchema ? { currentSchema: projectSchema } : {}),
         },
       },
       {
@@ -362,6 +399,8 @@ export function buildInstallPlan(repoRoot, options = {}, injected = {}) {
         mode: 'external',
         externalAction: 'link-repository',
         actionDetails: {
+          state: projectState,
+          deferred: projectState === 'PLANNED_CREATE',
           owner: config.extensions['board-sync'].owner,
           number: projectCreation ? '{{PROJECT_NUMBER}}' : config.extensions['board-sync'].number,
           repository: config.repository,
@@ -390,6 +429,9 @@ export function buildInstallPlan(repoRoot, options = {}, injected = {}) {
     operations: planned,
     conflicts: planned.filter((item) => item.action === 'conflict'),
     projectCreate: projectCreation ? { ...projectCreation } : null,
+    projectState,
+    verifiedProject,
+    projectSchema,
   };
 }
 
@@ -424,19 +466,28 @@ export function applyPlan(
       authentication: access,
       account: access.account,
     });
-    externalBoard.number = created.number;
-    externalBoard.owner = created.owner;
+    const verified = assertProjectWriteAccess(plan.config.repository, created, {
+      ...injected,
+      language: plan.config.language,
+      expectedAccount: expectedAccount ?? injected.expectedAccount,
+      authentication: access,
+    });
+    plan.projectState = 'APPLY_CREATE';
+    externalBoard.number = verified.number;
+    externalBoard.owner = verified.owner;
     const resolvedState = structuredClone(plan.config);
-    resolvedState.extensions['board-sync'].number = created.number;
+    resolvedState.extensions['board-sync'].number = verified.number;
     validateHeroesConfig(resolvedState);
     for (const operation of plan.operations) {
       if (operation.mode === 'external') {
-        operation.actionDetails.number = created.number;
+        operation.actionDetails.number = verified.number;
+        operation.actionDetails.state = 'APPLY_CREATE';
+        operation.actionDetails.deferred = false;
         continue;
       }
       operation.content = operation.target === '.squad/heroes.json'
         ? ''
-        : operation.content.replaceAll('{{PROJECT_NUMBER}}', String(created.number));
+        : operation.content.replaceAll('{{PROJECT_NUMBER}}', String(verified.number));
     }
     resolvedState.recovery.lastCompletedPlan = createHash('sha256')
       .update(JSON.stringify(summarizePlan(plan.operations.filter((entry) => entry.mode !== 'external'))))
@@ -450,7 +501,7 @@ export function applyPlan(
       language: plan.config.language,
       account: access.account,
     });
-    linkBoardProject(plan.config.repository, created, {
+    linkBoardProject(plan.config.repository, verified, {
       ...injected,
       language: plan.config.language,
       account: access.account,

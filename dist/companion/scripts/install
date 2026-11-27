@@ -179,10 +179,9 @@ export async function completeInteractiveOptions(options, existing, ask, choose,
       'Project status map JSON',
       JSON.stringify(current?.statusMap ?? { 'go:yes': 'Ready', 'go:done': 'Done' })
     ));
-    options.board.secret ??= await ask(
-      'GitHub Actions secret expression',
-      current?.secret ?? 'secrets.HEROES_PROJECT_TOKEN'
-    );
+    // Project V2 is outside the repository-scoped GITHUB_TOKEN permission model.
+    // A separately maintained Actions secret is wired by the workflow, not the
+    // installer plan, so no token expression or value enters local state.
   }
   return options;
 }

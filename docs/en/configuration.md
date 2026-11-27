@@ -66,10 +66,17 @@ Board sync is enabled only with complete versioned extension configuration.
 The repository owner is derived and cannot be guessed. If no explicit
 `--project-number` or stored number exists, a read-only `gh project list` check
 auto-selects one candidate, presents the same arrow-key picker for multiple candidates, or presents the explicit create/cancel menu for zero candidates. The selected project is
-verified with `gh project view` before the plan. Explicit numbers must pass the
-same check. Without opt-in, no workflow is installed, no secret is read and no
-Project permission is requested. Invalid partial configuration stops.
+verified with `gh project view` and `viewerCanUpdate` before the plan. Explicit
+numbers must pass the same checks. Without opt-in, no board workflow is
+installed. Invalid partial configuration stops.
 
 ## Zero-Project creation configuration
 
-The product owner remains derived from the repository. Owner account type and GraphQL node ID are resolved, never guessed. `--create-project` is an approval-bearing flag, not a boolean; pair it with a safe explicit `--project-title` in CI. Invalid/generic, whitespace-padded, control-character, or overlong titles fail before planning. Existing one/multiple/explicit-number behavior is unchanged. The dry-run plan uses `{{PROJECT_NUMBER}}`; apply resolves and stores the actual number in `.squad/heroes.json`. Schema and repository-link operations are idempotent.
+The product owner remains derived from the repository. Owner account type and GraphQL node ID are resolved, never guessed. `--create-project` is an approval-bearing flag, not a boolean; pair it with a safe explicit `--project-title` in CI. Invalid/generic, whitespace-padded, control-character, or overlong titles fail before planning. Existing one/multiple/explicit-number behavior is unchanged. The dry-run state is `PLANNED_CREATE`, uses `{{PROJECT_NUMBER}}`, and defers schema/link lookups; apply creates once, verifies the returned Project and stores the actual number in `.squad/heroes.json`. Schema and repository-link operations are idempotent.
+
+The Actions workflows reference the fixed secret `HEROES_PROJECT_TOKEN`;
+Project V2 requires a classic PAT with only `project`, or a fine-grained PAT
+with Projects read/write; `repo` is not required for the Project token.
+Repository issue/PR reads stay on `${{ github.token }}` with workflow
+permissions. The installer renders the fixed secret expression but does not
+ask for, read, store, or log a token value.

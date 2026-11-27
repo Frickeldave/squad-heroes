@@ -47,6 +47,19 @@ Tokens und PATs werden weder abgefragt noch als Argument, stdin, Datei, Log oder
 Test-Fixture akzeptiert. Zulässig sind nur der sichere Host-Credential-Store und
 der offizielle Browser-/Device-Flow. `--with-token`, Token-Umgebungsvariablen,
 Token-Argumente und ausgegebene Credentials werden nicht verwendet.
+Bei den installierten Project-Workflows ist eine bewusste Ausnahme zum
+repositorybezogenen Actions-`GITHUB_TOKEN` nötig: Projects v2 gehören einem
+Benutzer oder einer Organisation; GitHub bietet keine
+Workflow-Berechtigung, die `GITHUB_TOKEN` den dafür nötigen Project-v2-Zugriff
+gewährt. Die Workflows nutzen deshalb fest
+`secrets.HEROES_PROJECT_TOKEN`. Erwartet wird ein klassischer PAT mit
+ausschließlich Scope `project` oder ein fein abgestufter PAT mit **Projects:
+Lesen und Schreiben** für den Project-Owner; `repo` ist für diesen Token nicht
+nötig. Laufzeitskripte führen Project-v2-Aufrufe mit diesem Secret aus,
+Repository-Issue-/PR-Lesezugriffe und Label-Writes dagegen mit `${{ github.token }}`
+und den deklarierten Workflow-Rechten. Der Installer rendert nur den festen
+Ausdruck und liest weder Wert noch Token; beides wird nicht in
+`.squad/heroes.json` gespeichert oder protokolliert.
 Bei einer nicht unterstützten Squad-Version wird `squad upgrade --self` als
 normaler Benutzer und anschließend im Ziel-Repository `squad upgrade`
 ausgeführt. Ein root-eigenes globales npm-Paket kann den einmaligen,
@@ -62,4 +75,4 @@ Zertifikats- oder Signaturinfrastruktur und erfindet keine Upstream-Garantie.
 
 ## Freigabegrenze der Project-Erstellung
 
-Erstellung nur im Apply nach lokalen Konfliktprüfungen und angezeigtem Create-/Schema-/Link-Plan. `--create-project` ist die explizite CI-Freigabe; interaktiv ist nach dem Plan zusätzlich y/N nötig. Dry-run führt nur Identitäts-, Owner-Fähigkeits-, Scope- und API-Leseprüfungen aus. Owner wird abgeleitet, User-/Organization-Typ und Node-ID kommen aus GraphQL. `owner access` und nach Erstellung `viewerCanUpdate` sind Pflicht. Keine Token-Argumente werden akzeptiert oder protokolliert. 403 gehört an Owner/Admin bzw. Organizationsrichtlinie; keine blinde Wiederholung. Bereinigung ist manuell.
+Erstellung nur im Apply nach lokalen Konfliktprüfungen und angezeigtem Create-/Schema-/Link-Plan. `--create-project` ist die explizite CI-Freigabe; interaktiv ist nach dem Plan zusätzlich y/N nötig. Dry-run geht in `PLANNED_CREATE`: Identität, Owner-Fähigkeit, Scope und lesende Listenprüfung, aufgeschobene Schema-/Link-Operationen und keine Abfrage von `{{PROJECT_NUMBER}}`. Apply wechselt zu `APPLY_CREATE`, erstellt einmal, löst die zurückgegebene Nummer sofort über sichtbaren Project-/GraphQL-Zugriff auf, prüft `viewerCanUpdate` und konfiguriert/verknüpft idempotent. Bestehende Auswahl und Prüfung nach Erstellung behalten verwertbare 403/404-Hinweise. Keine Token-Argumente werden akzeptiert oder protokolliert. Keine blinde Wiederholung. Bereinigung ist manuell.

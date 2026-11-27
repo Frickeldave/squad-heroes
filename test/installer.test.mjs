@@ -48,7 +48,6 @@ test('interactive Companion wizard collects required and opt-in configuration', 
     ['Enable optional Project board sync (y/N)', 'y'],
     ['Project status field', 'Status'],
     ['Project status map JSON', JSON.stringify({ 'go:yes': 'Ready', 'go:done': 'Done' })],
-    ['GitHub Actions secret expression', 'secrets.HEROES_PROJECT_TOKEN'],
   ]);
   const asked = [];
   const selected = [];
@@ -92,6 +91,9 @@ test('interactive Companion wizard collects required and opt-in configuration', 
       if (args[0] === 'api' && args[1].startsWith('repos/')) {
         return commandResult('{"pull":true,"push":true}\n');
       }
+      if (args[0] === 'api' && args[1] === 'graphql') {
+        return commandResult('{"data":{"user":{"projectV2":{"id":"P7","viewerCanUpdate":true}}}}\n');
+      }
       return commandResult();
     },
   });
@@ -104,7 +106,6 @@ test('interactive Companion wizard collects required and opt-in configuration', 
     number: 7,
     statusField: 'Status',
     statusMap: { 'go:yes': 'Ready', 'go:done': 'Done' },
-    secret: 'secrets.HEROES_PROJECT_TOKEN',
   });
   assert.deepEqual(selected.slice(0, 3).map(({ label }) => label), [
     'Default model for reqeng',
@@ -439,7 +440,6 @@ test('multiple discovered Projects are selected only through the interactive pic
     board: {
       statusField: 'Status',
       statusMap: { 'go:yes': 'Ready' },
-      secret: 'secrets.HEROES_PROJECT_TOKEN',
     },
   }, null, async (label, fallback) => fallback, async (label, choices, current) => {
     selections.push({ label, choices, current });
@@ -480,7 +480,6 @@ test('dry-run board opt-in uses only read checks and writes no active targets', 
         number: 7,
         statusField: 'Status',
         statusMap: { 'go:yes': 'Ready', 'go:done': 'Done' },
-        secret: 'secrets.HEROES_PROJECT_TOKEN',
       },
     };
     const injected = {
@@ -494,8 +493,14 @@ test('dry-run board opt-in uses only read checks and writes no active targets', 
         if (args[0] === 'project' && args[1] === 'list') {
           return commandResult(JSON.stringify({ projects: [{ number: 7, title: 'Snake' }] }));
         }
+        if (args[0] === 'project' && args[1] === 'field-list') {
+          return commandResult('{"fields":[{"id":"F7","name":"Status","options":[{"name":"Ready"},{"name":"Done"}]}]}\n');
+        }
         if (args[0] === 'api' && args[1].startsWith('repos/')) {
           return commandResult('{"pull":true,"push":true}\n');
+        }
+        if (args[0] === 'api' && args[1] === 'graphql') {
+          return commandResult('{"data":{"user":{"projectV2":{"id":"P7","viewerCanUpdate":true}}}}\n');
         }
         return commandResult();
       },
@@ -520,12 +525,15 @@ test('Project access failure blocks board installation before its first write', 
     assert.throws(() => buildInstallPlan(root, {
       ...options,
       boardSync: true,
-      board: { number: 9, statusField: 'Status', statusMap: { 'go:yes': 'Ready' }, secret: 'secrets.HEROES_PROJECT_TOKEN' },
+      board: { number: 9, statusField: 'Status', statusMap: { 'go:yes': 'Ready' } },
     }, {
       spawn(command, args) {
         if (args[0] === 'auth') return commandResult("- Token scopes: 'repo', 'project'\n");
         if (args[0] === 'api' && args[1] === 'user') return commandResult('octocat\n');
         if (args[0] === 'project' && args[1] === 'list') return commandResult('{"projects":[]}\n');
+        if (args[0] === 'project' && args[1] === 'field-list') {
+          return commandResult('{"fields":[{"id":"F9","name":"Status","options":[{"name":"Ready"}]}]}\n');
+        }
         if (args[0] === 'project' && args[1] === 'view') {
           return { status: 1, stdout: '', stderr: 'forbidden' };
         }
@@ -545,6 +553,7 @@ test('mutating board installation rechecks Project access immediately before wri
   const root = fixture();
   let views = 0;
   let denyProject = false;
+  let permissionChecks = 0;
   const gate = {
     spawn(command, args) {
         if (args[0] === 'auth') return commandResult("- Token scopes: 'repo', 'project'\n");
@@ -553,11 +562,20 @@ test('mutating board installation rechecks Project access immediately before wri
         return commandResult('{"pull":true,"push":true}\n');
       }
       if (args[0] === 'project' && args[1] === 'list') return commandResult('{"projects":[]}\n');
+      if (args[0] === 'project' && args[1] === 'field-list') {
+        return commandResult('{"fields":[{"id":"F9","name":"Status","options":[{"name":"Ready"}]}]}\n');
+      }
       if (args[0] === 'project' && args[1] === 'view') {
         views += 1;
         return denyProject
           ? { status: 1, stdout: '', stderr: 'forbidden' }
           : commandResult(JSON.stringify({ number: 9 }));
+      }
+      if (args[0] === 'api' && args[1] === 'graphql') {
+        permissionChecks += 1;
+        return denyProject
+          ? { status: 0, stdout: '{"data":{"user":{"projectV2":null}}}\n', stderr: '' }
+          : commandResult('{"data":{"user":{"projectV2":{"id":"P9","viewerCanUpdate":true}}}}\n');
       }
       return commandResult();
     },
@@ -570,12 +588,12 @@ test('mutating board installation rechecks Project access immediately before wri
         number: 9,
         statusField: 'Status',
         statusMap: { 'go:yes': 'Ready' },
-        secret: 'secrets.HEROES_PROJECT_TOKEN',
       },
     }, gate);
     denyProject = true;
-    assert.throws(() => applyPlan(root, plan, {}, gate), /Project access failed/u);
-    assert.equal(views, 2);
+    assert.throws(() => applyPlan(root, plan, {}, gate), /Project access failed|write access could not be verified|not found/u);
+    assert.equal(views, 3);
+    assert.equal(permissionChecks, 1);
     assert.equal(existsSync(path.join(root, '.squad/heroes.json')), false);
   } finally {
     cleanup(root);
@@ -606,17 +624,15 @@ test('Project board activation verifies write rights before any file mutation', 
     },
   };
   try {
-    const plan = buildInstallPlan(root, {
+    assert.throws(() => buildInstallPlan(root, {
       ...options,
       boardSync: true,
       board: {
         number: 9,
         statusField: 'Status',
         statusMap: { 'go:yes': 'Ready' },
-        secret: 'secrets.HEROES_PROJECT_TOKEN',
       },
-    }, gate);
-    assert.throws(() => applyPlan(root, plan, {}, gate), (error) => {
+    }, gate), (error) => {
       assert.match(error.message, /403/iu);
       assert.match(error.message, /Project owner\/admin/u);
       return true;

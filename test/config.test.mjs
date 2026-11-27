@@ -55,7 +55,6 @@ test('existing v1 board state remains valid after Project number resolution', ()
       number: 42,
       statusField: 'Status',
       statusMap: { 'go:yes': 'Ready' },
-      secret: 'secrets.HEROES_PROJECT_TOKEN',
     },
   });
   assert.equal(validateHeroesConfig(config).extensions['board-sync'].number, 42);

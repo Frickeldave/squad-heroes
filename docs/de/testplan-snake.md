@@ -393,6 +393,7 @@ Browserdaten und Cleanup-Protokoll.
 ## Lifecycle-Fixture zur Project-Erstellung
 
 - Owner `frickeldave-test`, Repository `squad-heroes-snake`, null Projects: Pfeiltastenmenü mit Anlegen und Abbrechen/Freigeben prüfen; Abbrechen ist mutationsfrei.
-- Dry-run mit `--create-project --project-title squad-heroes-snake` zeigt Owner, Namen, `{{PROJECT_NUMBER}}`, Schema und Repository-Link, aber keine GitHub-Mutation.
-- Apply erzeugt genau einmal, nutzt die zurückgegebene Nummer/Node-ID und `viewerCanUpdate`, konfiguriert/verknüpft und persistiert die Nummer. Rerun erzeugt kein zweites Project und keinen lokalen Write.
+- Dry-run mit `--create-project --project-title squad-heroes-snake` prüft Scope und lesenden Owner-Zugriff früh, wechselt nach Create-Bestätigung zu `PLANNED_CREATE`, fragt Statusfeld/-Map ohne Token-Prompt, zeigt Owner, Name, `{{PROJECT_NUMBER}}` und aufgeschobene Schema-/Link-Operationen, macht keinen Lookup mit dem Platzhalter und keine GitHub-Mutation.
+- Apply erzeugt genau einmal, löst zurückgegebene Nummer/Node-ID sofort mit einem frischen Project-Lookup auf, prüft `viewerCanUpdate`, konfiguriert/verknüpft und persistiert die Nummer. Rerun erzeugt kein zweites Project und keinen lokalen Write.
 - 403, fehlende CI-Flags, mehrdeutige Booleans, ungültige Titel, Teilfehler/Recovery, bestehende Ein-/Mehrfach-/Explizitnummer-Flows und tokenfreie Logs prüfen.
+- Gerenderte Project-Workflows prüfen: `HEROES_PROJECT_TOKEN` fließt nur in Project-v2-Kommandos; Repository-Issue-/PR- und Label-Kommandos nutzen `${{ github.token }}` mit deklarierten Permissions. Das Project-Secret braucht nur den klassischen `project`-Scope (nicht `repo`) oder fein abgestuftes Projects-Lese-/Schreibrecht; `.squad/heroes.json` enthält kein Tokenfeld/-ausdruck.

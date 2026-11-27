@@ -377,6 +377,7 @@ results, and the cleanup record.
 ## Project creation lifecycle fixture
 
 - Fixture owner `frickeldave-test`, repository `squad-heroes-snake`, zero Projects. Verify the arrow menu contains create and cancel/share choices; cancellation mutates nothing.
-- Dry-run with `--create-project --project-title squad-heroes-snake` shows owner, name, `{{PROJECT_NUMBER}}`, schema, and repository-link operations, and records zero GitHub mutations.
-- Apply creates exactly once, observes the returned number/node ID and `viewerCanUpdate`, configures fields/options, links the repository, and persists the real number. A rerun with the saved state performs no second create and no local writes.
+- Dry-run with `--create-project --project-title squad-heroes-snake` first proves scope and owner list access, enters `PLANNED_CREATE`, requests status field/map defaults without a token prompt, shows owner, name, `{{PROJECT_NUMBER}}`, deferred schema and repository-link operations, performs no Project lookup by placeholder, and records zero GitHub mutations.
+- Apply creates exactly once, immediately resolves the returned number/node ID through a fresh Project lookup, observes `viewerCanUpdate`, configures fields/options, links the repository, and persists the real number. A rerun with the saved state performs no second create and no local writes.
 - Cover denied owner permission/403, missing noninteractive flags, ambiguous booleans, invalid titles, partial schema failure/recovery, existing one/multiple/explicit Project flows, and command logs containing no token material.
+- Inspect rendered Project workflows: `HEROES_PROJECT_TOKEN` is routed only into Project V2 commands, while repository issue/PR and label commands use `${{ github.token }}` plus declared permissions. The Project secret requires only classic `project` scope (not `repo`) or fine-grained Projects read/write; `.squad/heroes.json` contains no token field/expression.

@@ -14,9 +14,18 @@ if (!owner || !number || !field || Object.keys(statuses).length === 0 || !reposi
 }
 
 function gh(args) {
+  const isProject = args[0] === 'project' ||
+    (args[0] === 'api' && args[1] === 'graphql' && args.join(' ').includes('ProjectV2'));
+  const token = isProject
+    ? process.env.GH_PROJECT_TOKEN
+    : (process.env.GH_REPOSITORY_TOKEN ?? process.env.GH_TOKEN);
+  if (!token) throw new Error(`Missing ${isProject ? 'Project' : 'repository'} Actions token`);
   let last;
   for (let attempt = 1; attempt <= 3; attempt += 1) {
-    const result = spawnSync('gh', args, { encoding: 'utf8' });
+    const result = spawnSync('gh', args, {
+      encoding: 'utf8',
+      env: { ...process.env, GH_TOKEN: token },
+    });
     if (result.status === 0) return result.stdout.trim();
     last = result;
     if (attempt < 3) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, attempt * 250);

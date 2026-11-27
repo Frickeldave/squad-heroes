@@ -119,7 +119,6 @@ test('board workflow and script are absent without opt-in and complete when enab
         number: '7',
         statusField: 'Status',
         statusMap: { 'go:yes': 'Ready', 'go:done': 'Done' },
-        secret: 'secrets.HEROES_PROJECT_TOKEN',
       },
     });
 
@@ -169,6 +168,9 @@ test('board workflow and script are absent without opt-in and complete when enab
       'utf8'
     );
     assert.match(workflow, /vars\.HEROES_BOARD_SYNC == 'enabled'/u);
+    assert.match(workflow, /GH_PROJECT_TOKEN: \$\{\{ secrets\.HEROES_PROJECT_TOKEN \}\}/u);
+    assert.match(workflow, /GH_REPOSITORY_TOKEN: \$\{\{ github\.token \}\}/u);
+    assert.doesNotMatch(workflow, /projectSecret|\{\{\s*\{\{/u);
     assert.match(workflow, /HEROES_PROJECT_STATUS_FIELD: "Status"/u);
     assert.doesNotMatch(workflow, /HEROES_BOARD_SYNC == 'enabled'.*Project-Write/u);
     assert.ok(existsSync(path.join(root, 'scripts/sync-project-board.mjs')));
