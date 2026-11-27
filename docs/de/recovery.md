@@ -51,15 +51,22 @@ erneut auf Marker und UTF-8 validiert.
   nutzen; Squad selbst nicht unter `sudo` starten.
 - Exit-Code 2 gilt ebenso für fehlende, doppelte, ungültige oder Prerelease-
   Squad-Versionen; `2.0.0-rc.1` wird nicht akzeptiert.
-- `gh_host`: `gh` auf dem Host installieren und dort anmelden.
-- `gh_auth`: auf dem Host den offiziellen `gh auth login`-Browser-/Device-Flow
-  ausführen.
-- `gh_permission`: Repository-Lese- oder Push-Recht nicht beweisbar; Zugriff
-  bestätigen oder vom Owner anfordern.
-- `gh_project`, `project_missing`, `project_ambiguous`: Project-Scopes/Zugriff
-  oder deterministische Auswahl fehlen. Host-Auth mit `read:project,project`
-  erneuern, Account-Zugriff bestätigen, ein Project anlegen/freigeben oder für CI
-  eine validierte `--project-number` übergeben.
+- `gh_cli_missing`: `gh` installieren und dann über Browser/Device anmelden.
+- `gh_auth_failed`: den Host-Browser-/Device-Flow verwenden; keinen Token
+  einfügen.
+- `gh_repository_not_found`: falscher Slug, fehlendes Repository oder ein
+  privates Repository, das der aktive Account nicht sieht.
+- `gh_repository_read_denied`: einen Owner um Lese-/Collaborator-Zugriff bitten.
+- `gh_repository_push_denied`: lesbar, aber ein Owner/Maintainer muss Write-
+  oder Collaborator-Zugriff gewähren.
+- `gh_account_mismatch`: nur zu einem bereits eingerichteten Account wechseln,
+  sonst per Browser/Device anmelden und Identität auswählen.
+- `gh_api_error`: erneut versuchen und Host, VPN, DNS sowie GitHub-Verfügbarkeit
+  prüfen.
+- `gh_project_scope`/`gh_project_access`, `project_missing`,
+  `project_ambiguous`: Project-Scope/-Zugriff oder deterministische Auswahl
+  fehlt. Nur den nötigen Scope erneuern, ein Project anlegen/freigeben oder für
+  CI eine validierte `--project-number` übergeben.
 - `conflicts`: Dry-run und Dateien unverändert; Entscheidung erforderlich.
 - `ambiguous_markers`: doppelte, fehlende oder vertauschte Marker.
 - `deployment_branch`: Ref ungültig oder nicht eindeutig.
@@ -75,3 +82,36 @@ erneut auf Marker und UTF-8 validiert.
 Bei Authentifizierungsfehlern nur offizielle Host-Flows `gh auth login` oder
 `gh auth refresh` nutzen. Tokens nicht kopieren, nicht mit `--with-token`
 übergeben und keine Token-Werte im Terminal eingeben.
+
+## GitHub-Preflight-Korrekturen zum Kopieren
+
+Jeder Fehler meldet Host, sicheren aktiven Login, Repository-Slug, bereinigtes
+Prüfergebnis und **Keine Mutation gestartet**. Tokens, Header und vollständige
+API-Antworten werden nie ausgegeben.
+
+```sh
+gh auth status --hostname github.com
+gh api user --jq .login
+gh api repos/OWNER/REPO --jq .permissions
+gh repo view OWNER/REPO
+```
+
+- `404`: Owner/Name ist falsch oder der Account sieht das private Repository
+  nicht. Ein authentifizierter Owner prüft Existenz und gewährt
+  Collaborator-Zugriff.
+- Antwort mit `read: true` und `push: false`: kein Owner-Identitätsfehler.
+  Owner/Maintainer um Write-/Collaborator-Zugriff bitten und Login mit
+  `gh api user --jq .login` prüfen. Der Account muss nicht Owner sein.
+- Fehlende/fehlgeschlagene Host-Anmeldung:
+  `gh auth login --hostname github.com --web`.
+- Ist der richtige Account schon eingerichtet:
+  `gh auth switch --hostname github.com --user ACCOUNT`. Sonst Browser-/Device-Login
+  verwenden und diese Identität wählen. CI-/Operator-Läufe können bei bekannter
+  Identität `--expected-github-account ACCOUNT` übergeben; Owner-Gleichheit wird
+  niemals automatisch angenommen.
+- Nur-lesende Project-Auswahl:
+  `gh auth refresh -h github.com -s read:project`.
+- Mutiert dokumentiertes Project-Setup das Project:
+  `gh auth refresh -h github.com -s project`.
+- Bei API-/Netzwerkfehlern nach Prüfung von `github.com`, VPN und DNS erneut
+  versuchen. Keine Tokens, `Authorization`-Header oder Antwort-Bodies ausgeben.

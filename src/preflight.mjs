@@ -3,9 +3,11 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { HeroesError, INCOMPATIBLE_SQUAD_EXIT, fail } from './errors.mjs';
 import { readUtf8 } from './io.mjs';
+import { supportedLanguage, translate } from './messages.mjs';
 
 export const SQUAD_MIN_VERSION = '2.0.0';
 export const SQUAD_AGENT_PATH = '.github/agents/squad.agent.md';
+export const GITHUB_HOST = 'github.com';
 export const VERIFIED_MODEL_FALLBACK = Object.freeze([
   'mai-code-2',
   'claude-sonnet-5.5',
@@ -66,38 +68,164 @@ function run(command, args, options = {}) {
   });
 }
 
-function repositoryOwner(repository) {
+function repositoryParts(repository) {
   const match = String(repository ?? '').match(/^([-A-Za-z0-9_.]+)\/[-A-Za-z0-9_.]+$/u);
   if (!match) fail('repository', 'Repository must use owner/name syntax');
-  return match[1];
+  return { owner: match[1], slug: String(repository) };
 }
 
-function ghFailure(action, result) {
+function repositoryOwner(repository) {
+  return repositoryParts(repository).owner;
+}
+
+function language(options) {
+  return supportedLanguage(options.language ?? options.locale ?? process.env.LANG) ?? 'en';
+}
+
+function diagnostic(options, id, values) {
+  return translate(language(options), id, values).text;
+}
+
+function safeGhAccount(value) {
+  const login = String(value ?? '').trim();
+  return /^(?!-)[A-Za-z0-9-]{1,39}$/u.test(login) ? login : null;
+}
+
+function safeStatusSummary(result) {
+  const stderr = String(result?.stderr ?? '');
+  const http = stderr.match(/\bHTTP\s+([1-5]\d\d)\b/iu);
+  if (http) return `HTTP ${http[1]}`;
+  if (['ENOENT', 'ENOTFOUND', 'EAI_AGAIN', 'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT']
+    .includes(result?.error?.code)) {
+    return `process error ${result.error.code}`;
+  }
+  if (Number.isInteger(result?.status)) return `exit status ${result.status}`;
+  return 'command failed';
+}
+
+function stop(category, options, id, values, details = {}) {
+  fail(`gh_${category}`, diagnostic(options, id, values), {
+    category,
+    host: GITHUB_HOST,
+    ...details,
+  });
+}
+
+function assertGhInstalled(result, options) {
   if (result?.error?.code === 'ENOENT') {
-    fail('gh_host', 'GitHub CLI is unavailable. Install `gh` on the host and run `gh auth login`, then retry.');
+    stop('cli_missing', options, 'gh_cli_missing', { host: GITHUB_HOST });
   }
-  if (action === 'auth') {
-    fail('gh_auth', 'GitHub authentication failed. Run the host-side `gh auth login` browser/device flow, then retry. No token is accepted by the installer.');
-  }
-  throw result?.error ?? new Error(result?.stderr || `GitHub ${action} check failed`);
 }
 
 export function assertGithubWriteAccess(repository, options = {}) {
-  const auth = run('gh', ['auth', 'status'], options);
-  if (auth.status !== 0) ghFailure('auth', auth);
+  const slug = repositoryParts(repository).slug;
+  const auth = run('gh', ['auth', 'status', '--hostname', GITHUB_HOST], options);
+  assertGhInstalled(auth, options);
+  if (auth.status !== 0) {
+    stop('auth_failed', options, 'gh_auth_failed', {
+      host: GITHUB_HOST,
+      summary: safeStatusSummary(auth),
+      repository: slug,
+    }, { summary: safeStatusSummary(auth), repository: slug });
+  }
   const account = run('gh', ['api', 'user', '--jq', '.login'], options);
-  if (account.status !== 0 || !String(account.stdout).trim()) {
-    fail('gh_auth', 'The authenticated GitHub account could not access GitHub. Run `gh auth login` on the host and confirm account access, then retry.');
+  assertGhInstalled(account, options);
+  const login = safeGhAccount(account.stdout);
+  if (account.status !== 0 || !login) {
+    stop('auth_failed', options, 'gh_auth_failed', {
+      host: GITHUB_HOST,
+      summary: safeStatusSummary(account),
+      repository: slug,
+    }, { summary: safeStatusSummary(account), repository: slug });
   }
-  const read = run('gh', ['api', `repos/${repository}`, '--jq', '.permissions.pull'], options);
-  const push = run('gh', ['api', `repos/${repository}`, '--jq', '.permissions.push'], options);
-  if (read.status !== 0 || String(read.stdout).trim() !== 'true') {
-    fail('gh_permission', `Repository read permission for ${repository} could not be proven. Confirm the authenticated account can access the repository or ask an owner to grant access; refresh host auth with the required repo scope if needed. No mutation was started.`);
+  const expectedAccount = safeGhAccount(options.expectedAccount);
+  if (options.expectedAccount && !expectedAccount) {
+    fail(
+      'gh_account_mismatch',
+      diagnostic(options, 'gh_account_invalid', { active: login }),
+      { category: 'account_mismatch', host: GITHUB_HOST, activeAccount: login }
+    );
   }
-  if (push.status !== 0 || String(push.stdout).trim() !== 'true') {
-    fail('gh_permission', `Repository push permission for ${repository} could not be proven. Ask a repository owner for push access or run host-side \`gh auth login\` with the required repo scopes, then retry. No mutation was started.`);
+  if (expectedAccount && expectedAccount.toLowerCase() !== login.toLowerCase()) {
+    fail('gh_account_mismatch', diagnostic(options, 'gh_account_mismatch', {
+      active: login,
+      expected: expectedAccount,
+      repository: slug,
+      host: GITHUB_HOST,
+    }), { category: 'account_mismatch', host: GITHUB_HOST, activeAccount: login, expectedAccount });
   }
-  return { repository, owner: repositoryOwner(repository), account: String(account.stdout).trim(), read: true, push: true };
+
+  const verification = run('gh', ['api', `repos/${slug}`, '--jq', '.permissions'], options);
+  assertGhInstalled(verification, options);
+  if (verification.status !== 0) {
+    const summary = safeStatusSummary(verification);
+    if (summary === 'HTTP 404') {
+      stop('repository_not_found', options, 'gh_repository_not_found', {
+        active: login,
+        repository: slug,
+        host: GITHUB_HOST,
+        summary,
+      }, { summary, repository: slug, activeAccount: login });
+    }
+    if (summary === 'HTTP 401') {
+      stop('auth_failed', options, 'gh_auth_failed', {
+        host: GITHUB_HOST,
+        summary,
+        repository: slug,
+      }, { summary, repository: slug, activeAccount: login });
+    }
+    stop('api_error', options, 'gh_api_error', {
+      active: login,
+      repository: slug,
+      host: GITHUB_HOST,
+      summary,
+    }, { summary, repository: slug, activeAccount: login });
+  }
+
+  let permissions;
+  try {
+    permissions = JSON.parse(String(verification.stdout));
+  } catch {
+    permissions = null;
+  }
+  if (!permissions || typeof permissions !== 'object') {
+    stop('api_error', options, 'gh_api_error', {
+      active: login,
+      repository: slug,
+      host: GITHUB_HOST,
+      summary: 'invalid permissions response',
+    }, { summary: 'invalid permissions response', repository: slug, activeAccount: login });
+  }
+  const safePermissions = {
+    read: permissions.read === true || permissions.pull === true,
+    push: permissions.push === true,
+    admin: permissions.admin === true,
+    triage: permissions.triage === true,
+  };
+  const renderedPermissions = JSON.stringify(safePermissions);
+  if (!safePermissions.read) {
+    stop('repository_read_denied', options, 'gh_repository_read_denied', {
+      active: login,
+      repository: slug,
+      host: GITHUB_HOST,
+      permissions: renderedPermissions,
+    }, { repository: slug, activeAccount: login, permissions: safePermissions });
+  }
+  if (!safePermissions.push) {
+    stop('repository_push_denied', options, 'gh_repository_push_denied', {
+      active: login,
+      repository: slug,
+      host: GITHUB_HOST,
+      permissions: renderedPermissions,
+    }, { repository: slug, activeAccount: login, permissions: safePermissions });
+  }
+  return {
+    repository: slug,
+    owner: repositoryOwner(slug),
+    account: login,
+    host: GITHUB_HOST,
+    ...safePermissions,
+  };
 }
 
 export function discoverModels(options = {}) {
@@ -122,13 +250,36 @@ function parseProjects(result) {
   }
 }
 
+function projectScopeFailure(owner, repository, options, result, number) {
+  const active = safeGhAccount(options.account) ?? 'unknown';
+  const summary = safeStatusSummary(result);
+  const output = String(result?.stderr ?? '');
+  if (/\b(read:project|project)\b/iu.test(output) || /\bscope\b/iu.test(output)) {
+    stop('project_scope', options, 'gh_project_scope', {
+      active,
+      owner,
+      host: GITHUB_HOST,
+      summary,
+      project: number ? ` #${number}` : '',
+    }, { summary, repository, activeAccount: active, owner, projectNumber: number });
+  }
+  stop('project_access', options, 'gh_project_access', {
+    active,
+    owner,
+    host: GITHUB_HOST,
+    summary,
+    project: number ? ` #${number}` : '',
+  }, { summary, repository, activeAccount: active, owner, projectNumber: number });
+}
+
 export function listBoardProjects(repository, options = {}) {
   const owner = repositoryOwner(repository);
   const listed = run('gh', [
     'project', 'list', '--owner', owner, '--limit', '100', '--format', 'json',
   ], options);
   if (listed.status !== 0) {
-    fail('gh_project', 'GitHub Project access could not be proven. Run host-side `gh auth refresh -s read:project,project` (or `gh auth login`), then confirm the authenticated account can access this owner’s Projects. No mutation was started.');
+    assertGhInstalled(listed, options);
+    projectScopeFailure(owner, repository, options, listed);
   }
   const candidates = parseProjects(listed);
   if (!Array.isArray(candidates)) fail('gh_project', 'GitHub Project discovery returned an invalid response.');
@@ -168,7 +319,8 @@ export function resolveBoardProject(repository, board = {}, options = {}) {
     'project', 'view', String(number), '--owner', owner, '--format', 'json',
   ], options);
   if (viewed.status !== 0) {
-    fail('gh_project', `GitHub Project #${number} for "${owner}" could not be read. Confirm Project access or run host-side \`gh auth refresh -s read:project,project\`, then retry. No mutation was started.`);
+    assertGhInstalled(viewed, options);
+    projectScopeFailure(owner, repository, options, viewed, number);
   }
   try {
     const value = JSON.parse(String(viewed.stdout));

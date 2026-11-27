@@ -47,14 +47,20 @@ markers and UTF-8 before write.
   do not run Squad itself under `sudo`.
 - Exit code 2 also covers missing, duplicate, invalid or prerelease Squad
   versions; `2.0.0-rc.1` is not accepted.
-- `gh_host`: install `gh` on the host, then authenticate there.
-- `gh_auth`: run the host-side `gh auth login` browser/device flow.
-- `gh_permission`: repository read or push permission cannot be proven; confirm
-  access or request it from an owner.
-- `gh_project`, `project_missing`, `project_ambiguous`: Project scopes/access or
-  deterministic selection is missing. Refresh host auth with
-  `read:project,project`, confirm account access, create/share a Project, or pass
-  a validated `--project-number` for CI.
+- `gh_cli_missing`: install `gh`, then run the host browser/device login.
+- `gh_auth_failed`: use the host browser/device login; never paste a token.
+- `gh_repository_not_found`: the slug is wrong, the repo is absent, or the active
+  account cannot see a private repo.
+- `gh_repository_read_denied`: ask an owner to grant read/collaborator access.
+- `gh_repository_push_denied`: readable repo, but an owner/maintainer must grant
+  write/collaborator access.
+- `gh_account_mismatch`: switch only to an already configured account, otherwise
+  log in through the browser/device flow and select the expected identity.
+- `gh_api_error`: retry and check host, VPN, DNS, and GitHub availability.
+- `gh_project_scope`/`gh_project_access`, `project_missing`,
+  `project_ambiguous`: Project scope/access or deterministic selection is
+  missing. Refresh only the scope needed; create/share a Project or pass a
+  validated `--project-number` for CI.
 - `conflicts`: dry run and files unchanged; decision required.
 - `ambiguous_markers`: duplicate, absent or reversed markers.
 - `deployment_branch`: ref is invalid or ambiguous.
@@ -70,3 +76,37 @@ markers and UTF-8 before write.
 For authentication failures, use only official host-side `gh auth login` or
 `gh auth refresh` flows. Do not copy tokens, use `--with-token`, or type token
 values into a terminal.
+
+## Copy/paste GitHub preflight remediation
+
+Every failed gate reports the host, the safe active login, repository slug,
+sanitized verification result, and **No mutation started**. It never prints a
+token, header, or full API response.
+
+```sh
+gh auth status --hostname github.com
+gh api user --jq .login
+gh api repos/OWNER/REPO --jq .permissions
+gh repo view OWNER/REPO
+```
+
+- A `404` means the owner/name is wrong or the account cannot see the private
+  repository. Ask an authenticated owner to verify it exists and grant
+  collaborator access.
+- A `200` response with `read: true` and `push: false` is not an owner-identity
+  failure. Ask an owner or maintainer for write/collaborator access. Confirm the
+  login with `gh api user --jq .login`; repository owner equality is not
+  required.
+- Missing/failed host login:
+  `gh auth login --hostname github.com --web`.
+- If the correct account is already configured:
+  `gh auth switch --hostname github.com --user ACCOUNT`. Otherwise use the
+  browser/device login and select that identity. CI/operator runs may pass
+  `--expected-github-account ACCOUNT` when an identity is known; repository
+  owner equality is never inferred automatically.
+- Read-only Project selection:
+  `gh auth refresh -h github.com -s read:project`.
+- If documented Project setup mutates the Project:
+  `gh auth refresh -h github.com -s project`.
+- For API/network errors, retry after checking `github.com`, VPN, and DNS. Do
+  not expose tokens, `Authorization` headers, or response bodies.

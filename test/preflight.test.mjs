@@ -3,7 +3,12 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
-import { assertGithubWriteAccess, assertSquadCompatibility, detectSquadVersion } from '../src/preflight.mjs';
+import {
+  assertGithubWriteAccess,
+  assertSquadCompatibility,
+  detectSquadVersion,
+  listBoardProjects,
+} from '../src/preflight.mjs';
 import { cleanup, fixture, write } from './helpers.mjs';
 
 for (const version of ['2.0.0', '2.0.1', '3.0.0', '3.0.0+build.7']) {
@@ -40,23 +45,155 @@ test('0.13.1 plugin preflight exits 2 with safe update guidance', () => {
   }
 });
 
-test('GitHub auth gate exposes no credentials and stops on host or permission failure', () => {
+function ghFixture(repositoryResult, overrides = {}) {
   const calls = [];
-  assert.throws(() => assertGithubWriteAccess('owner/repository', {
-    spawn: (command, args) => {
-      calls.push({ command, args });
-      return { status: 1, stdout: '', stderr: '' };
-    },
-  }), /gh auth login/);
-  assert.deepEqual(calls, [{ command: 'gh', args: ['auth', 'status'] }]);
+  const spawn = (command, args) => {
+    calls.push({ command, args });
+    if (args[0] === 'auth') return overrides.auth ?? { status: 0, stdout: '', stderr: '' };
+    if (args[0] === 'api' && args[1] === 'user') {
+      return overrides.account ?? { status: 0, stdout: 'octocat\n', stderr: '' };
+    }
+    if (args[0] === 'api' && args[1] === `repos/${overrides.repository ?? 'owner/repository'}`) {
+      return typeof repositoryResult === 'function' ? repositoryResult(args) : repositoryResult;
+    }
+    return overrides.fallback ?? { status: 0, stdout: '', stderr: '' };
+  };
+  return { spawn, calls };
+}
 
+test('GitHub preflight safely reports every failure category', () => {
+  const secret = 'ghp_SUPER_SECRET_VALUE';
+  const cases = [
+    {
+      category: 'cli_missing',
+      fixture: ghFixture(null, { auth: { error: { code: 'ENOENT' }, status: null } }),
+      pattern: /GitHub CLI is unavailable|`gh` is missing/u,
+      command: 'gh auth login --hostname github.com --web',
+    },
+    {
+      category: 'auth_failed',
+      fixture: ghFixture(null, { auth: { status: 1, stderr: `Authorization: Bearer ${secret}` } }),
+      pattern: /GitHub authentication failed/u,
+      command: 'gh auth status --hostname github.com',
+    },
+    {
+      category: 'repository_not_found',
+      fixture: ghFixture({ status: 1, stdout: secret, stderr: 'HTTP 404: Not Found token=hidden' }),
+      pattern: /gh repo view owner\/repository/u,
+      command: 'gh api repos/owner/repository --jq .permissions',
+    },
+    {
+      category: 'repository_read_denied',
+      fixture: ghFixture({ status: 0, stdout: '{"pull":false,"push":false,"admin":false,"triage":false}' }),
+      pattern: /read access/u,
+      command: 'gh repo view owner/repository',
+    },
+    {
+      category: 'repository_push_denied',
+      fixture: ghFixture({ status: 0, stdout: '{"pull":true,"push":false,"admin":false,"triage":false}' }),
+      pattern: /write or collaborator access/u,
+      command: 'gh api user --jq .login',
+    },
+  ];
+  for (const item of cases) {
+    assert.throws(
+      () => assertGithubWriteAccess('owner/repository', { spawn: item.fixture.spawn }),
+      (error) => {
+        assert.equal(error.details.category, item.category);
+        assert.match(error.message, item.pattern);
+        assert.match(error.message, new RegExp(item.command.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'), 'u'));
+        assert.doesNotMatch(error.message, /SUPER_SECRET|ghp_|github_pat_|Authorization|token=/iu);
+        assert.match(error.message, /github\.com/u);
+        assert.match(error.message, /No mutation started/u);
+        return true;
+      }
+    );
+  }
+});
+
+test('GitHub preflight diagnoses account mismatch and API errors without leaking output', () => {
+  const mismatch = ghFixture({ status: 0, stdout: '{"pull":true,"push":true}' });
   assert.throws(() => assertGithubWriteAccess('owner/repository', {
-    spawn: (_command, args) => args[0] === 'auth'
-      ? { status: 0, stdout: '', stderr: '' }
-      : args[1] === 'user'
-        ? { status: 0, stdout: 'octocat\n', stderr: '' }
-        : { status: 0, stdout: args.at(-1) === '.permissions.pull' ? 'true\n' : 'false\n', stderr: '' },
-  }), /push permission/);
+    spawn: mismatch.spawn,
+    expectedAccount: 'hubot',
+  }), (error) => {
+    assert.equal(error.details.category, 'account_mismatch');
+    assert.match(error.message, /Active gh account: octocat/u);
+    assert.match(error.message, /gh auth switch --hostname github.com --user hubot/u);
+    assert.match(error.message, /owner equality is not required/u);
+    return true;
+  });
+  assert.throws(() => assertGithubWriteAccess('owner/repository', {
+    spawn: mismatch.spawn,
+    expectedAccount: 'ghp_EXPECTED_SECRET',
+  }), (error) => {
+    assert.equal(error.details.category, 'account_mismatch');
+    assert.match(error.message, /safe public login/u);
+    assert.doesNotMatch(error.message, /ghp_EXPECTED_SECRET/u);
+    return true;
+  });
+
+  const api = ghFixture({ status: 1, stdout: 'github_pat_private', stderr: 'dial tcp: lookup github.com: no such host ghp_private' });
+  assert.throws(() => assertGithubWriteAccess('owner/repository', { spawn: api.spawn }), (error) => {
+    assert.equal(error.details.category, 'api_error');
+    assert.match(error.message, /exit status 1/u);
+    assert.match(error.message, /VPN, DNS/u);
+    assert.match(error.message, /Active gh account: octocat/u);
+    assert.doesNotMatch(error.message, /private|ghp_/iu);
+    return true;
+  });
+});
+
+test('GitHub preflight uses one permissions check and returns booleans only', () => {
+  const fixture = ghFixture({ status: 0, stdout: JSON.stringify({
+    admin: false,
+    maintain: true,
+    push: true,
+    triage: true,
+    pull: true,
+  }) });
+  const result = assertGithubWriteAccess('owner/repository', { spawn: fixture.spawn });
+  assert.deepEqual(result, {
+    repository: 'owner/repository',
+    owner: 'owner',
+    account: 'octocat',
+    host: 'github.com',
+    read: true,
+    push: true,
+    admin: false,
+    triage: true,
+  });
+  const permissionCalls = fixture.calls.filter(({ args }) => args[0] === 'api' && args[1].startsWith('repos/'));
+  assert.deepEqual(permissionCalls, [{
+    command: 'gh',
+    args: ['api', 'repos/owner/repository', '--jq', '.permissions'],
+  }]);
+});
+
+test('GitHub Project scope and access failures are actionable and localized', () => {
+  const scope = { status: 1, stdout: '', stderr: 'requires scope read:project; token=secret' };
+  assert.throws(() => listBoardProjects('owner/repository', {
+    account: 'octocat',
+    spawn: () => scope,
+  }), (error) => {
+    assert.equal(error.details.category, 'project_scope');
+    assert.match(error.message, /gh auth refresh -h github.com -s read:project/u);
+    assert.match(error.message, /gh auth refresh -h github.com -s project/u);
+    assert.match(error.message, /Active gh account: octocat/u);
+    assert.doesNotMatch(error.message, /token=secret/u);
+    return true;
+  });
+  assert.throws(() => listBoardProjects('owner/repository', {
+    account: 'octocat',
+    language: 'de',
+    spawn: () => ({ status: 1, stdout: '', stderr: 'HTTP 500 internal ghp_secret' }),
+  }), (error) => {
+    assert.equal(error.details.category, 'project_access');
+    assert.match(error.message, /Keine Mutation gestartet/u);
+    assert.match(error.message, /VPN\/DNS/u);
+    assert.doesNotMatch(error.message, /ghp_secret/u);
+    return true;
+  });
 });
 
 for (const [label, source, detected] of [

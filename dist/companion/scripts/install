@@ -15,7 +15,7 @@ import { createInterface } from 'node:readline/promises';
 
 const HELP = `Usage:
   node .squad/templates/squad-heroes/companion/scripts/install --target /path/to/repository --repository owner/name --profile typescript-development --deployment-branches N \\
-    --deployment-branch-1 main [--deployment-branch-2 int ...] [--language de|en] [--dry-run]
+    --deployment-branch-1 main [--deployment-branch-2 int ...] [--language de|en] [--expected-github-account ACCOUNT] [--dry-run]
 
 Squad 2.0.0 or higher must be installed in the target repository. The installer
 is human-triggered, performs two version checks, never calls plugin installation
@@ -53,7 +53,11 @@ export async function completeInteractiveOptions(options, existing, ask, choose,
   const preliminaryLanguage = supportedLanguage(
     options.language ?? existing?.language ?? process.env.LANG
   ) ?? 'en';
-  const repositoryAccess = assertGithubWriteAccess(options.repository, injected);
+  const repositoryAccess = assertGithubWriteAccess(options.repository, {
+    ...injected,
+    language: preliminaryLanguage,
+    expectedAccount: options.expectedAccount ?? injected.expectedAccount,
+  });
   process.stdout.write(`${wizardText(preliminaryLanguage, 'github_access_verified').replace('{account}', repositoryAccess.account)}\n`);
 
   options.profile ??= await ask('Project profile', existing?.profile ?? 'typescript-development');
@@ -98,7 +102,11 @@ export async function completeInteractiveOptions(options, existing, ask, choose,
     const current = existing?.extensions?.['board-sync'];
     const configuredNumber = options.board.number ?? current?.number;
     if (configuredNumber === undefined || configuredNumber === null || configuredNumber === '') {
-      const projects = listBoardProjects(options.repository, injected);
+      const projects = listBoardProjects(options.repository, {
+        ...injected,
+        language,
+        account: repositoryAccess.account,
+      });
       if (projects.length > 1) {
         const labels = projects.map((project) =>
           `${project.number} — ${project.title ?? project.name ?? 'Project'}`
@@ -114,6 +122,8 @@ export async function completeInteractiveOptions(options, existing, ask, choose,
     resolveBoardProject(options.repository, options.board, {
       ...injected,
       configuredNumber: current?.number,
+      language,
+      account: repositoryAccess.account,
     });
     options.board.statusField ??= await ask('Project status field', current?.statusField ?? 'Status');
     options.board.statusMap ??= JSON.parse(await ask(
@@ -167,8 +177,15 @@ export async function main() {
     if (process.stdin.isTTY) {
       await wizard(options);
     } else if (options.repository) {
-      assertGithubWriteAccess(options.repository);
-      if (options.boardSync) resolveBoardProject(options.repository, options.board);
+      const language = supportedLanguage(options.language ?? process.env.LANG) ?? 'en';
+      const access = assertGithubWriteAccess(options.repository, {
+        language,
+        expectedAccount: options.expectedAccount,
+      });
+      if (options.boardSync) resolveBoardProject(options.repository, options.board, {
+        language,
+        account: access.account,
+      });
     }
     const repoRoot = resolve(options.target ?? process.cwd());
     const plan = buildInstallPlan(repoRoot, options);

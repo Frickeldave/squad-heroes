@@ -9,7 +9,13 @@ import { cleanup, commandResult, fixture, write } from './helpers.mjs';
 const product = path.resolve(import.meta.dirname, '..');
 const injected = {
   cwd: '.',
-  spawn: (command, args) => args[0] === 'auth' ? commandResult() : commandResult('true\n'),
+  spawn: (command, args) => {
+    if (args[0] === 'api' && args[1] === 'user') return commandResult('octocat\n');
+    if (args[0] === 'api' && args[1].startsWith('repos/')) {
+      return commandResult('{"pull":true,"push":true,"admin":false,"triage":false}\n');
+    }
+    return commandResult();
+  },
 };
 const options = {
   repository: 'owner/repository',

@@ -19,12 +19,14 @@ verändert sein Plugin-verwaltetes Bundle selbst nicht.
 
 ## Rechte und Zustimmung
 
-Vor Planung sind `gh auth status`, authentifizierter Account-Zugriff sowie
-Repository-Lese-/Push-Rechte Pflicht. Board-Opt-in verlangt zusätzlich
-nicht-mutierenden Project-list/view-Zugriff; der Owner wird aus dem Repository
-abgeleitet. Host-Authentifizierungsfehler verweisen auf `gh auth login`.
-Fehlende Project-Scopes verweisen auf `gh auth refresh -s read:project,project`
-und anschließende Bestätigung von Owner-/Account-Zugriff. Berechtigung ersetzt
+Vor Planung sind `gh auth status --hostname github.com`, authentifizierter
+Account-Zugriff und `gh api repos/OWNER/REPO --jq .permissions` Pflicht.
+Gespeichert werden nur die Booleans read/push/admin/triage. Board-Opt-in
+verlangt zusätzlich nicht-mutierenden Project-list/view-Zugriff; der Owner wird
+aus dem Repository abgeleitet. Host-Fehler verweisen auf
+`gh auth login --hostname github.com --web`. Nur-lesender Project-Zugriff nutzt
+`gh auth refresh -h github.com -s read:project`; dokumentiertes mutierendes
+Project-Setup bei Bedarf den Scope `project`. Berechtigung ersetzt
 keine ausdrückliche Zustimmung. Dry-run und Erstaktivierung schreiben kein
 Project; der spätere Workflow bleibt separat opt-in.
 

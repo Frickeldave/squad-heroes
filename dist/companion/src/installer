@@ -24,6 +24,7 @@ export function parseInstallArguments(argv) {
     boardSync: false,
     board: {},
     repository: null,
+    expectedAccount: null,
     profile: null,
     language: null,
     models: { reqeng: 'mai-code-2', work: 'claude-sonnet-5.5', review: 'gpt-6.1-terra' },
@@ -42,6 +43,7 @@ export function parseInstallArguments(argv) {
     else if (arg === '--project-secret') options.board.secret = argv[++index];
     else if (arg === '--review-baseline') options.reviewBaseline = argv[++index];
     else if (arg === '--repository') options.repository = argv[++index];
+    else if (arg === '--expected-github-account') options.expectedAccount = argv[++index];
     else if (arg === '--profile') options.profile = argv[++index];
     else if (arg === '--language') options.language = argv[++index];
     else if (arg === '--target') options.target = argv[++index];
@@ -170,8 +172,21 @@ export function buildInstallPlan(repoRoot, options = {}, injected = {}) {
   if (existing) validateHeroesConfig(existing);
   const accessRepository = options.repository ?? existing?.repository;
   if (!accessRepository) fail('repository_missing', '--repository owner/name is required for initial installation');
-  assertGithubWriteAccess(accessRepository, injected);
-  if (options.boardSync) resolveBoardProject(accessRepository, options.board, injected);
+  const language = resolveLanguage(
+    options.language,
+    existing?.language,
+    options.locale ?? process.env.LANG
+  ).language;
+  const access = assertGithubWriteAccess(accessRepository, {
+    ...injected,
+    language,
+    expectedAccount: options.expectedAccount ?? injected.expectedAccount,
+  });
+  if (options.boardSync) resolveBoardProject(accessRepository, options.board, {
+    ...injected,
+    language,
+    account: access.account,
+  });
   const reviewBaseline = assertReviewBaseline(
     repoRoot,
     options.reviewBaseline ?? existing?.reviewBaseline,
@@ -185,7 +200,6 @@ export function buildInstallPlan(repoRoot, options = {}, injected = {}) {
   if (!options.branches && !existing?.deploymentBranches) {
     fail('branches_missing', 'Pass --deployment-branches and the matching --deployment-branch-N values');
   }
-  const language = resolveLanguage(options.language, existing?.language, options.locale ?? process.env.LANG).language;
   const config = existing
     ? validateHeroesConfig({
         ...existing,
@@ -262,7 +276,12 @@ export function buildInstallPlan(repoRoot, options = {}, injected = {}) {
   return { config: completed, operations: planned, conflicts: planned.filter((item) => item.action === 'conflict') };
 }
 
-export function applyPlan(repoRoot, plan, { dryRun = false, verify = false } = {}, injected = {}) {
+export function applyPlan(
+  repoRoot,
+  plan,
+  { dryRun = false, verify = false, expectedAccount } = {},
+  injected = {}
+) {
   const conflicts = plan.conflicts;
   if (conflicts.length) {
     const list = summarizePlan(plan.operations);
@@ -270,9 +289,19 @@ export function applyPlan(repoRoot, plan, { dryRun = false, verify = false } = {
   }
   if (verify || dryRun) return { changed: 0, plan: summarizePlan(plan.operations) };
   assertSquadCompatibility(repoRoot);
-  if (plan.config.repository) assertGithubWriteAccess(plan.config.repository, injected);
+  const access = plan.config.repository
+    ? assertGithubWriteAccess(plan.config.repository, {
+        ...injected,
+        language: plan.config.language,
+        expectedAccount: expectedAccount ?? injected.expectedAccount,
+      })
+    : null;
   if (plan.config.extensions?.['board-sync']) {
-    resolveBoardProject(plan.config.repository, { ...plan.config.extensions['board-sync'] }, injected);
+    resolveBoardProject(plan.config.repository, { ...plan.config.extensions['board-sync'] }, {
+      ...injected,
+      language: plan.config.language,
+      account: access.account,
+    });
   }
   let changed = 0;
   for (const operation of [...plan.operations.filter(({ id }) => id !== 'heroes-state'),

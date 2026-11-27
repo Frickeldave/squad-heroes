@@ -24,7 +24,13 @@ const options = {
 };
 const injected = {
   cwd: '.',
-  spawn: (command, args) => args[0] === 'auth' ? commandResult() : commandResult('true\n'),
+  spawn: (command, args) => {
+    if (args[0] === 'api' && args[1] === 'user') return commandResult('octocat\n');
+    if (args[0] === 'api' && args[1].startsWith('repos/')) {
+      return commandResult('{"pull":true,"push":true,"admin":false,"triage":false}\n');
+    }
+    return commandResult();
+  },
 };
 
 test('interactive Companion wizard collects required and opt-in configuration', async () => {
@@ -72,7 +78,10 @@ test('interactive Companion wizard collects required and opt-in configuration', 
         return commandResult(JSON.stringify({ number: 7, title: 'Snake' }));
       }
       if (args[0] === 'api' && args[1] === 'user') return commandResult('octocat\n');
-      return commandResult('true\n');
+      if (args[0] === 'api' && args[1].startsWith('repos/')) {
+        return commandResult('{"pull":true,"push":true}\n');
+      }
+      return commandResult();
     },
   });
   assert.equal(completed.profile, 'typescript-development');
@@ -129,7 +138,10 @@ test('interactive German model labels and discovery fallback are explicit', asyn
       spawn(command, args) {
         if (command === 'copilot') return { status: 1, stdout: '', stderr: '' };
         if (args[0] === 'api' && args[1] === 'user') return commandResult('octocat\n');
-        return commandResult('true\n');
+        if (args[0] === 'api' && args[1].startsWith('repos/')) {
+          return commandResult('{"pull":true,"push":true}\n');
+        }
+        return commandResult();
       },
     });
   } finally {
@@ -147,7 +159,7 @@ test('GitHub preflight diagnoses host, auth and repository permission failures b
   const root = fixture();
   try {
     const failures = [
-      [{ error: { code: 'ENOENT' }, status: null }, /GitHub CLI is unavailable/u],
+      [{ error: { code: 'ENOENT' }, status: null }, /`gh` is missing/u],
       [{ status: 1, stdout: '', stderr: '' }, /gh auth login/u],
     ];
     for (const [result, message] of failures) {
@@ -160,22 +172,20 @@ test('GitHub preflight diagnoses host, auth and repository permission failures b
     assert.throws(() => assertGithubWriteAccess('owner/repository', {
       spawn: () => {
         call += 1;
-        if (call === 3) return commandResult('false\n');
-        if (call === 4) return commandResult('true\n');
         if (call === 2) return commandResult('octocat\n');
+        if (call === 3) return commandResult('{"pull":false,"push":true}\n');
         return commandResult();
       },
-    }), /Repository read permission/u);
+    }), /Repository read access/u);
     call = 0;
     assert.throws(() => assertGithubWriteAccess('owner/repository', {
       spawn: () => {
         call += 1;
         if (call === 2) return commandResult('octocat\n');
-        if (call === 3) return commandResult('true\n');
-        if (call === 4) return commandResult('false\n');
+        if (call === 3) return commandResult('{"pull":true,"push":false}\n');
         return commandResult();
       },
-    }), /Repository push permission/u);
+    }), /push access is false/u);
   } finally {
     cleanup(root);
   }
@@ -207,7 +217,7 @@ test('board project resolution derives owner and handles one, many, zero and ina
   }), /No GitHub Project/u);
   assert.throws(() => resolveBoardProject('owner/repository', { number: 4 }, {
     spawn: list([], 1),
-  }), /could not be read/u);
+  }), /Project access failed/u);
   assert.throws(() => resolveBoardProject('owner/repository', { owner: 'other', number: 4 }), /derived/u);
 });
 
@@ -233,6 +243,9 @@ test('multiple discovered Projects are selected only through the interactive men
     spawn(command, args) {
       if (command === 'copilot') return { status: 1, stdout: '', stderr: '' };
       if (args[0] === 'api' && args[1] === 'user') return commandResult('octocat\n');
+      if (args[0] === 'api' && args[1].startsWith('repos/')) {
+        return commandResult('{"pull":true,"push":true}\n');
+      }
       if (args[0] === 'project' && args[1] === 'list') {
         return commandResult(JSON.stringify({
           projects: [{ number: 1, title: 'Roadmap' }, { number: 2, title: 'Delivery' }],
@@ -271,7 +284,10 @@ test('dry-run board opt-in uses only read checks and writes no active targets', 
         if (args[0] === 'project' && args[1] === 'view') {
           return commandResult(JSON.stringify({ number: 7 }));
         }
-        return commandResult('true\n');
+        if (args[0] === 'api' && args[1].startsWith('repos/')) {
+          return commandResult('{"pull":true,"push":true}\n');
+        }
+        return commandResult();
       },
     };
     const plan = buildInstallPlan(root, boardOptions, injected);
@@ -301,9 +317,12 @@ test('Project access failure blocks board installation before its first write', 
         if (args[0] === 'project' && args[1] === 'view') {
           return { status: 1, stdout: '', stderr: 'forbidden' };
         }
-        return commandResult('true\n');
+        if (args[0] === 'api' && args[1].startsWith('repos/')) {
+          return commandResult('{"pull":true,"push":true}\n');
+        }
+        return commandResult();
       },
-    }), /could not be read/u);
+    }), /Project access failed/u);
     assert.equal(existsSync(path.join(root, '.squad/heroes.json')), false);
   } finally {
     cleanup(root);

@@ -19,12 +19,14 @@ changes its own plugin-managed bundle.
 
 ## Permissions and approval
 
-Before planning, `gh auth status`, authenticated account access and repository
-read/push permissions are required. Board opt-in additionally requires
+Before planning, `gh auth status --hostname github.com`, authenticated account
+access and `gh api repos/OWNER/REPO --jq .permissions` are required. Only the
+read/push/admin/triage booleans are retained. Board opt-in additionally requires
 non-mutating Project list/view access; selected owner is derived from the
-repository. Host authentication failures direct the operator to `gh auth
-login`. Missing Project scopes direct to `gh auth refresh -s
-read:project,project`, followed by confirmation of owner/account access.
+repository. Host failures direct the operator to
+`gh auth login --hostname github.com --web`. Read-only Project access uses
+`gh auth refresh -h github.com -s read:project`; a documented mutating Project
+setup uses the `project` scope when needed.
 Permission does not replace explicit approval. The installer performs no
 Project write in dry-run or initial activation; the later workflow remains a
 separate opt-in.

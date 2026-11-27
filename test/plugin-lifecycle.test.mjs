@@ -92,7 +92,11 @@ for (const fixtureId of [1, 2]) test(`real Squad lifecycle uses an installed sel
   const activeWorkflow = path.join(root, '.github/workflows/heroes-ci.yml');
   const installedEntry = path.join(root, '.squad/templates/squad-heroes/companion/scripts/install');
   const installedCharter = path.join(root, '.squad/templates/squad-heroes/companion/.squad/heroes/agents/tony.en.md');
-  write(root, 'bin/gh', '#!/bin/sh\nprintf "true\\n"\n');
+  write(root, 'bin/gh', `#!/bin/sh
+if [ "$1" = "api" ] && [ "$2" = "user" ]; then printf 'octocat\\n'; fi
+if [ "$1" = "api" ] && printf '%s' "$2" | grep -q '^repos/'; then printf '{"pull":true,"push":true,"admin":false,"triage":false}\\n'; fi
+exit 0
+`);
   chmodSync(path.join(root, 'bin/gh'), 0o755);
   try {
     mustRun(root, ['validate', product]);
