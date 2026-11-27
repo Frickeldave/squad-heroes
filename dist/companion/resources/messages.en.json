@@ -15,8 +15,8 @@
   "picker_help": "↑/↓ or j/k to move, Enter to confirm, Escape or q to cancel",
   "picker_current": "(current)",
   "picker_cancelled": "Selection cancelled; no changes were made.",
-  "picker_tty_required": "Interactive selection requires a TTY. For noninteractive use pass the installation flags, including --model-reqeng, --model-work, --model-review, and --project-number when board sync is enabled.",
-  "github_access_verified": "GitHub host authentication, repository permissions, Project scope, and non-mutating Project API access verified for {account}. Safe scope status: project granted.",
+  "picker_tty_required": "Interactive selection requires a TTY. For noninteractive use pass all installation flags, including --model-reqeng, --model-work, --model-review, and either --project-number or both --create-project and --project-title when board sync is enabled.",
+  "github_access_verified": "GitHub host authentication, repository permissions, Project scope, and non-mutating Project API access verified. Active account: {account}. Derived Project owner: {owner}. Safe scope status: project granted.",
   "github_project": "GitHub Project",
   "gh_cli_missing": "GitHub preflight failed. Host: {host}. Active gh account: unavailable. `gh` is missing. Install GitHub CLI, then run `gh auth login --hostname github.com --web` and retry. Verification begins with `gh auth status --hostname github.com`. No mutation started.",
   "gh_auth_failed": "GitHub authentication failed. Host: {host}. Active gh account: unavailable. Repository: {repository}. Result: {summary}. Run `gh auth status --hostname github.com`, then `gh auth login --hostname github.com --web` and complete the browser/device flow. No token is accepted or printed. No mutation started.",
@@ -28,5 +28,13 @@
   "gh_api_error": "GitHub API verification failed. Host: {host}. Active gh account: {active}. Repository: {repository}. Verification: `gh api repos/{repository} --jq .permissions` → {summary}. Retry; then check the hostname, VPN, DNS, and GitHub availability. Do not inspect or share tokens, headers, or full response bodies. No mutation started.",
   "gh_project_scope": "GitHub Board setup needs the write-capable `project` scope. Host: {host}. Active gh account: {active}. Safe scope status: {scopeStatus}. Project owner: {owner}{project}. Result: {summary}. Run:\n`gh auth refresh -h github.com -s project`\nthen\n`gh auth status --hostname github.com`\nThe refresh uses GitHub's browser/device flow. No token is requested. No mutation started.",
   "gh_project_access": "GitHub Project access failed. Host: {host}. Active gh account: {active}. Project owner: {owner}{project}. Result: {summary}. For 403, ask a Project owner/admin to grant this account write access and confirm organization policies permit Projects. For 404, verify the derived owner, Project number, visibility, and that the account can see the owner's private Project. Check with `gh project list --owner {owner} --limit 100 --format json`. Check host/VPN/DNS for network failures. No mutation started.",
-  "gh_project_write_access": "GitHub Project write access could not be verified. Host: {host}. Active gh account: {active}. Project owner: {owner}{project}. Result: {summary}. A 403 requires Project write rights and compatible organization policy; a 404 means the Project or owner is not visible to this account. Confirm with `gh project view {number} --owner {owner}`. Ask a Project owner/admin to grant access. No mutation started."
+  "gh_project_write_access": "GitHub Project write access could not be verified. Host: {host}. Active gh account: {active}. Project owner: {owner}{project}. Result: {summary}. A 403 requires Project write rights and compatible organization policy; a 404 means the Project or owner is not visible to this account. Confirm with `gh project view {number} --owner {owner}`. Ask a Project owner/admin to grant access. No mutation started.",
+  "github_project_missing": "No GitHub Project exists for the derived owner. What should Companion do?",
+  "github_project_create": "Create a new Project with Companion",
+  "github_project_cancel": "Cancel / supply or share an existing Project",
+  "github_project_cancelled": "Project setup cancelled. No external or local mutation was started.",
+  "github_project_title_prompt": "New Project title",
+  "github_project_owner_prompt": "Active account {account} will create Project \"{title}\" for derived owner {owner}. Confirm the title, owner, and account (y/N)",
+  "github_project_apply_approval": "Rendered plan creates GitHub Project \"{title}\" for owner \"{owner}\" and configures its schema/link. This is externally visible and not automatically rolled back. Approve apply",
+  "gh_project_create_access": "GitHub Project creation is denied. Host: {host}. Active gh account: {active}. Derived {kind} owner: {owner}. Result: {summary}. The active account cannot create Projects for this owner. Ask an owner/admin to grant Project creation permission or adjust organization policy. Creation uses no token argument and was not attempted."
 }

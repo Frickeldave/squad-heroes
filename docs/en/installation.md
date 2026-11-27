@@ -76,8 +76,7 @@ to a commit in the target repository.
 
 Project board opt-in never asks for owner or number. Owner is always derived
 from `--repository`; the available Projects are read through `gh`. One Project
-is selected automatically, multiple Projects use the same arrow-key picker, and zero stops before
-planning with setup/access instructions. Explicit `--project-number` (and a
+is selected automatically, multiple Projects use the same arrow-key picker, and zero opens the explicit create/cancel menu described below. Explicit `--project-number` (and a
 matching derived-owner `--project-owner`) may be used by CI but is always
 validated through the API. Before Board configuration can mutate, a fresh
 GraphQL check verifies `viewerCanUpdate`; the later workflow repeats that
@@ -147,3 +146,15 @@ node .squad/templates/squad-heroes/companion/scripts/install --target "$PWD"
 The installed copy is self-contained; the external source checkout is not used
 by Companion installation. `squad plugin uninstall squad-heroes` removes only
 the managed distribution, not active files already created by the Companion.
+
+## Companion-created Projects
+
+With board sync enabled and zero visible Projects, the TTY wizard renders an arrow-key menu: create a new Project, or cancel/supply/share one. It derives owner `frickeldave-test`, proposes title `squad-heroes-snake`, and requires explicit title/owner confirmation. For CI, both `--create-project` and `--project-title` are mandatory; `--create-project=false` is invalid.
+
+Exact dry-run (no GitHub mutation):
+
+```bash
+node .squad/templates/squad-heroes/companion/scripts/install --target "$PWD" --repository frickeldave-test/squad-heroes-snake --enable-board-sync --profile typescript-development --language en --deployment-branches 1 --deployment-branch-1 main --model-reqeng mai-code-2 --model-work claude-sonnet-5.5 --model-review gpt-6.1-terra --create-project --project-title squad-heroes-snake --dry-run
+```
+
+The same command without `--dry-run` is apply. It uses authenticated `gh api graphql` to create after local conflict checks, resolves the real number/node ID, configures the status field/options, links the repository, validates `viewerCanUpdate`, and then writes `.squad/heroes.json`. The terminal apply additionally requires approval of the rendered plan. Manual cleanup may be necessary after a partial external failure; no automatic rollback is promised.

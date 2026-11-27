@@ -65,6 +65,7 @@ function run(command, args, options = {}) {
     cwd: options.cwd,
     encoding: 'utf8',
     env: options.env ?? process.env,
+    ...(options.input !== undefined ? { input: options.input } : {}),
   });
 }
 
@@ -368,7 +369,7 @@ export function resolveBoardProject(repository, board = {}, options = {}) {
   } else {
     const candidates = options.projectCatalog ?? listBoardProjects(repository, options);
     if (candidates.length === 0) {
-      fail('project_missing', `No GitHub Project is available for "${owner}". Create or share a Project with the authenticated account, then rerun after granting the required Project scopes. No mutation was started.`);
+      fail('project_missing', `No GitHub Project is available for "${owner}". Choose Companion Project creation, or cancel and supply/share an existing Project. No mutation was started.`);
     }
     if (candidates.length === 1) selected = candidates[0];
     else {
@@ -399,6 +400,244 @@ export function resolveBoardProject(repository, board = {}, options = {}) {
   return { ...board, owner, number };
 }
 
+export function validateProjectTitle(value) {
+  const title = String(value ?? '').trim();
+  if (
+    title.length < 1 ||
+    title.length > 120 ||
+    title !== String(value ?? '') ||
+    /[\u0000-\u001f\u007f]/u.test(title) ||
+    /^(?:\.{1,2}|untitled|project)$/iu.test(title)
+  ) {
+    fail('project_title', 'Project title must be explicit, 1-120 printable characters, trimmed, and not generic or ambiguous.');
+  }
+  return title;
+}
+
+export function resolveProjectOwnerForCreate(repository, title, options = {}) {
+  const owner = repositoryOwner(repository);
+  const safeTitle = validateProjectTitle(title);
+  const authentication = options.authentication ?? assertGithubAuthentication({ ...options, repository });
+  assertGithubProjectScope(authentication, { ...options, repository, owner });
+  const query = 'query($login:String!){organization(login:$login){id login __typename viewerCanAdminister}user(login:$login){id login __typename isViewer}}';
+  const result = run('gh', [
+    'api', 'graphql', '-f', `query=${query}`, '-F', `login=${owner}`,
+  ], options);
+  if (result.status !== 0) {
+    assertGhInstalled(result, options);
+    projectScopeFailure(owner, repository, options, result);
+  }
+  let payload;
+  try {
+    payload = JSON.parse(String(result.stdout));
+  } catch {
+    fail('gh_project_owner', `GitHub owner "${owner}" returned an invalid identity response. No mutation was started.`);
+  }
+  const organization = payload?.data?.organization;
+  const user = payload?.data?.user;
+  const identity = organization ?? user;
+  if (!identity || (organization && user) || typeof identity.id !== 'string' || !identity.id) {
+    fail('gh_project_owner', `GitHub could not resolve exactly one owner identity for "${owner}". No mutation was started.`);
+  }
+  if (identity.login?.toLowerCase() !== owner.toLowerCase()) {
+    fail('gh_project_owner', `GitHub owner identity does not match derived owner "${owner}". No mutation was started.`);
+  }
+  const ownerMutable = organization
+    ? identity.viewerCanAdminister === true
+    : identity.isViewer === true;
+  if (!ownerMutable) {
+    stop('project_create_denied', options, 'gh_project_create_access', {
+      active: authentication.account,
+      owner,
+      host: GITHUB_HOST,
+      kind: identity.__typename ?? (organization ? 'Organization' : 'User'),
+      summary: 'owner update capability is false (403)',
+    }, {
+      summary: 'owner update capability is false (403)',
+      repository,
+      activeAccount: authentication.account,
+      owner,
+      ownerId: identity.id,
+    });
+  }
+  return {
+    owner,
+    ownerId: identity.id,
+    ownerType: identity.__typename ?? (organization ? 'Organization' : 'User'),
+    title: safeTitle,
+    ownerMutable: true,
+  };
+}
+
+export function createBoardProject(repository, ownerIdentity, options = {}) {
+  const authentication = options.authentication ?? assertGithubAuthentication({ ...options, repository });
+  assertGithubProjectScope(authentication, { ...options, repository, owner: ownerIdentity.owner });
+  const verifiedOwner = resolveProjectOwnerForCreate(
+    repository,
+    ownerIdentity.title,
+    { ...options, authentication }
+  );
+  if (verifiedOwner.ownerId !== ownerIdentity.ownerId || verifiedOwner.ownerType !== ownerIdentity.ownerType) {
+    fail('gh_project_owner', 'GitHub Project owner identity changed after planning. No Project was created.');
+  }
+  const current = listBoardProjects(repository, {
+    ...options,
+    account: authentication.account,
+  });
+  const sameTitles = current.filter((project) =>
+    String(project.title ?? project.name ?? '') === verifiedOwner.title
+  );
+  if (sameTitles.length > 1) {
+    fail('project_ambiguous', `Multiple GitHub Projects are already named "${verifiedOwner.title}". Refusing to create a duplicate.`);
+  }
+  if (sameTitles.length === 1) {
+    const number = Number(sameTitles[0].number);
+    if (!Number.isInteger(number) || number <= 0) {
+      fail('project_number', 'The matching recovery Project has no valid number.');
+    }
+    return assertProjectWriteAccess(repository, { owner: verifiedOwner.owner, number }, {
+      ...options,
+      authentication,
+      projectCatalog: current,
+    });
+  }
+  const query = 'mutation($ownerId:ID!,$title:String!){createProjectV2(input:{ownerId:$ownerId,title:$title}){projectV2{id number title viewerCanUpdate}}}';
+  const result = run('gh', [
+    'api', 'graphql', '-f', `query=${query}`,
+    '-F', `ownerId=${verifiedOwner.ownerId}`, '-f', `title=${verifiedOwner.title}`,
+  ], options);
+  if (result.status !== 0) {
+    assertGhInstalled(result, options);
+    projectScopeFailure(verifiedOwner.owner, repository, options, result);
+  }
+  let payload;
+  try {
+    payload = JSON.parse(String(result.stdout));
+  } catch {
+    fail('gh_project_create', 'GitHub Project creation returned an invalid response. No local state was written; inspect and recover manually.');
+  }
+  const created = payload?.data?.createProjectV2?.projectV2;
+  if (!created || created.viewerCanUpdate !== true ||
+      !Number.isInteger(Number(created.number)) || Number(created.number) <= 0 ||
+      typeof created.id !== 'string' || !created.id) {
+    fail('gh_project_create', 'GitHub did not return a writable Project node and number. No local state was written; inspect and recover manually.');
+  }
+  if (created.title !== verifiedOwner.title) {
+    fail('gh_project_create', 'GitHub returned a Project with an unexpected title. No local state was written; inspect and recover manually.');
+  }
+  return { owner: verifiedOwner.owner, number: Number(created.number), id: created.id, title: created.title };
+}
+
+export function configureBoardProject(repository, board, options = {}) {
+  const owner = repositoryOwner(repository);
+  const number = Number(board.number);
+  const fieldName = String(board.statusField ?? '').trim();
+  const statuses = [...new Set(Object.values(board.statusMap ?? {}))];
+  if (!fieldName || statuses.length === 0 ||
+      statuses.some((status) => typeof status !== 'string' || !status.trim())) {
+    fail('project_schema', 'Project schema requires a non-empty status field and status option names.');
+  }
+  const listed = run('gh', [
+    'project', 'field-list', String(number), '--owner', owner, '--format', 'json',
+  ], options);
+  if (listed.status !== 0) {
+    assertGhInstalled(listed, options);
+    projectScopeFailure(owner, repository, options, listed, number);
+  }
+  let fields;
+  try {
+    fields = JSON.parse(String(listed.stdout)).fields;
+  } catch {
+    fail('project_schema', 'GitHub Project field discovery returned an invalid response.');
+  }
+  if (!Array.isArray(fields)) fail('project_schema', 'GitHub Project field discovery returned no fields array.');
+  let field = fields.find((candidate) => candidate.name === fieldName);
+  if (!field) {
+    const created = run('gh', [
+      'project', 'field-create', String(number), '--owner', owner,
+      '--name', fieldName, '--data-type', 'SINGLE_SELECT',
+      '--single-select-options', statuses.join(','), '--format', 'json',
+    ], options);
+    if (created.status !== 0) {
+      assertGhInstalled(created, options);
+      if (/\bscope\b/iu.test(String(created.stderr ?? ''))) {
+        projectScopeFailure(owner, repository, options, created, number);
+      }
+      fail('project_schema', `Could not create Project field "${fieldName}" (${safeStatusSummary(created)}). The Project creation already occurred and no local state was written; inspect/recover the Project schema manually without creating another Project.`);
+    }
+    field = { id: JSON.parse(String(created.stdout)).id, name: fieldName, options: statuses.map((name) => ({ name })) };
+  } else {
+    const existingOptions = Array.isArray(field.options) ? field.options : [];
+    const missing = statuses.filter((status) => !existingOptions.some((option) => option.name === status));
+    if (missing.length) {
+      const query = 'mutation($input:UpdateProjectV2FieldInput!){updateProjectV2Field(input:$input){clientMutationId}}';
+      const input = {
+        fieldId: field.id,
+        singleSelectOptions: [
+          ...existingOptions.map((option) => ({
+            ...(option.id ? { id: option.id } : {}),
+            name: option.name,
+            color: option.color ?? 'GRAY',
+            description: option.description ?? '',
+          })),
+          ...missing.map((name) => ({ name, color: 'GRAY', description: '' })),
+        ],
+      };
+      const updated = run('gh', ['api', 'graphql', '--input', '-'], {
+        ...options,
+        input: JSON.stringify({ query, variables: { input } }),
+      });
+      if (updated.status !== 0) {
+        assertGhInstalled(updated, options);
+        fail('project_schema', `Could not add Project status options for "${fieldName}". The Project may be partially configured; recover manually from this safe plan. ${safeStatusSummary(updated)}`);
+      }
+    }
+  }
+  return { number, fieldId: field.id, fieldName, statuses };
+}
+
+export function linkBoardProject(repository, project, options = {}) {
+  const repositoryNode = run('gh', [
+    'api', 'graphql', '-f',
+    'query=query($owner:String!,$name:String!){repository(owner:$owner,name:$name){id}}',
+    '-F', `owner=${repositoryOwner(repository)}`,
+    '-F', `name=${repository.split('/')[1]}`,
+  ], options);
+  if (repositoryNode.status !== 0) projectScopeFailure(repositoryOwner(repository), repository, options, repositoryNode);
+  let repoId;
+  try {
+    repoId = JSON.parse(String(repositoryNode.stdout)).data.repository.id;
+  } catch {
+    fail('project_link', 'GitHub repository node ID could not be resolved for Project linkage.');
+  }
+  const linkedCheck = run('gh', [
+    'api', 'graphql', '-f',
+    'query=query($projectId:ID!){node(id:$projectId){... on ProjectV2{repositories(first:100){nodes{id}}}}}',
+    '-F', `projectId=${project.id}`,
+  ], options);
+  if (linkedCheck.status === 0) {
+    try {
+      const repositories = JSON.parse(String(linkedCheck.stdout)).data.node.repositories.nodes;
+      if (repositories.some((candidate) => candidate.id === repoId)) {
+        return { projectId: project.id, repositoryId: repoId, linked: true };
+      }
+    } catch {
+      fail('project_link', 'GitHub Project repository links returned an invalid response. No local state was written.');
+    }
+  }
+  const query = 'mutation($projectId:ID!,$repositoryId:ID!){linkProjectV2ToRepository(input:{projectId:$projectId,repositoryId:$repositoryId}){clientMutationId}}';
+  const linked = run('gh', [
+    'api', 'graphql', '-f', `query=${query}`,
+    '-F', `projectId=${project.id}`, '-F', `repositoryId=${repoId}`,
+  ], options);
+  if (linked.status !== 0) {
+    const output = String(linked.stderr ?? '');
+    if (/already linked/iu.test(output)) return { projectId: project.id, repositoryId: repoId, linked: true };
+    assertGhInstalled(linked, options);
+    fail('project_link', `GitHub Project repository linkage failed (${safeStatusSummary(linked)}). No local state was written; recover this linkage manually.`);
+  }
+  return { projectId: project.id, repositoryId: repoId, linked: true };
+}
 export function assertProjectWriteAccess(repository, board, options = {}) {
   const authentication = options.authentication ?? assertGithubAuthentication({
     ...options,
@@ -464,7 +703,7 @@ export function assertProjectWriteAccess(repository, board, options = {}) {
       projectNumber: resolved.number,
     });
   }
-  return resolved;
+  return { ...resolved, id: project.id, viewerCanUpdate: project.viewerCanUpdate };
 }
 
 export function preflightGithubAccess(repository, options = {}) {

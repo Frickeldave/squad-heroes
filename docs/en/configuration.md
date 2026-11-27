@@ -65,8 +65,11 @@ arguments. Names are neither normalized nor guessed. They render into
 Board sync is enabled only with complete versioned extension configuration.
 The repository owner is derived and cannot be guessed. If no explicit
 `--project-number` or stored number exists, a read-only `gh project list` check
-auto-selects one candidate, presents the same arrow-key picker for multiple candidates, or fails
-with human setup instructions for zero candidates. The selected project is
+auto-selects one candidate, presents the same arrow-key picker for multiple candidates, or presents the explicit create/cancel menu for zero candidates. The selected project is
 verified with `gh project view` before the plan. Explicit numbers must pass the
 same check. Without opt-in, no workflow is installed, no secret is read and no
 Project permission is requested. Invalid partial configuration stops.
+
+## Zero-Project creation configuration
+
+The product owner remains derived from the repository. Owner account type and GraphQL node ID are resolved, never guessed. `--create-project` is an approval-bearing flag, not a boolean; pair it with a safe explicit `--project-title` in CI. Invalid/generic, whitespace-padded, control-character, or overlong titles fail before planning. Existing one/multiple/explicit-number behavior is unchanged. The dry-run plan uses `{{PROJECT_NUMBER}}`; apply resolves and stores the actual number in `.squad/heroes.json`. Schema and repository-link operations are idempotent.

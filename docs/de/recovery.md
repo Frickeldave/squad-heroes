@@ -67,8 +67,7 @@ erneut auf Marker und UTF-8 validiert.
   `project_ambiguous`: schreibfähiger `project`-Scope, Project-API-Zugriff oder
   deterministische Auswahl fehlt. Ausschließlich mit
   `gh auth refresh -h github.com -s project` erneuern und mit
-  `gh auth status --hostname github.com` prüfen; ein Project anlegen/freigeben
-  oder für CI eine validierte `--project-number` übergeben. 403 bedeutet
+  `gh auth status --hostname github.com` prüfen; im Companion mit `--create-project --project-title` anlegen oder für ein vorhandenes Project eine validierte `--project-number` übergeben. 403 bedeutet
   Project-/Organizationsrechte, 404 falschen, privaten oder unsichtbaren
   Owner/Project-Kontext.
 - `conflicts`: Dry-run und Dateien unverändert; Entscheidung erforderlich.
@@ -121,3 +120,7 @@ gh repo view OWNER/REPO
   konfiguriert.
 - Bei API-/Netzwerkfehlern nach Prüfung von `github.com`, VPN und DNS erneut
   versuchen. Keine Tokens, `Authorization`-Header oder Antwort-Bodies ausgeben.
+
+## Recovery nach Project-Erstellung
+
+Die Project-Erstellung ist extern sichtbar und wird nicht automatisch zurückgerollt. Bei Fehlern an Schema/Link wird kein lokaler State geschrieben; der Teilzustand muss manuell geprüft/bereinigt werden. Beim Wiederholen wird das eine passende Project erkannt und wiederverwendet, nicht erneut angelegt. Danach werden Schema/Link erneut geprüft und nötige Änderungen nachgeholt. Titel und Project-Nummer vor dem Rerun verifizieren. Fertiger State enthält die reale Nummer und Recovery-Baselines in `.squad/heroes.json`.

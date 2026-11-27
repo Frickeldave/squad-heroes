@@ -80,8 +80,7 @@ bleiben Wizard-Eingaben. Die Baseline wird als lokaler Commit validiert.
 
 Bei Board-Sync wird der Project-Owner aus `owner/repository` abgeleitet.
 Project-Nummer und Zugriff werden vor Auswahl ausschließlich lesend geprüft: ein Project
-wird automatisch gewählt, mehrere erscheinen in derselben Pfeiltasten-Auswahl, keines stoppt mit
-konkreten Einrichtungshinweisen. `--project-owner`/`--project-number` bleiben
+wird automatisch gewählt, mehrere erscheinen in derselben Pfeiltasten-Auswahl, keines öffnet im Wizard eine Pfeiltasten-Auswahl: „Neues Project mit Companion“ oder Abbrechen/Freigeben eines vorhandenen Projects. Bei Companion-Erstellung wird der Titel vorgeschlagen, muss aber bestätigt werden; Owner bleibt aus dem Repository abgeleitet. CI benutzt `--create-project` zusammen mit `--project-title`. `--project-owner`/`--project-number` bleiben
 validierte CI-Overrides; Tokens werden nie abgefragt oder gespeichert.
 
 Für CI/Tests bleibt alles explizit und nicht-interaktiv:
@@ -105,6 +104,21 @@ Nach Prüfung denselben lokal installierten Companion-Befehl ohne `--dry-run`
 ausführen. Erst dieser Schritt materialisiert aktive Ziele wie
 `scripts/start-work.mjs`, Workflows, Prompts und Agent-Charters. Er ist
 konfliktsicher und wiederholte Ausführung ist ein No-op.
+
+
+### Project-Erstellung durch Companion
+
+Dry-run plant die extern sichtbare Project-Erstellung mit Owner und Titel sowie Schema- und Repository-Verknüpfung. Er erzeugt keine Project-Ressource und zeigt für die noch unbekannte Nummer `{{PROJECT_NUMBER}}`:
+
+```bash
+node .squad/templates/squad-heroes/companion/scripts/install --target "$PWD" \
+  --repository frickeldave-test/squad-heroes-snake --enable-board-sync \
+  --profile typescript-development --language en --deployment-branches 1 --deployment-branch-1 main \
+  --model-reqeng mai-code-2 --model-work claude-sonnet-5.5 --model-review gpt-6.1-terra \
+  --create-project --project-title squad-heroes-snake --dry-run
+```
+
+Derselbe Befehl ohne `--dry-run` ist die explizite CI-Freigabe. Erst im Apply werden Owner-ID, Project-Nummer und Node-ID über authentifiziertes `gh api graphql` ermittelt; Feld/Statusoptionen und Repository-Link folgen. `viewerCanUpdate` wird geprüft. Im Terminal muss der angezeigte Plan zusätzlich bestätigt werden. Fehler nach der Erstellung werden als manuell zu bereinigende Teilzustände gemeldet; es wird kein automatisches Rollback behauptet. Ein gespeicherter Project-Eintrag verhindert Dubletten beim Wiederholen.
 
 ## Update und Entfernung
 

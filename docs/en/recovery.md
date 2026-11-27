@@ -61,8 +61,7 @@ markers and UTF-8 before write.
   `project_ambiguous`: the write-capable `project` scope, Project API access, or
   deterministic selection is missing. Refresh only with
   `gh auth refresh -h github.com -s project`, then verify with
-  `gh auth status --hostname github.com`; create/share a Project or pass a
-  validated `--project-number` for CI. 403 means Project/organization rights;
+  `gh auth status --hostname github.com`; choose Companion creation with `--create-project --project-title`, or use a validated `--project-number` for an existing Project in CI. 403 means Project/organization rights;
   404 means wrong, private, or invisible owner/Project.
 - `conflicts`: dry run and files unchanged; decision required.
 - `ambiguous_markers`: duplicate, absent or reversed markers.
@@ -115,3 +114,7 @@ gh repo view OWNER/REPO
   schema.
 - For API/network errors, retry after checking `github.com`, VPN, and DNS. Do
   not expose tokens, `Authorization` headers, or response bodies.
+
+## Recovery after Project creation
+
+Project creation is externally visible and not automatically rolled back. If schema/link configuration fails, the installer writes no local state, reports the partial operation, and leaves manual inspection/cleanup to the operator. Rerunning is safe: the one matching Project is discovered and reused, so Companion must not create a duplicate. It then retries schema/link reads and needed mutations. Reuse the same confirmed title and verify the Project number before rerun. Completed state stores the real number in `.squad/heroes.json` and its recovery baselines.

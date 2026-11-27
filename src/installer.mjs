@@ -4,8 +4,12 @@ import {
   assertSquadCompatibility,
   assertProjectWriteAccess,
   assertReviewBaseline,
+  configureBoardProject,
+  createBoardProject,
+  linkBoardProject,
   preflightGithubAccess,
   resolveBoardProject,
+  resolveProjectOwnerForCreate,
 } from './preflight.mjs';
 import { buildHeroesConfig, validateHeroesConfig } from './config.mjs';
 import { classifyOperation, assertPlanSafe, summarizePlan, recoveryBaselines } from './plan.mjs';
@@ -25,6 +29,9 @@ export function parseInstallArguments(argv) {
     boardSync: false,
     boardSyncExplicit: false,
     board: {},
+    createProject: false,
+    createProjectApproved: false,
+    projectTitle: null,
     repository: null,
     expectedAccount: null,
     profile: null,
@@ -47,6 +54,11 @@ export function parseInstallArguments(argv) {
     }
     else if (arg === '--project-owner') options.board.owner = argv[++index];
     else if (arg === '--project-number') options.board.number = argv[++index];
+    else if (arg === '--create-project') {
+      options.createProject = true;
+      options.createProjectApproved = true;
+    }
+    else if (arg === '--project-title') options.projectTitle = argv[++index];
     else if (arg === '--project-status-field') options.board.statusField = argv[++index];
     else if (arg === '--project-status-map') options.board.statusMap = parseJsonFile(argv[++index]);
     else if (arg === '--project-secret') options.board.secret = argv[++index];
@@ -194,12 +206,46 @@ export function buildInstallPlan(repoRoot, options = {}, injected = {}) {
     language,
     expectedAccount: options.expectedAccount ?? injected.expectedAccount,
   });
-  if (options.boardSync) resolveBoardProject(accessRepository, options.board, {
-    ...injected,
-    language,
-    account: access.account,
-    projectCatalog: access.projects,
-  });
+  let projectCreation = null;
+  if (options.boardSync) {
+    const existingBoard = existing?.extensions?.['board-sync'];
+    const configuredNumber = options.board.number ?? existingBoard?.number;
+    if (
+      (configuredNumber === undefined || configuredNumber === null || configuredNumber === '') &&
+      access.projects.length === 0
+    ) {
+      if (options.board.owner && options.board.owner !== access.owner) {
+        fail('project_owner', `Project owner must be derived from repository ${accessRepository}: expected "${access.owner}".`);
+      }
+      if (!options.createProject || !options.projectTitle) {
+        fail(
+          'project_create_flags',
+          'No GitHub Project exists. In CI pass both --create-project and --project-title; interactive users must select and confirm Companion creation.'
+        );
+      }
+      const title = options.projectTitle;
+      const identity = resolveProjectOwnerForCreate(accessRepository, title, {
+        ...injected,
+        language,
+        authentication: access,
+        account: access.account,
+      });
+      options.board.owner = access.owner;
+      options.board.number = '{{PROJECT_NUMBER}}';
+      projectCreation = {
+        ...identity,
+        approved: options.createProjectApproved === true,
+      };
+    } else {
+      resolveBoardProject(accessRepository, options.board, {
+        ...injected,
+        language,
+        account: access.account,
+        configuredNumber,
+        projectCatalog: access.projects,
+      });
+    }
+  }
   const reviewBaseline = assertReviewBaseline(
     repoRoot,
     options.reviewBaseline ?? existing?.reviewBaseline,
@@ -229,10 +275,11 @@ export function buildInstallPlan(repoRoot, options = {}, injected = {}) {
               branches: options.branches ?? existing.deploymentBranches,
               boardSync: true,
               board: options.board,
+              allowProjectPlaceholder: Boolean(projectCreation),
             }).extensions
           : options.boardSyncExplicit ? {} : existing.extensions,
         ...(reviewBaseline ? { reviewBaseline } : {}),
-      })
+      }, { allowProjectPlaceholder: Boolean(projectCreation) })
     : buildHeroesConfig({
         repository: options.repository,
         language,
@@ -241,6 +288,7 @@ export function buildInstallPlan(repoRoot, options = {}, injected = {}) {
         boardSync: options.boardSync,
         board: options.board,
         reviewBaseline,
+        allowProjectPlaceholder: Boolean(projectCreation),
       });
   const decisions = options.decisionFile ? parseJsonFile(path.resolve(options.decisionFile)) : {};
   const operations = [
@@ -272,8 +320,59 @@ export function buildInstallPlan(repoRoot, options = {}, injected = {}) {
     owner: 'companion',
     mode: 'package-json',
   });
+  if (config.extensions?.['board-sync']) {
+    if (projectCreation) {
+      operations.unshift({
+        id: 'project-create',
+        target: `github-project:${projectCreation.owner}/${projectCreation.title}`,
+        rendered: '',
+        owner: 'github',
+        mode: 'external',
+        externalAction: 'create-project',
+        actionDetails: {
+          owner: projectCreation.owner,
+          ownerType: projectCreation.ownerType,
+          ownerId: projectCreation.ownerId,
+          title: projectCreation.title,
+          number: '{{PROJECT_NUMBER}}',
+          approval: projectCreation.approved ? 'explicit' : 'required',
+        },
+      });
+    }
+    operations.push(
+      {
+        id: 'project-schema',
+        target: `github-project:${config.extensions['board-sync'].owner}/#${config.extensions['board-sync'].number}`,
+        rendered: '',
+        owner: 'github',
+        mode: 'external',
+        externalAction: 'configure-project-schema',
+        actionDetails: {
+          owner: config.extensions['board-sync'].owner,
+          number: projectCreation ? '{{PROJECT_NUMBER}}' : config.extensions['board-sync'].number,
+          field: config.extensions['board-sync'].statusField,
+          options: [...new Set(Object.values(config.extensions['board-sync'].statusMap))],
+        },
+      },
+      {
+        id: 'project-link',
+        target: `github-project:${config.extensions['board-sync'].owner}/#${config.extensions['board-sync'].number}:repository`,
+        rendered: '',
+        owner: 'github',
+        mode: 'external',
+        externalAction: 'link-repository',
+        actionDetails: {
+          owner: config.extensions['board-sync'].owner,
+          number: projectCreation ? '{{PROJECT_NUMBER}}' : config.extensions['board-sync'].number,
+          repository: config.repository,
+        },
+      }
+    );
+  }
   const planned = operations.map((entry) => classifyOperation(repoRoot, entry, decisions));
-  const fingerprint = createHash('sha256').update(JSON.stringify(summarizePlan(planned))).digest('hex');
+  const fingerprint = createHash('sha256')
+    .update(JSON.stringify(summarizePlan(planned.filter((entry) => entry.mode !== 'external'))))
+    .digest('hex');
   const completed = {
     ...config,
     recovery: {
@@ -286,7 +385,12 @@ export function buildInstallPlan(repoRoot, options = {}, injected = {}) {
   const stateOperation = planned.find((entry) => entry.target === '.squad/heroes.json');
   if (stateOperation) stateOperation.content = `${JSON.stringify(completed, null, 2)}\n`;
   assertPlanSafe(planned);
-  return { config: completed, operations: planned, conflicts: planned.filter((item) => item.action === 'conflict') };
+  return {
+    config: completed,
+    operations: planned,
+    conflicts: planned.filter((item) => item.action === 'conflict'),
+    projectCreate: projectCreation ? { ...projectCreation } : null,
+  };
 }
 
 export function applyPlan(
@@ -301,6 +405,9 @@ export function applyPlan(
     fail('conflicts', `Installation stopped: ${conflicts.length} unresolved conflicts. ${JSON.stringify(list)}`);
   }
   if (verify || dryRun) return { changed: 0, plan: summarizePlan(plan.operations) };
+  if (plan.projectCreate && plan.projectCreate.approved !== true) {
+    fail('project_create_approval', 'Project creation is visible and irreversible-ish. Review and explicitly approve the rendered plan before apply.');
+  }
   assertSquadCompatibility(repoRoot);
   const access = plan.config.repository
     ? preflightGithubAccess(plan.config.repository, {
@@ -309,17 +416,69 @@ export function applyPlan(
         expectedAccount: expectedAccount ?? injected.expectedAccount,
       })
     : null;
-  if (plan.config.extensions?.['board-sync']) {
-    assertProjectWriteAccess(plan.config.repository, { ...plan.config.extensions['board-sync'] }, {
+  const externalBoard = { ...plan.config.extensions?.['board-sync'] };
+  if (plan.projectCreate) {
+    const created = createBoardProject(plan.config.repository, plan.projectCreate, {
+      ...injected,
+      language: plan.config.language,
+      authentication: access,
+      account: access.account,
+    });
+    externalBoard.number = created.number;
+    externalBoard.owner = created.owner;
+    const resolvedState = structuredClone(plan.config);
+    resolvedState.extensions['board-sync'].number = created.number;
+    validateHeroesConfig(resolvedState);
+    for (const operation of plan.operations) {
+      if (operation.mode === 'external') {
+        operation.actionDetails.number = created.number;
+        continue;
+      }
+      operation.content = operation.target === '.squad/heroes.json'
+        ? ''
+        : operation.content.replaceAll('{{PROJECT_NUMBER}}', String(created.number));
+    }
+    resolvedState.recovery.lastCompletedPlan = createHash('sha256')
+      .update(JSON.stringify(summarizePlan(plan.operations.filter((entry) => entry.mode !== 'external'))))
+      .digest('hex');
+    resolvedState.recovery.targets = recoveryBaselines(plan.operations);
+    validateHeroesConfig(resolvedState);
+    const stateOperation = plan.operations.find((entry) => entry.id === 'heroes-state');
+    stateOperation.content = `${JSON.stringify(resolvedState, null, 2)}\n`;
+    configureBoardProject(plan.config.repository, externalBoard, {
+      ...injected,
+      language: plan.config.language,
+      account: access.account,
+    });
+    linkBoardProject(plan.config.repository, created, {
+      ...injected,
+      language: plan.config.language,
+      account: access.account,
+    });
+  } else if (plan.config.extensions?.['board-sync']) {
+    const verified = assertProjectWriteAccess(plan.config.repository, externalBoard, {
       ...injected,
       language: plan.config.language,
       expectedAccount: expectedAccount ?? injected.expectedAccount,
     });
+    configureBoardProject(plan.config.repository, verified, {
+      ...injected,
+      language: plan.config.language,
+      account: access?.account,
+    });
+    const projectIdentity = injected.projectIdentity ?? { ...verified, id: verified.id };
+    if (projectIdentity.id) {
+      linkBoardProject(plan.config.repository, projectIdentity, {
+        ...injected,
+        language: plan.config.language,
+        account: access?.account,
+      });
+    }
   }
   let changed = 0;
   for (const operation of [...plan.operations.filter(({ id }) => id !== 'heroes-state'),
                            ...plan.operations.filter(({ id }) => id === 'heroes-state')]) {
-    if (operation.action === 'noop') continue;
+    if (operation.action === 'noop' || operation.mode === 'external') continue;
     const target = assertSafeTarget(repoRoot, operation.target);
     mkdirSync(path.dirname(target), { recursive: true });
     const staging = `${target}.squad-heroes-staging`;

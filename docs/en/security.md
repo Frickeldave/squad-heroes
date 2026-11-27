@@ -59,3 +59,7 @@ requires pasting a token into the terminal.
 Trust is `source trust: moderate`: release/tag, version/commit and available
 upstream hashes are checked. The product creates no custom PKI, certificate or
 signature infrastructure and invents no upstream guarantee.
+
+## Project creation approval boundary
+
+Creation occurs only in apply, after all local plan conflict checks and a rendered create/schema/link plan. `--create-project` is explicit CI approval; interactive apply requires a further y/N confirmation after rendering. Dry-run performs only identity, owner capability, scope, and API reads. The owner is derived, its user/organization kind and node ID come from GraphQL, and `owner access` plus post-create `viewerCanUpdate` are required. No token argument is accepted or logged. A 403 should be resolved with a Project owner/admin or organization policy; mutation is not retried blindly. Cleanup is manual and no rollback is claimed.

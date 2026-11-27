@@ -59,3 +59,7 @@ dieser Befehle erfordert, dass ein Token ins Terminal eingefügt wird.
 Vertrauensstufe `source trust: moderate`: Release/Tag, Version/Commit und
 vorhandene Upstream-Hashes werden geprüft. Das Projekt baut keine eigene PKI,
 Zertifikats- oder Signaturinfrastruktur und erfindet keine Upstream-Garantie.
+
+## Freigabegrenze der Project-Erstellung
+
+Erstellung nur im Apply nach lokalen Konfliktprüfungen und angezeigtem Create-/Schema-/Link-Plan. `--create-project` ist die explizite CI-Freigabe; interaktiv ist nach dem Plan zusätzlich y/N nötig. Dry-run führt nur Identitäts-, Owner-Fähigkeits-, Scope- und API-Leseprüfungen aus. Owner wird abgeleitet, User-/Organization-Typ und Node-ID kommen aus GraphQL. `owner access` und nach Erstellung `viewerCanUpdate` sind Pflicht. Keine Token-Argumente werden akzeptiert oder protokolliert. 403 gehört an Owner/Admin bzw. Organizationsrichtlinie; keine blinde Wiederholung. Bereinigung ist manuell.

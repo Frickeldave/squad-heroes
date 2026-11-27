@@ -74,3 +74,7 @@ Das gewählte Project wird vor dem Plan mit `gh project view` verifiziert; eine
 explizite Nummer passiert denselben Check. Ohne Opt-in wird weder Workflow
 installiert noch ein Secret gelesen oder eine Project-Permission angefordert.
 Fehlerhafte Teilkonfiguration stoppt.
+
+## Konfiguration bei null Projects
+
+Der Product-Owner bleibt aus dem Repository abgeleitet. Account-Typ und GraphQL-Node-ID werden aufgelöst, nie geraten. `--create-project` ist ein Freigabe-Flag ohne Boolean-Wert und wird in CI mit einem sicheren, expliziten `--project-title` kombiniert. Generische, leer/Whitespace-gepolsterte, control- oder überlange Titel scheitern vor dem Plan. Ein-/Mehrfach-/Explizitnummer-Flows bleiben unverändert. Der Dry-run nutzt `{{PROJECT_NUMBER}}`; Apply speichert die echte Nummer. Schema- und Repository-Link sind idempotent.

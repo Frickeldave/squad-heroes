@@ -373,3 +373,10 @@ gh issue list --repo github.com:{owner}/squad-heroes-snake --state open
 Final evidence includes commit IDs, `list --json`, plugin checksums, Companion
 plan, ticket/PR numbers, check/review results, model/Scribe evidence, browser
 results, and the cleanup record.
+
+## Project creation lifecycle fixture
+
+- Fixture owner `frickeldave-test`, repository `squad-heroes-snake`, zero Projects. Verify the arrow menu contains create and cancel/share choices; cancellation mutates nothing.
+- Dry-run with `--create-project --project-title squad-heroes-snake` shows owner, name, `{{PROJECT_NUMBER}}`, schema, and repository-link operations, and records zero GitHub mutations.
+- Apply creates exactly once, observes the returned number/node ID and `viewerCanUpdate`, configures fields/options, links the repository, and persists the real number. A rerun with the saved state performs no second create and no local writes.
+- Cover denied owner permission/403, missing noninteractive flags, ambiguous booleans, invalid titles, partial schema failure/recovery, existing one/multiple/explicit Project flows, and command logs containing no token material.

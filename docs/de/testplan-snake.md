@@ -389,3 +389,10 @@ gh issue list --repo github.com:{owner}/squad-heroes-snake --state open
 Finale Evidenz enthält: Commit-IDs, `list --json`, Plugin-Checksummen, Companion-
 Plan, Ticket-/PR-Nummern, Check-/Review-Ergebnisse, Modell-/Scribe-Nachweis,
 Browserdaten und Cleanup-Protokoll.
+
+## Lifecycle-Fixture zur Project-Erstellung
+
+- Owner `frickeldave-test`, Repository `squad-heroes-snake`, null Projects: Pfeiltastenmenü mit Anlegen und Abbrechen/Freigeben prüfen; Abbrechen ist mutationsfrei.
+- Dry-run mit `--create-project --project-title squad-heroes-snake` zeigt Owner, Namen, `{{PROJECT_NUMBER}}`, Schema und Repository-Link, aber keine GitHub-Mutation.
+- Apply erzeugt genau einmal, nutzt die zurückgegebene Nummer/Node-ID und `viewerCanUpdate`, konfiguriert/verknüpft und persistiert die Nummer. Rerun erzeugt kein zweites Project und keinen lokalen Write.
+- 403, fehlende CI-Flags, mehrdeutige Booleans, ungültige Titel, Teilfehler/Recovery, bestehende Ein-/Mehrfach-/Explizitnummer-Flows und tokenfreie Logs prüfen.

@@ -12,6 +12,12 @@ const injected = {
     if (args[0] === 'auth') return commandResult("- Token scopes: 'repo', 'project'\n");
     if (args[0] === 'api' && args[1] === 'user') return commandResult('octocat\n');
     if (args[0] === 'api' && args[1] === 'graphql') {
+      if (args.join(' ').includes('repository(owner:')) {
+        return commandResult(JSON.stringify({ data: { repository: { id: 'R1' } } }));
+      }
+      if (args.join(' ').includes('repositories(first:100)')) {
+        return commandResult(JSON.stringify({ data: { node: { repositories: { nodes: [{ id: 'R1' }] } } } }));
+      }
       return commandResult(JSON.stringify({
         data: { organization: { projectV2: { id: 'P1', viewerCanUpdate: true } } },
       }));
@@ -24,6 +30,11 @@ const injected = {
     }
     if (args[0] === 'project' && args[1] === 'list') {
       return commandResult(JSON.stringify({ projects: [] }));
+    }
+    if (args[0] === 'project' && args[1] === 'field-list') {
+      return commandResult(JSON.stringify({
+        fields: [{ id: 'F1', name: 'Status', options: [{ id: 'O1', name: 'Ready' }, { id: 'O2', name: 'Done' }] }],
+      }));
     }
     return commandResult();
   },

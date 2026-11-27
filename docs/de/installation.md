@@ -153,3 +153,15 @@ Die installierte Kopie ist selbstständig; der externe Checkout wird während
 der Companion-Installation nicht verwendet. `squad plugin uninstall
 squad-heroes` entfernt nur die verwaltete Distribution, nicht die bereits vom
 Companion erzeugten aktiven Dateien.
+
+## Durch Companion erstellte Projects
+
+Bei aktiviertem Board-Sync und null sichtbaren Projects zeigt der Wizard ein Pfeiltastenmenü: neues Project anlegen oder Abbrechen/ein vorhandenes bereitstellen. Owner `frickeldave-test` wird abgeleitet, Titel `squad-heroes-snake` vorgeschlagen und Titel sowie Owner explizit bestätigt. In CI sind `--create-project` und `--project-title` gemeinsam Pflicht; `--create-project=false` ist ungültig.
+
+Exakter Dry-run (keine GitHub-Mutation):
+
+```bash
+node .squad/templates/squad-heroes/companion/scripts/install --target "$PWD" --repository frickeldave-test/squad-heroes-snake --enable-board-sync --profile typescript-development --language en --deployment-branches 1 --deployment-branch-1 main --model-reqeng mai-code-2 --model-work claude-sonnet-5.5 --model-review gpt-6.1-terra --create-project --project-title squad-heroes-snake --dry-run
+```
+
+Ohne `--dry-run` wird derselbe Befehl zum Apply. Nach lokalen Konfliktprüfungen wird authentifiziertes `gh api graphql` verwendet; echte Nummer/Node-ID werden ermittelt, Statusfeld/-optionen sowie Repository-Link konfiguriert und `viewerCanUpdate` geprüft. Anschließend wird `.squad/heroes.json` geschrieben. Im Terminal ist nach dem angezeigten Plan eine weitere Freigabe nötig. Bei externem Teilfehler kann manuelle Bereinigung nötig sein; es gibt kein behauptetes automatisches Rollback.

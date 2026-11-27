@@ -38,8 +38,13 @@ With --enable-board-sync, Project owner is derived from --repository. The
 write-capable project scope is proved from the active account's sanitized
 gh auth status output, followed by a non-mutating Project API probe. CI may use
 --project-number for a deterministic validated override. Use --disable-board-sync
-to make the board-off choice explicit without a prompt. The scope and API gates
-remain required for dry-run. No token is accepted.
+to make the board-off choice explicit without a prompt. When no Project exists,
+interactive use offers explicit Companion creation or cancellation. CI must use
+both --create-project and --project-title; the former is the explicit apply
+approval and never accepts a boolean value. The rendered dry-run contains a
+Project-number placeholder and every follow-up schema/link operation, and makes
+no external mutation. The scope and API gates remain required for dry-run. No
+token is accepted.
 `;
 
 function existingOptions(target) {
@@ -72,7 +77,8 @@ export async function completeInteractiveOptions(options, existing, ask, choose,
   });
   options.githubPreflight = repositoryAccess;
   process.stdout.write(`${wizardText(preliminaryLanguage, 'github_access_verified')
-    .replace('{account}', repositoryAccess.account)}\n`);
+    .replace('{account}', repositoryAccess.account)
+    .replace('{owner}', repositoryAccess.owner)}\n`);
 
   options.profile ??= await ask('Project profile', existing?.profile ?? 'typescript-development');
   if (!['typescript-development', 'TypeScript Development'].includes(options.profile)) {
@@ -118,7 +124,36 @@ export async function completeInteractiveOptions(options, existing, ask, choose,
     const configuredNumber = options.board.number ?? current?.number;
     if (configuredNumber === undefined || configuredNumber === null || configuredNumber === '') {
       const projects = repositoryAccess.projects;
-      if (projects.length > 1) {
+      if (projects.length === 0) {
+        const createLabel = wizardText(language, 'github_project_create');
+        const cancelLabel = wizardText(language, 'github_project_cancel');
+        const selection = await choose(
+          wizardText(language, 'github_project_missing'),
+          [createLabel, cancelLabel],
+          createLabel
+        );
+        if (selection !== createLabel) {
+          throw new Error(wizardText(language, 'github_project_cancelled'));
+        }
+        const defaultTitle = options.repository.split('/')[1];
+        options.projectTitle = await ask(
+          wizardText(language, 'github_project_title_prompt'),
+          options.projectTitle ?? defaultTitle
+        );
+        const ownerConfirmation = await ask(
+          wizardText(language, 'github_project_owner_prompt')
+            .replace('{owner}', repositoryAccess.owner)
+            .replace('{account}', repositoryAccess.account)
+            .replace('{title}', options.projectTitle),
+          'N'
+        );
+        if (!['y', 'yes'].includes(String(ownerConfirmation).trim().toLowerCase())) {
+          throw new Error(wizardText(language, 'github_project_cancelled'));
+        }
+        options.createProject = true;
+        options.createProjectApproved = false;
+        options.renderedProjectApprovalRequired = true;
+      } else if (projects.length > 1) {
         const labels = projects.map((project) =>
           `${project.number} — ${project.title ?? project.name ?? 'Project'}`
         );
@@ -130,13 +165,15 @@ export async function completeInteractiveOptions(options, existing, ask, choose,
         options.board.number = Number(String(selection).split(/\s+—\s+/u, 1)[0]);
       }
     }
-    resolveBoardProject(options.repository, options.board, {
-      ...injected,
-      configuredNumber: current?.number,
-      language,
-      account: repositoryAccess.account,
-      projectCatalog: repositoryAccess.projects,
-    });
+    if (!options.createProject) {
+      resolveBoardProject(options.repository, options.board, {
+        ...injected,
+        configuredNumber: current?.number,
+        language,
+        account: repositoryAccess.account,
+        projectCatalog: repositoryAccess.projects,
+      });
+    }
     options.board.statusField ??= await ask('Project status field', current?.statusField ?? 'Status');
     options.board.statusMap ??= JSON.parse(await ask(
       'Project status map JSON',
@@ -303,7 +340,8 @@ export async function main() {
         expectedAccount: options.expectedAccount,
       });
       process.stdout.write(`${wizardText(language, 'github_access_verified')
-        .replace('{account}', options.githubPreflight.account)}\n`);
+        .replace('{account}', options.githubPreflight.account)
+        .replace('{owner}', options.githubPreflight.owner)}\n`);
       assertSquadCompatibility(resolve(options.target ?? process.cwd()));
       const missingModelFlags = !existing && ['reqeng', 'work', 'review']
         .some((flow) => !options.explicitModels[flow]);
@@ -316,6 +354,22 @@ export async function main() {
       githubPreflight: options.githubPreflight,
     });
     printPlan(plan, plan.config.language);
+    if (plan.projectCreate && options.renderedProjectApprovalRequired && !options.dryRun) {
+      const prompt = createInterface({ input: process.stdin, output: process.stdout });
+      try {
+        const approval = (await prompt.question(
+          wizardText(plan.config.language, 'github_project_apply_approval')
+            .replace('{owner}', plan.projectCreate.owner)
+            .replace('{title}', plan.projectCreate.title) + ' (y/N): '
+        )).trim().toLowerCase();
+        if (!['y', 'yes'].includes(approval)) {
+          throw new Error(wizardText(plan.config.language, 'github_project_cancelled'));
+        }
+        plan.projectCreate.approved = true;
+      } finally {
+        prompt.close();
+      }
+    }
     const result = applyPlan(repoRoot, plan, options);
     process.stdout.write(`${JSON.stringify(result)}\n`);
   } catch (error) {

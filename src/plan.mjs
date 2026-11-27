@@ -51,6 +51,9 @@ export function mergeManagedSection(existing, incoming, key, decision) {
 }
 
 export function classifyOperation(repoRoot, item, decisions = {}) {
+  if (item.mode === 'external') {
+    return { ...item, action: 'execute', content: '' };
+  }
   const target = assertSafeTarget(repoRoot, item.target);
   const exists = existsSync(target);
   if (exists && lstatSync(target).isSymbolicLink()) {
@@ -152,10 +155,11 @@ export function classifyOperation(repoRoot, item, decisions = {}) {
 }
 
 export function summarizePlan(operations) {
-  return operations.map(({ target, action, owner, options, base, before, incoming, section }) => ({
+  return operations.map(({ target, action, owner, options, base, before, incoming, section, externalAction, actionDetails }) => ({
     target,
     action,
     owner,
+    ...(externalAction ? { operation: externalAction, details: actionDetails } : {}),
     ...(options ? { options, section, preview: { base, local: before, incoming } } : {}),
   }));
 }
@@ -163,6 +167,7 @@ export function summarizePlan(operations) {
 export function recoveryBaselines(operations) {
   const targets = {};
   for (const operation of operations) {
+    if (operation.mode === 'external') continue;
     if (operation.action === 'conflict' || operation.target === '.squad/heroes.json') continue;
     if (operation.mode === 'managed-section') {
       targets[operation.target] = managedChecksum(operation.content, operation.section);
@@ -175,6 +180,12 @@ export function recoveryBaselines(operations) {
 
 export function assertPlanSafe(operations) {
   for (const operation of operations) {
+    if (operation.mode === 'external') {
+      if (!operation.externalAction || typeof operation.actionDetails !== 'object') {
+        fail('external_plan', 'External operation is incomplete');
+      }
+      continue;
+    }
     if (!safeRelativePath(operation.target)) fail('unsafe_target', `Unsafe target ${operation.target}`);
     if (operation.action === 'conflict') continue;
     if (typeof operation.content !== 'string') fail('plan_content', `Plan missing content for ${operation.target}`);

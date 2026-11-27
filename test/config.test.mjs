@@ -42,3 +42,27 @@ test('accepts exactly one to three distinct branch refs without normalization', 
   assert.throws(() => validateDeploymentBranches(['dev', 'DEV']), /unique/);
   assert.throws(() => validateDeploymentBranches(['bad..branch']), /Invalid/);
 });
+
+test('existing v1 board state remains valid after Project number resolution', () => {
+  const config = buildHeroesConfig({
+    repository: 'frickeldave-test/squad-heroes-snake',
+    language: 'en',
+    modelDefaults: { reqeng: 'a', work: 'b', review: 'c' },
+    branches: ['main'],
+    boardSync: true,
+    board: {
+      owner: 'frickeldave-test',
+      number: 42,
+      statusField: 'Status',
+      statusMap: { 'go:yes': 'Ready' },
+      secret: 'secrets.HEROES_PROJECT_TOKEN',
+    },
+  });
+  assert.equal(validateHeroesConfig(config).extensions['board-sync'].number, 42);
+  assert.throws(() => validateHeroesConfig({
+    ...config,
+    extensions: {
+      'board-sync': { ...config.extensions['board-sync'], number: '{{PROJECT_NUMBER}}' },
+    },
+  }), /incomplete/u);
+});

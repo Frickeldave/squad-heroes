@@ -18,7 +18,7 @@ const ALLOWED_TOP_LEVEL = new Set([
   'repository', 'managed', 'recovery', 'extensions', 'reviewBaseline',
 ]);
 
-export function validateHeroesConfig(config) {
+export function validateHeroesConfig(config, { allowProjectPlaceholder = false } = {}) {
   if (!config || typeof config !== 'object' || Array.isArray(config)) fail('config_type', 'heroes.json must be an object');
   for (const key of Object.keys(config)) {
     if (!ALLOWED_TOP_LEVEL.has(key)) fail('config_key', `Unknown heroes.json key: ${key}`);
@@ -70,7 +70,9 @@ export function validateHeroesConfig(config) {
       fail('extension', 'board-sync extension must have the complete closed schema');
     }
     if (!/^[A-Za-z0-9_.-]+$/u.test(extension.owner ?? '') ||
-        !Number.isInteger(extension.number) || extension.number <= 0 ||
+        (!(
+          Number.isInteger(extension.number) && extension.number > 0
+        ) && !(allowProjectPlaceholder && extension.number === '{{PROJECT_NUMBER}}')) ||
         !extension.statusField ||
         !extension.statusMap || typeof extension.statusMap !== 'object' ||
         Array.isArray(extension.statusMap) || Object.keys(extension.statusMap).length === 0 ||
@@ -98,7 +100,16 @@ export function validateDeploymentBranches(branches) {
   return branches;
 }
 
-export function buildHeroesConfig({ repository, language, modelDefaults, branches, boardSync = false, board = {}, reviewBaseline }) {
+export function buildHeroesConfig({
+  repository,
+  language,
+  modelDefaults,
+  branches,
+  boardSync = false,
+  board = {},
+  reviewBaseline,
+  allowProjectPlaceholder = false,
+}) {
   const config = {
     schemaVersion: 1,
     product: 'squad-heroes',
@@ -114,7 +125,9 @@ export function buildHeroesConfig({ repository, language, modelDefaults, branche
         schemaVersion: 1,
         enabled: true,
         owner: board.owner,
-        number: Number(board.number),
+        number: allowProjectPlaceholder && board.number === '{{PROJECT_NUMBER}}'
+          ? '{{PROJECT_NUMBER}}'
+          : Number(board.number),
         statusField: board.statusField,
         statusMap: board.statusMap,
         secret: board.secret,
@@ -122,5 +135,8 @@ export function buildHeroesConfig({ repository, language, modelDefaults, branche
     } : {},
     ...(reviewBaseline ? { reviewBaseline } : {}),
   };
+  if (allowProjectPlaceholder && config.extensions['board-sync']) {
+    return validateHeroesConfig(config, { allowProjectPlaceholder: true });
+  }
   return validateHeroesConfig(config);
 }
