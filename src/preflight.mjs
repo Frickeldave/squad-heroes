@@ -6,6 +6,11 @@ import { readUtf8 } from './io.mjs';
 
 export const SQUAD_MIN_VERSION = '2.0.0';
 export const SQUAD_AGENT_PATH = '.github/agents/squad.agent.md';
+export const VERIFIED_MODEL_FALLBACK = Object.freeze([
+  'mai-code-2',
+  'claude-sonnet-5.5',
+  'gpt-6.1-terra',
+]);
 
 function stableSemVer(value) {
   const match = value.match(
@@ -61,14 +66,126 @@ function run(command, args, options = {}) {
   });
 }
 
+function repositoryOwner(repository) {
+  const match = String(repository ?? '').match(/^([-A-Za-z0-9_.]+)\/[-A-Za-z0-9_.]+$/u);
+  if (!match) fail('repository', 'Repository must use owner/name syntax');
+  return match[1];
+}
+
+function ghFailure(action, result) {
+  if (result?.error?.code === 'ENOENT') {
+    fail('gh_host', 'GitHub CLI is unavailable. Install `gh` on the host and run `gh auth login`, then retry.');
+  }
+  if (action === 'auth') {
+    fail('gh_auth', 'GitHub authentication failed. Run the host-side `gh auth login` browser/device flow, then retry. No token is accepted by the installer.');
+  }
+  throw result?.error ?? new Error(result?.stderr || `GitHub ${action} check failed`);
+}
+
 export function assertGithubWriteAccess(repository, options = {}) {
   const auth = run('gh', ['auth', 'status'], options);
-  if (auth.status !== 0) {
-    fail('gh_auth', 'GitHub authentication failed. Run the host-side `gh auth login` browser/device flow and retry.');
+  if (auth.status !== 0) ghFailure('auth', auth);
+  const account = run('gh', ['api', 'user', '--jq', '.login'], options);
+  if (account.status !== 0 || !String(account.stdout).trim()) {
+    fail('gh_auth', 'The authenticated GitHub account could not access GitHub. Run `gh auth login` on the host and confirm account access, then retry.');
   }
-  const result = run('gh', ['api', `repos/${repository}`, '--jq', '.permissions.push'], options);
-  if (result.status !== 0 || String(result.stdout).trim() !== 'true') {
-    fail('gh_permission', `GitHub push permission for ${repository} could not be proven. No mutation was started.`);
+  const read = run('gh', ['api', `repos/${repository}`, '--jq', '.permissions.pull'], options);
+  const push = run('gh', ['api', `repos/${repository}`, '--jq', '.permissions.push'], options);
+  if (read.status !== 0 || String(read.stdout).trim() !== 'true') {
+    fail('gh_permission', `Repository read permission for ${repository} could not be proven. Confirm the authenticated account can access the repository or ask an owner to grant access; refresh host auth with the required repo scope if needed. No mutation was started.`);
   }
-  return { repository, push: true };
+  if (push.status !== 0 || String(push.stdout).trim() !== 'true') {
+    fail('gh_permission', `Repository push permission for ${repository} could not be proven. Ask a repository owner for push access or run host-side \`gh auth login\` with the required repo scopes, then retry. No mutation was started.`);
+  }
+  return { repository, owner: repositoryOwner(repository), account: String(account.stdout).trim(), read: true, push: true };
+}
+
+export function discoverModels(options = {}) {
+  const result = run('copilot', ['help', 'config'], options);
+  let models = [];
+  if (result?.status === 0) {
+    const section = String(result.stdout).match(/^\s*`model`:[\s\S]*?(?=^\s*`[A-Za-z])/mu)?.[0] ?? '';
+    models = [...section.matchAll(/^\s*-\s+"([^"]+)"\s*$/gmu)]
+      .map((match) => match[1])
+      .filter((model) => model && model !== 'auto');
+  }
+  if (!models.length) return { models: [...VERIFIED_MODEL_FALLBACK], fallback: true };
+  return { models: [...new Set(models)], fallback: false };
+}
+
+function parseProjects(result) {
+  try {
+    const parsed = JSON.parse(String(result.stdout));
+    return Array.isArray(parsed) ? parsed : parsed.projects;
+  } catch {
+    fail('gh_project', 'GitHub Project discovery returned an invalid response. Confirm Project access and retry.');
+  }
+}
+
+export function listBoardProjects(repository, options = {}) {
+  const owner = repositoryOwner(repository);
+  const listed = run('gh', [
+    'project', 'list', '--owner', owner, '--limit', '100', '--format', 'json',
+  ], options);
+  if (listed.status !== 0) {
+    fail('gh_project', 'GitHub Project access could not be proven. Run host-side `gh auth refresh -s read:project,project` (or `gh auth login`), then confirm the authenticated account can access this owner’s Projects. No mutation was started.');
+  }
+  const candidates = parseProjects(listed);
+  if (!Array.isArray(candidates)) fail('gh_project', 'GitHub Project discovery returned an invalid response.');
+  return candidates;
+}
+
+export function resolveBoardProject(repository, board = {}, options = {}) {
+  const owner = repositoryOwner(repository);
+  if (board.owner && board.owner !== owner) {
+    fail('project_owner', `Project owner must be derived from repository ${repository}: expected "${owner}".`);
+  }
+  board.owner = owner;
+  const configured = board.number === undefined || board.number === null || board.number === ''
+    ? options.configuredNumber
+    : board.number;
+  let selected;
+  if (configured !== undefined && configured !== null && configured !== '') {
+    selected = { number: Number(configured) };
+    if (!Number.isInteger(selected.number) || selected.number <= 0) {
+      fail('project_number', `Project number "${configured}" is invalid; select an available GitHub Project.`);
+    }
+  } else {
+    const candidates = listBoardProjects(repository, options);
+    if (candidates.length === 0) {
+      fail('project_missing', `No GitHub Project is available for "${owner}". Create or share a Project with the authenticated account, then rerun after granting the required Project scopes. No mutation was started.`);
+    }
+    if (candidates.length === 1) selected = candidates[0];
+    else {
+      fail('project_ambiguous', `Multiple GitHub Projects are available for "${owner}". Pass a validated --project-number override in non-interactive mode or select one from the interactive menu.`);
+    }
+  }
+  const number = Number(selected?.number);
+  if (!Number.isInteger(number) || number <= 0) {
+    fail('project_number', 'The selected GitHub Project does not have a valid project number.');
+  }
+  const viewed = run('gh', [
+    'project', 'view', String(number), '--owner', owner, '--format', 'json',
+  ], options);
+  if (viewed.status !== 0) {
+    fail('gh_project', `GitHub Project #${number} for "${owner}" could not be read. Confirm Project access or run host-side \`gh auth refresh -s read:project,project\`, then retry. No mutation was started.`);
+  }
+  try {
+    const value = JSON.parse(String(viewed.stdout));
+    if (Number(value.number ?? number) !== number) throw new Error('number mismatch');
+  } catch {
+    fail('gh_project', `GitHub Project #${number} for "${owner}" returned an invalid response. No mutation was started.`);
+  }
+  board.number = number;
+  return { ...board, owner, number };
+}
+
+export function assertReviewBaseline(repoRoot, baseline, options = {}) {
+  if (!baseline) return undefined;
+  const result = run('git', ['-C', repoRoot, 'rev-parse', '--verify', `${baseline}^{commit}`], options);
+  const resolved = String(result.stdout ?? '').trim();
+  if (result.status !== 0 || !/^[0-9a-f]{40,64}$/u.test(resolved)) {
+    fail('review_baseline', `Review baseline "${baseline}" is not a provable commit in the target repository.`);
+  }
+  return resolved;
 }

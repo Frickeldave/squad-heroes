@@ -1,6 +1,11 @@
 import { existsSync, mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { assertSquadCompatibility, assertGithubWriteAccess } from './preflight';
+import {
+  assertSquadCompatibility,
+  assertGithubWriteAccess,
+  assertReviewBaseline,
+  resolveBoardProject,
+} from './preflight';
 import { buildHeroesConfig, validateHeroesConfig } from './config';
 import { classifyOperation, assertPlanSafe, summarizePlan, recoveryBaselines } from './plan';
 import { parseJsonFile, readUtf8, assertSafeTarget } from './io';
@@ -166,6 +171,12 @@ export function buildInstallPlan(repoRoot, options = {}, injected = {}) {
   const accessRepository = options.repository ?? existing?.repository;
   if (!accessRepository) fail('repository_missing', '--repository owner/name is required for initial installation');
   assertGithubWriteAccess(accessRepository, injected);
+  if (options.boardSync) resolveBoardProject(accessRepository, options.board, injected);
+  const reviewBaseline = assertReviewBaseline(
+    repoRoot,
+    options.reviewBaseline ?? existing?.reviewBaseline,
+    injected
+  );
   const selectedProfile = options.profile ?? existing?.profile;
   if (!selectedProfile) fail('profile_missing', 'Choose --profile typescript-development for non-interactive installation');
   if (existing && selectedProfile !== existing.profile) {
@@ -193,7 +204,7 @@ export function buildInstallPlan(repoRoot, options = {}, injected = {}) {
               board: options.board,
             }).extensions
           : existing.extensions,
-        ...(options.reviewBaseline ? { reviewBaseline: options.reviewBaseline } : {}),
+        ...(reviewBaseline ? { reviewBaseline } : {}),
       })
     : buildHeroesConfig({
         repository: options.repository,
@@ -202,7 +213,7 @@ export function buildInstallPlan(repoRoot, options = {}, injected = {}) {
         branches: options.branches,
         boardSync: options.boardSync,
         board: options.board,
-        reviewBaseline: options.reviewBaseline,
+        reviewBaseline,
       });
   const decisions = options.decisionFile ? parseJsonFile(path.resolve(options.decisionFile)) : {};
   const operations = [
@@ -260,6 +271,9 @@ export function applyPlan(repoRoot, plan, { dryRun = false, verify = false } = {
   if (verify || dryRun) return { changed: 0, plan: summarizePlan(plan.operations) };
   assertSquadCompatibility(repoRoot);
   if (plan.config.repository) assertGithubWriteAccess(plan.config.repository, injected);
+  if (plan.config.extensions?.['board-sync']) {
+    resolveBoardProject(plan.config.repository, { ...plan.config.extensions['board-sync'] }, injected);
+  }
   let changed = 0;
   for (const operation of [...plan.operations.filter(({ id }) => id !== 'heroes-state'),
                            ...plan.operations.filter(({ id }) => id === 'heroes-state')]) {

@@ -7,5 +7,11 @@
   "incompatible": "Squad version is incompatible.",
   "gate_ok": "Preflight passed.",
   "external_approval_required": "Externally visible actions require explicit confirmation.",
-  "fallback_visible": "Translation uses language {language} as a visible fallback."
+  "fallback_visible": "Translation uses language {language} as a visible fallback.",
+  "default_model_reqeng": "Default model for reqeng",
+  "default_model_work": "Default model for work",
+  "default_model_review": "Default model for review",
+  "model_catalog_fallback": "Copilot model discovery is unavailable; using the verified fallback model menu.",
+  "github_access_verified": "GitHub host authentication and repository access verified for {account}.",
+  "github_project": "GitHub Project"
 }

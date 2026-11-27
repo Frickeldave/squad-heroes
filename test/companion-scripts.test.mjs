@@ -26,6 +26,33 @@ function installed() {
   return root;
 }
 
+test('materialized launcher preserves --model runtime override', () => {
+  const root = installed();
+  try {
+    const bin = path.join(root, 'bin');
+    write(root, 'bin/gh', '#!/bin/sh\nif [ "$1" = "api" ]; then printf "true\\n"; fi\nexit 0\n');
+    write(root, 'bin/copilot', `#!/bin/sh
+if [ "$1" = "config" ] && [ "$2" = "model" ] && [ "$3" = "gpt-6.1-terra" ]; then exit 0; fi
+exit 11
+`);
+    chmodSync(path.join(bin, 'gh'), 0o755);
+    chmodSync(path.join(bin, 'copilot'), 0o755);
+    const result = spawnSync(process.execPath, [
+      '--input-type=module',
+      '--eval',
+      "import { resolveModel } from './scripts/heroes-flow-shared.mjs'; console.log(await resolveModel('work', ['--model', 'gpt-6.1-terra']));",
+    ], {
+      cwd: root,
+      env: { ...process.env, PATH: `${bin}:${process.env.PATH}` },
+      encoding: 'utf8',
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stdout.trim(), 'gpt-6.1-terra');
+  } finally {
+    cleanup(root);
+  }
+});
+
 for (const version of ['2.0.0', '2.0.1', '3.0.0']) {
   test(`materialized companion accepts Squad ${version}`, () => {
     const root = fixture(version);

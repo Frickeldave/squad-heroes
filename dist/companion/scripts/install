@@ -3,6 +3,14 @@ import { resolve } from 'node:path';
 import { existsSync, readFileSync } from 'node:fs';
 import { applyPlan, buildInstallPlan, parseInstallArguments, printPlan } from '../src/installer';
 import { HeroesError, INCOMPATIBLE_SQUAD_EXIT } from '../src/errors';
+import {
+  assertGithubWriteAccess,
+  assertReviewBaseline,
+  discoverModels,
+  listBoardProjects,
+  resolveBoardProject,
+} from '../src/preflight';
+import { resolveLanguage, supportedLanguage, translate } from '../src/messages';
 import { createInterface } from 'node:readline/promises';
 
 const HELP = `Usage:
@@ -19,8 +27,14 @@ command that lists the complete versioned Companion distribution below
 templates/squad-heroes/companion/. It does not directly target active consumer
 paths.
 
-Model selection is --model-reqeng/--model-work/--model-review or the persisted
-flow defaults in .squad/heroes.json; there is no fallback.
+Interactive model selection is a menu, backed by the installed Copilot model
+catalog or a visible verified fallback. CI may override a flow at launch with
+--model; installation flags --model-reqeng/--model-work/--model-review remain
+available.
+
+With --enable-board-sync, Project owner is derived from --repository. Project
+number is discovered and validated read-only; CI may use --project-number for a
+deterministic validated override. No token is accepted.
 `;
 
 function existingOptions(target) {
@@ -29,14 +43,26 @@ function existingOptions(target) {
   return JSON.parse(readFileSync(configPath, 'utf8'));
 }
 
-export async function completeInteractiveOptions(options, existing, ask) {
+function wizardText(language, id) {
+  return translate(language, id).text;
+}
+
+export async function completeInteractiveOptions(options, existing, ask, choose, injected = {}) {
+  if (!choose) throw new Error('Interactive selection requires a menu implementation');
+  options.repository ??= await ask('GitHub repository (owner/name)', existing?.repository ?? '');
+  const preliminaryLanguage = supportedLanguage(
+    options.language ?? existing?.language ?? process.env.LANG
+  ) ?? 'en';
+  const repositoryAccess = assertGithubWriteAccess(options.repository, injected);
+  process.stdout.write(`${wizardText(preliminaryLanguage, 'github_access_verified').replace('{account}', repositoryAccess.account)}\n`);
+
   options.profile ??= await ask('Project profile', existing?.profile ?? 'typescript-development');
   if (!['typescript-development', 'TypeScript Development'].includes(options.profile)) {
     throw new Error('Only TypeScript Development is available in this MVP');
   }
   if (options.profile === 'TypeScript Development') options.profile = 'typescript-development';
-  options.repository ??= await ask('GitHub repository (owner/name)', existing?.repository ?? '');
   options.language ??= await ask('Language (de|en)', existing?.language ?? 'en');
+  const language = resolveLanguage(options.language, existing?.language, process.env.LANG).language;
 
   if (!options.branches && !existing?.deploymentBranches) {
     const count = Number(await ask('Deployment branch count (1-3)', '1'));
@@ -47,10 +73,13 @@ export async function completeInteractiveOptions(options, existing, ask) {
     }
   }
 
+  const discovery = discoverModels(injected);
+  if (discovery.fallback) process.stdout.write(`${wizardText(language, 'model_catalog_fallback')}\n`);
   for (const flow of ['reqeng', 'work', 'review']) {
     if (!options.explicitModels?.[flow]) {
       const fallback = existing?.modelDefaults?.[flow] ?? options.models[flow];
-      options.models[flow] = await ask(`Model for ${flow}`, fallback);
+      const label = wizardText(language, `default_model_${flow}`);
+      options.models[flow] = await choose(label, discovery.models, fallback);
       options.explicitModels[flow] = true;
     }
   }
@@ -58,6 +87,7 @@ export async function completeInteractiveOptions(options, existing, ask) {
     'Review baseline commit (optional; blank keeps the configured value)',
     existing?.reviewBaseline ?? ''
   ) || undefined;
+  options.reviewBaseline = assertReviewBaseline(resolve(options.target ?? process.cwd()), options.reviewBaseline, injected);
 
   if (!options.boardSync) {
     const current = existing?.extensions?.['board-sync'];
@@ -66,8 +96,25 @@ export async function completeInteractiveOptions(options, existing, ask) {
   }
   if (options.boardSync) {
     const current = existing?.extensions?.['board-sync'];
-    options.board.owner ??= await ask('Project owner', current?.owner ?? '');
-    options.board.number ??= await ask('Project number', String(current?.number ?? ''));
+    const configuredNumber = options.board.number ?? current?.number;
+    if (configuredNumber === undefined || configuredNumber === null || configuredNumber === '') {
+      const projects = listBoardProjects(options.repository, injected);
+      if (projects.length > 1) {
+        const labels = projects.map((project) =>
+          `${project.number} — ${project.title ?? project.name ?? 'Project'}`
+        );
+        const selection = await choose(
+        wizardText(language, 'github_project'),
+        labels,
+        labels[projects.findIndex(({ number }) => Number(number) === Number(current?.number))] ?? labels[0]
+        );
+        options.board.number = Number(String(selection).split(/\s+—\s+/u, 1)[0]);
+      }
+    }
+    resolveBoardProject(options.repository, options.board, {
+      ...injected,
+      configuredNumber: current?.number,
+    });
     options.board.statusField ??= await ask('Project status field', current?.statusField ?? 'Status');
     options.board.statusMap ??= JSON.parse(await ask(
       'Project status map JSON',
@@ -88,8 +135,23 @@ async function wizard(options) {
     const suffix = fallback ? ` [${fallback}]` : '';
     return (await prompt.question(`${label}${suffix}: `)).trim() || fallback;
   };
+  const choose = async (label, choices, current = '') => {
+    const values = [...new Set(choices.filter(Boolean))];
+    if (current && !values.includes(current)) values.unshift(current);
+    if (values.length === 0) throw new Error(`No choices are available for ${label}`);
+    process.stdout.write(`${label} (choose one):\n`);
+    values.forEach((choice, index) => {
+      process.stdout.write(`  ${index + 1}. ${choice}${choice === current ? ' (current)' : ''}\n`);
+    });
+    while (true) {
+      const answer = (await prompt.question(`Select 1-${values.length}${current ? ` [${values.indexOf(current) + 1}]` : ''}: `)).trim();
+      const index = Number(answer || (current ? values.indexOf(current) + 1 : NaN)) - 1;
+      if (Number.isInteger(index) && index >= 0 && index < values.length) return values[index];
+      process.stdout.write('Invalid selection. Choose a displayed menu number.\n');
+    }
+  };
   try {
-    return await completeInteractiveOptions(options, existing, ask);
+    return await completeInteractiveOptions(options, existing, ask, choose);
   } finally {
     prompt.close();
   }
@@ -104,6 +166,9 @@ export async function main() {
     }
     if (process.stdin.isTTY) {
       await wizard(options);
+    } else if (options.repository) {
+      assertGithubWriteAccess(options.repository);
+      if (options.boardSync) resolveBoardProject(options.repository, options.board);
     }
     const repoRoot = resolve(options.target ?? process.cwd());
     const plan = buildInstallPlan(repoRoot, options);

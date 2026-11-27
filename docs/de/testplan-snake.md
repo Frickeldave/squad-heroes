@@ -180,15 +180,29 @@ node .squad/templates/squad-heroes/companion/scripts/install \
   --deployment-branches 1 \
   --deployment-branch-1 main \
   --language de \
+  --model-reqeng mai-code-2 \
+  --model-work claude-sonnet-5.5 \
+  --model-review gpt-6.1-terra \
   --dry-run
 ```
 
 Vorbedingungen: freigegebene Modell-IDs und vollständige nicht-interaktive
-Eingaben liegen vor. Erwartet: der separate **Companion-Aktivierungsplan**
+Eingaben liegen vor. Prüfen, dass Dry-run nur `gh auth status`,
+Account-/Repository-Rechteabfragen und bei Opt-in lesende Project-Abfragen
+ausführt. Erwartet: der separate **Companion-Aktivierungsplan**
 zeigt `scripts/start-work.mjs`, weitere `scripts/`-Ziele, `.github/prompts/` und
 `.github/workflows/heroes-ci.yml`. Er verursacht keine Writes, passiert beide
 Version-Gates, fordert keinen Token an und hält Plugin-/Companion-Ownership
 getrennt.
+
+Den Installer zusätzlich einmal auf einem TTY ohne Modell-Flags starten.
+`Standardmodell für reqeng/work/review` müssen nummerierte Menüs sein;
+beliebiger Freitext darf nicht akzeptiert werden. Nur der angezeigte aktuelle
+Wert ist Vorgabe. Bei Board-Sync muss Owner `\{owner\}` abgeleitet und die
+Project-Nummer automatisch beziehungsweise im Menü gewählt werden—niemals als
+Freitext. Einzel-, Mehrfach- und Null-Project-Fall prüfen. Einen Launcher mit
+`--model` starten und nachweisen, dass der Override für diesen Lauf unverändert
+genutzt wird.
 
 Den identischen Befehl ohne `--dry-run` ausführen. Danach:
 

@@ -19,8 +19,10 @@ The Companion requires one stable Squad marker `<!-- version: X.Y.Z -->` in
 planning and again before writing. Missing, duplicate, invalid, prerelease and
 older markers stop with exit code 2.
 
-The Companion also requires successful `gh auth status` and a non-mutating push
-permission query. It never requests, accepts or persists a token. An unsupported
+The Companion also requires successful `gh auth status`, authenticated account
+access, and non-mutating repository read/push permission queries. When board sync
+is selected it additionally proves GitHub Project read access before planning.
+It never requests, accepts or persists a token. An unsupported
 Squad version must be repaired with the normal-user upgrade flow described
 below; never run Squad itself with `sudo`.
 
@@ -53,10 +55,20 @@ node .squad/templates/squad-heroes/companion/scripts/install \
   --dry-run
 ```
 
-On a TTY, a wizard gathers the profile, repository, language, deployment branch
-count/names, review baseline, all three explicit flow models and optional Project
-board synchronization. Empty optional values use the displayed existing/default
-value. Non-interactive CI supplies the existing flags:
+On a TTY, a wizard gathers the profile, repository, language and deployment
+branch count/names. The three **default flow models** use numbered menus from
+Copilot's documented model catalog; if discovery fails, a visible verified
+fallback menu is used. The launcher runtime `--model` override remains
+independent. The optional review baseline is clearly labeled and must resolve
+to a commit in the target repository.
+
+Project board opt-in never asks for owner or number. Owner is always derived
+from `--repository`; the available Projects are read through `gh`. One Project
+is selected automatically, multiple Projects use a menu, and zero stops before
+planning with setup/access instructions. Explicit `--project-number` (and a
+matching derived-owner `--project-owner`) may be used by CI but is always
+validated through the API. Dry-run performs only these read checks. Empty
+optional values use the displayed existing value. Non-interactive CI supplies:
 
 ```bash
 node .squad/templates/squad-heroes/companion/scripts/install \

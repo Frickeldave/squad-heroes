@@ -53,7 +53,9 @@ test('GitHub auth gate exposes no credentials and stops on host or permission fa
   assert.throws(() => assertGithubWriteAccess('owner/repository', {
     spawn: (_command, args) => args[0] === 'auth'
       ? { status: 0, stdout: '', stderr: '' }
-      : { status: 0, stdout: 'false\n', stderr: '' },
+      : args[1] === 'user'
+        ? { status: 0, stdout: 'octocat\n', stderr: '' }
+        : { status: 0, stdout: args.at(-1) === '.permissions.pull' ? 'true\n' : 'false\n', stderr: '' },
   }), /push permission/);
 });
 

@@ -20,8 +20,10 @@ Der Companion verlangt genau einen stabilen Squad-Marker
 Er prüft ihn vor der Planung und erneut vor dem Schreiben. Fehlende, doppelte,
 ungültige, Prerelease- oder ältere Marker stoppen mit Exitcode 2.
 
-Zusätzlich müssen `gh auth status` und eine nicht-mutierende Push-Rechteprüfung
-erfolgreich sein. Der Companion fragt weder Token ab noch akzeptiert oder
+Zusätzlich müssen `gh auth status`, authentifizierter Account-Zugriff sowie
+nicht-mutierende Repository-Lese- und Push-Rechteprüfungen erfolgreich sein.
+Bei Board-Opt-in wird vor der Planung zusätzlich der GitHub-Project-Lesezugriff
+bewiesen. Der Companion fragt weder Token ab noch akzeptiert oder
 persistiert er sie. Eine zu alte Squad-Version wird mit dem unten beschriebenen
 normalen Upgrade-Fluss repariert; Squad selbst nie mit `sudo` ausführen.
 
@@ -54,10 +56,21 @@ node .squad/templates/squad-heroes/companion/scripts/install \
   --dry-run
 ```
 
-An einem TTY erfragt ein Wizard Profil, Repository, Sprache, Anzahl/Namen der
-Deployment-Branches, Review-Baseline, alle drei expliziten Flow-Modelle und
-optionales Project-Board-Sync. Leere optionale Werte nutzen angezeigte
-Bestands-/Standardwerte. Nicht-interaktive CI übergibt die vorhandenen Flags:
+An einem TTY erfragt ein Wizard Profil, Repository, Sprache und
+Deployment-Branches. Die drei **Standardmodelle der Flows** werden aus
+nummerierten Menüs des dokumentierten Copilot-Modellkatalogs gewählt; ist
+Erkennung nicht verfügbar, wird sichtbar ein verifiziertes Ersatzmenü benutzt.
+Der Launcher-Override `--model` bleibt pro Lauf verfügbar. Die optionale
+Review-Baseline ist eindeutig beschriftet und muss im Ziel als Commit auflösbar
+sein.
+
+Beim Board-Opt-in werden Owner und Nummer nicht eingegeben: Der Owner wird stets
+aus `--repository` abgeleitet, Projects werden lesend über `gh` erkannt. Ein
+Project wird automatisch gewählt, mehrere erscheinen im Menü, keines stoppt
+vor Planung mit konkreter Setup-/Zugriffsanleitung. Für CI bleiben
+`--project-number` und ein dazu passender `--project-owner` als stets per API
+validierte Overrides möglich. Dry-run führt nur Leseprüfungen aus. Leere
+optionale Werte nutzen sichtbare Bestandswerte. Nicht-interaktive CI übergibt:
 
 ```bash
 node .squad/templates/squad-heroes/companion/scripts/install \

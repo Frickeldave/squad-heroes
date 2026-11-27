@@ -47,7 +47,14 @@ markers and UTF-8 before write.
   do not run Squad itself under `sudo`.
 - Exit code 2 also covers missing, duplicate, invalid or prerelease Squad
   versions; `2.0.0-rc.1` is not accepted.
-- `gh_permission`: push permission cannot be proven.
+- `gh_host`: install `gh` on the host, then authenticate there.
+- `gh_auth`: run the host-side `gh auth login` browser/device flow.
+- `gh_permission`: repository read or push permission cannot be proven; confirm
+  access or request it from an owner.
+- `gh_project`, `project_missing`, `project_ambiguous`: Project scopes/access or
+  deterministic selection is missing. Refresh host auth with
+  `read:project,project`, confirm account access, create/share a Project, or pass
+  a validated `--project-number` for CI.
 - `conflicts`: dry run and files unchanged; decision required.
 - `ambiguous_markers`: duplicate, absent or reversed markers.
 - `deployment_branch`: ref is invalid or ambiguous.
@@ -60,5 +67,6 @@ markers and UTF-8 before write.
   chmod npm's global tree. Only after these checks pass, run `squad upgrade` in
   the target repository and verify the marker.
 
-For authentication failures, use only the official `gh auth login`
-browser/device flow. Do not copy tokens or type them into a terminal.
+For authentication failures, use only official host-side `gh auth login` or
+`gh auth refresh` flows. Do not copy tokens, use `--with-token`, or type token
+values into a terminal.

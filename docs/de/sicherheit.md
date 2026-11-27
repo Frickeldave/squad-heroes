@@ -19,10 +19,14 @@ verändert sein Plugin-verwaltetes Bundle selbst nicht.
 
 ## Rechte und Zustimmung
 
-Vor Mutation sind `gh auth status` und Push-Recht Pflicht. Zusätzlich muss jede
-irreversible oder extern sichtbare Wirkung im Plan ausdrücklich freigegeben
-werden. Berechtigung ersetzt keine Zustimmung. Dieser MVP-Installer führt
-keine realen Board-, Release- oder Deployment-Writes aus.
+Vor Planung sind `gh auth status`, authentifizierter Account-Zugriff sowie
+Repository-Lese-/Push-Rechte Pflicht. Board-Opt-in verlangt zusätzlich
+nicht-mutierenden Project-list/view-Zugriff; der Owner wird aus dem Repository
+abgeleitet. Host-Authentifizierungsfehler verweisen auf `gh auth login`.
+Fehlende Project-Scopes verweisen auf `gh auth refresh -s read:project,project`
+und anschließende Bestätigung von Owner-/Account-Zugriff. Berechtigung ersetzt
+keine ausdrückliche Zustimmung. Dry-run und Erstaktivierung schreiben kein
+Project; der spätere Workflow bleibt separat opt-in.
 
 ## Konflikte
 
@@ -35,7 +39,8 @@ bleibt append-only; `team.md` ändert nur Markerbereiche.
 
 Tokens und PATs werden weder abgefragt noch als Argument, stdin, Datei, Log oder
 Test-Fixture akzeptiert. Zulässig sind nur der sichere Host-Credential-Store und
-der offizielle Browser-/Device-Flow.
+der offizielle Browser-/Device-Flow. `--with-token`, Token-Umgebungsvariablen,
+Token-Argumente und ausgegebene Credentials werden nicht verwendet.
 Bei einer nicht unterstützten Squad-Version wird `squad upgrade --self` als
 normaler Benutzer und anschließend im Ziel-Repository `squad upgrade`
 ausgeführt. Ein root-eigenes globales npm-Paket kann den einmaligen,

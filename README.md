@@ -60,11 +60,19 @@ node .squad/templates/squad-heroes/companion/scripts/install --target "$PWD" --d
 Erst ein ausdrücklicher Lauf dieses kopierten Installers ohne `--dry-run`
 materialisiert aktive Ziele.
 
-In einem Terminal fragt der Wizard nach Profil, Repository, Sprache,
-Deployment-Branches, Review-Baseline, Modellen und optionalem Board-Sync.
-Initial werden Repository und Branches benötigt; leere optionale Eingaben
-verwenden angezeigte Standardwerte bzw. bleiben deaktiviert. Der Wizard fragt
-nie nach Tokens und persistiert keine Credentials.
+Im Terminal prüft der Wizard zuerst die Host-Authentifizierung sowie
+Repository-Lese- und Push-Rechte. Die drei **Standardmodelle** werden über
+nummerierte Menüs ausgewählt, nicht als Freitext; die Modelle aus dem
+installierten Copilot-Katalog werden benutzt, andernfalls sichtbar ein
+verifiziertes Ersatzmenü. Launcher dürfen `--model` weiterhin pro Lauf
+überschreiben. Profile, Sprache, Branches und die optionale Review-Baseline
+bleiben Wizard-Eingaben. Die Baseline wird als lokaler Commit validiert.
+
+Bei Board-Sync wird der Project-Owner aus `owner/repository` abgeleitet.
+Project-Nummer und Zugriff werden ausschließlich lesend geprüft: ein Project
+wird automatisch gewählt, mehrere erscheinen als Menü, keines stoppt mit
+konkreten Einrichtungshinweisen. `--project-owner`/`--project-number` bleiben
+validierte CI-Overrides; Tokens werden nie abgefragt oder gespeichert.
 
 Für CI/Tests bleibt alles explizit und nicht-interaktiv:
 
@@ -119,13 +127,14 @@ Plugin-State; aktive, vom Companion erzeugte Dateien bleiben bestehen.
 
 - Node.js 20+, npm für die Produktentwicklung
 - Squad `2.0.0` oder höher, stabil (kein Prerelease)
-- lokal installierter `gh`, authentifiziert und mit Push-Recht
+- lokal installierter `gh`, authentifiziert, mit Repository-Lese-/Push-Recht
+  und bei Board-Opt-in mit Project-Lesezugriff
 - genau ein stabiler `<!-- version: X.Y.Z -->`-Marker in
   `.github/agents/squad.agent.md`
 
-Der Companion prüft Squad, GitHub-Authentifizierung und Push-Recht, fordert
-niemals Token an und speichert keine Credentials. Konflikte werden vor dem
-ersten Schreibzugriff angezeigt.
+Der Companion prüft Squad, GitHub-Authentifizierung sowie Repository- und
+Project-Zugriff, fordert niemals Token an und speichert keine Credentials.
+Konflikte werden vor dem ersten Schreibzugriff angezeigt.
 
 ## Dokumentation
 

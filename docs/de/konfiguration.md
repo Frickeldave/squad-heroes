@@ -14,20 +14,26 @@ Konflikt bleibt. Entscheidungen liegen in derselben Recovery-Struktur; sie
 ersetzen niemals `.squad/plugins/*`.
 
 Der installierte Einstiegspunkt liest diesen Stand aus dem Consumer, nicht aus
-dem ursprünglichen Plugin-Checkout. Im interaktiven Update erscheinen
-Repository, Branches, Sprache, Modelle, Review-Baseline und Board-Konfiguration
-als Wizard-Vorgaben; CLI-Flags bleiben maßgeblich.
+dem ursprünglichen Plugin-Checkout. Interaktive Updates zeigen Bestandswerte
+als beschriftete Vorgaben. Die drei Standardmodelle werden in Menüs gewählt;
+CLI-Flags bleiben maßgeblich. Review-Baseline und Board-Konfiguration werden
+erneut validiert.
 
 ## Modelle
 
-Je Flow gilt ausschließlich `--model-reqeng`, `--model-work` oder
-`--model-review` > zugehöriger Wert in `modelDefaults` > Abbruch.
+Der Installations-**Standard** jedes Flows wird als `Standardmodell für reqeng`,
+`work` oder `review` gewählt. Interaktive Eingabe ist auf ein nummeriertes
+Katalogmenü beschränkt; die Erkennung nutzt `copilot help config`. Ist sie nicht
+verfügbar, wird ein verifiziertes Ersatzmenü sichtbar angekündigt. Die
+Installationsflags heißen `--model-reqeng`, `--model-work` und
+`--model-review`.
 Es gibt keinen `auto`-, Cache-, Family-, Team-,
 Prompt- oder Cross-Flow-Fallback. Das Modell wird einmal aufgelöst und unverändert
 weitergegeben.
 Vor dem Start prüft das Companion-Profil die ID mit einer isolierten
 `copilot config model`-Abfrage gegen den autorisierten Host-Katalog. Credential-
-Werte werden dabei weder gelesen noch ausgegeben.
+Werte werden dabei weder gelesen noch ausgegeben. Per Launcher-Aufruf darf
+`--model ID` weiterhin den konfigurierten Standard dieses Flows überschreiben.
 
 ## Prompt-Layer
 
@@ -58,5 +64,11 @@ geraten. Sie erscheinen in `heroes.json` und den fünf Consumer-Workflows.
 ## Board-Sync
 
 Board-Sync ist nur mit kompletter, versionierter Extension-Konfiguration
-aktivierbar. Ohne Opt-in wird weder Workflow installiert noch ein Secret gelesen
-oder eine Project-Permission angefordert. Fehlerhafte Teilkonfiguration stoppt.
+aktivierbar. Der Repository-Owner wird abgeleitet und nie geraten. Fehlen
+`--project-number` und gespeicherte Nummer, wählt eine lesende
+`gh project list`-Prüfung einen einzelnen Kandidaten automatisch, zeigt bei
+mehreren ein Menü und stoppt bei null mit menschlicher Einrichtungsanleitung.
+Das gewählte Project wird vor dem Plan mit `gh project view` verifiziert; eine
+explizite Nummer passiert denselben Check. Ohne Opt-in wird weder Workflow
+installiert noch ein Secret gelesen oder eine Project-Permission angefordert.
+Fehlerhafte Teilkonfiguration stoppt.

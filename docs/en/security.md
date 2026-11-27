@@ -19,10 +19,15 @@ changes its own plugin-managed bundle.
 
 ## Permissions and approval
 
-Before mutation, `gh auth status` and push permission are required. Every
-irreversible or externally visible effect must also be explicitly approved in
-the plan. Permission does not replace approval. This MVP installer performs no
-real board, release or deployment writes.
+Before planning, `gh auth status`, authenticated account access and repository
+read/push permissions are required. Board opt-in additionally requires
+non-mutating Project list/view access; selected owner is derived from the
+repository. Host authentication failures direct the operator to `gh auth
+login`. Missing Project scopes direct to `gh auth refresh -s
+read:project,project`, followed by confirmation of owner/account access.
+Permission does not replace explicit approval. The installer performs no
+Project write in dry-run or initial activation; the later workflow remains a
+separate opt-in.
 
 ## Conflicts
 
@@ -33,8 +38,9 @@ are only `use`, `keep`, `merge` and `abort`. A merge is revalidated.
 ## Credentials
 
 Tokens and PATs are never requested or accepted as arguments, stdin, files,
-logs or test fixtures. Only the host credential store and official
-browser/device flow are supported.
+logs or test fixtures. Only the host credential store and official browser/device flow are supported.
+The installer never uses `--with-token`, environment-token input, token
+arguments or printed credentials.
 For an unsupported Squad version, the documented operator-only remedy is
 `squad upgrade --self` as the normal user followed by `squad upgrade` in the
 target repository. A root-owned global npm package may require the one-off

@@ -13,19 +13,24 @@ drift remains a conflict until an explicit decision. Decisions remain in that
 same recovery structure and never replace `.squad/plugins/*`.
 
 The installed entry point loads this state from the consumer repository, not
-from the original plugin checkout. On an interactive update it displays the
-stored repository, branches, language, models, review baseline and board
-configuration as wizard defaults; CLI flags remain authoritative.
+from the original plugin checkout. On an interactive update it displays stored
+values as labeled defaults. Repository, branches and language are collected
+normally; the three default flow models are menu selections. CLI flags remain
+authoritative. Review baseline and board configuration are validated again.
 
 ## Models
 
-Each flow uses only its `--model-reqeng`, `--model-work` or `--model-review`
-value > matching `modelDefaults` value > stop.
+Each flow's installation **default** is selected under `Default model for
+reqeng`, `work` or `review`. Interactive input is restricted to a numbered
+catalog menu; discovery comes from `copilot help config`, with a visibly
+announced verified fallback catalog if unavailable. The installation flags are
+`--model-reqeng`, `--model-work` and `--model-review`.
 There is no `auto`, cache, family, team, prompt or cross-flow fallback. The model
 is resolved once and passed unchanged.
 Before launch, the Companion probes the ID with an isolated
 `copilot config model` query against the authorized host catalog. Credential
-values are neither read nor emitted.
+values are neither read nor emitted. A launcher invocation can still use
+`--model ID` to override that flow's configured default for this run.
 
 ## Prompt layers
 
@@ -56,5 +61,10 @@ arguments. Names are neither normalized nor guessed. They render into
 ## Board sync
 
 Board sync is enabled only with complete versioned extension configuration.
-Without opt-in, no workflow is installed, no secret is read and no Project
-permission is requested. Invalid partial configuration stops.
+The repository owner is derived and cannot be guessed. If no explicit
+`--project-number` or stored number exists, a read-only `gh project list` check
+auto-selects one candidate, presents a menu for multiple candidates, or fails
+with human setup instructions for zero candidates. The selected project is
+verified with `gh project view` before the plan. Explicit numbers must pass the
+same check. Without opt-in, no workflow is installed, no secret is read and no
+Project permission is requested. Invalid partial configuration stops.

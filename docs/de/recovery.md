@@ -51,7 +51,15 @@ erneut auf Marker und UTF-8 validiert.
   nutzen; Squad selbst nicht unter `sudo` starten.
 - Exit-Code 2 gilt ebenso für fehlende, doppelte, ungültige oder Prerelease-
   Squad-Versionen; `2.0.0-rc.1` wird nicht akzeptiert.
-- `gh_permission`: Push-Recht nicht beweisbar.
+- `gh_host`: `gh` auf dem Host installieren und dort anmelden.
+- `gh_auth`: auf dem Host den offiziellen `gh auth login`-Browser-/Device-Flow
+  ausführen.
+- `gh_permission`: Repository-Lese- oder Push-Recht nicht beweisbar; Zugriff
+  bestätigen oder vom Owner anfordern.
+- `gh_project`, `project_missing`, `project_ambiguous`: Project-Scopes/Zugriff
+  oder deterministische Auswahl fehlen. Host-Auth mit `read:project,project`
+  erneuern, Account-Zugriff bestätigen, ein Project anlegen/freigeben oder für CI
+  eine validierte `--project-number` übergeben.
 - `conflicts`: Dry-run und Dateien unverändert; Entscheidung erforderlich.
 - `ambiguous_markers`: doppelte, fehlende oder vertauschte Marker.
 - `deployment_branch`: Ref ungültig oder nicht eindeutig.
@@ -64,5 +72,6 @@ erneut auf Marker und UTF-8 validiert.
   rekursiv am globalen npm-Baum `chmod` ausführen. Erst nach erfolgreicher
   Prüfung im Ziel-Repository `squad upgrade` starten und den Marker prüfen.
 
-Bei Authentifizierungsfehlern nur den offiziellen `gh auth login`-Browser-/Device-Flow
-nutzen. Tokens nicht kopieren oder im Terminal eingeben.
+Bei Authentifizierungsfehlern nur offizielle Host-Flows `gh auth login` oder
+`gh auth refresh` nutzen. Tokens nicht kopieren, nicht mit `--with-token`
+übergeben und keine Token-Werte im Terminal eingeben.

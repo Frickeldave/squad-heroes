@@ -106,6 +106,14 @@ for (const fixtureId of [1, 2]) test(`real Squad lifecycle uses an installed sel
 
     mustRun(root, ['install', product]);
     assert.equal(existsSync(installedEntry), true);
+    const installedInstaller = readFileSync(installedEntry, 'utf8');
+    assert.match(installedInstaller, /choose one/u);
+    assert.match(installedInstaller, /default_model_\$\{flow\}/u);
+    assert.doesNotMatch(installedInstaller, /ask\(`Model for/u);
+    assert.match(
+      readFileSync(path.join(root, '.squad/templates/squad-heroes/companion/resources/messages.de.json'), 'utf8'),
+      /Standardmodell für reqeng/u
+    );
     mustRun(root, ['enable', 'squad-heroes']);
     mustRun(root, ['verify']);
 

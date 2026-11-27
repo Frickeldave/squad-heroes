@@ -7,5 +7,11 @@
   "incompatible": "Squad-Version inkompatibel.",
   "gate_ok": "Preflight erfolgreich.",
   "external_approval_required": "Extern sichtbare Aktionen erfordern eine explizite Bestätigung.",
-  "fallback_visible": "Übersetzung verwendet Sprache {language} als sichtbaren Fallback."
+  "fallback_visible": "Übersetzung verwendet Sprache {language} als sichtbaren Fallback.",
+  "default_model_reqeng": "Standardmodell für reqeng",
+  "default_model_work": "Standardmodell für work",
+  "default_model_review": "Standardmodell für review",
+  "model_catalog_fallback": "Copilot-Modellerkennung ist nicht verfügbar; das verifizierte Ersatz-Menü wird verwendet.",
+  "github_access_verified": "Host-GitHub-Anmeldung und Repository-Zugriff für {account} wurden geprüft.",
+  "github_project": "GitHub-Project"
 }

@@ -3,6 +3,11 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { applyPlan, buildInstallPlan, printPlan } from '../src/installer.mjs';
+import {
+  assertGithubWriteAccess,
+  resolveBoardProject,
+  VERIFIED_MODEL_FALLBACK,
+} from '../src/preflight.mjs';
 import { parseJsonFile } from '../src/io.mjs';
 import { completeInteractiveOptions } from '../scripts/install.mjs';
 import { cleanup, commandResult, fixture, write } from './helpers.mjs';
@@ -29,15 +34,15 @@ test('interactive Companion wizard collects required and opt-in configuration', 
     ['Deployment branch count (1-3)', '2'],
     ['Deployment branch 1', 'main'],
     ['Deployment branch 2', 'int'],
-    ['Review baseline commit (optional; blank keeps the configured value)', 'a'.repeat(40)],
+    ['Review baseline commit (optional; blank keeps the configured value)', ''],
     ['Enable optional Project board sync (y/N)', 'y'],
-    ['Project owner', 'owner'],
-    ['Project number', '7'],
     ['Project status field', 'Status'],
     ['Project status map JSON', JSON.stringify({ 'go:yes': 'Ready', 'go:done': 'Done' })],
     ['GitHub Actions secret expression', 'secrets.HEROES_PROJECT_TOKEN'],
   ]);
   const asked = [];
+  const selected = [];
+  const ghCalls = [];
   const completed = await completeInteractiveOptions({
     profile: null,
     repository: null,
@@ -50,21 +55,259 @@ test('interactive Companion wizard collects required and opt-in configuration', 
   }, null, async (label, fallback) => {
     asked.push(label);
     return answers.get(label) || fallback;
+  }, async (label, choices, current) => {
+    selected.push({ label, choices, current });
+    assert.ok(choices.includes(current));
+    return current;
+  }, {
+    spawn(command, args) {
+      ghCalls.push([command, ...args]);
+      if (command === 'copilot') {
+        return commandResult('  `model`: AI model\n    - "mai-code-2"\n    - "claude-sonnet-5.5"\n    - "gpt-6.1-terra"\n\n  `next`: x\n');
+      }
+      if (args[0] === 'project' && args[1] === 'list') {
+        return commandResult(JSON.stringify({ projects: [{ number: 7, title: 'Snake' }] }));
+      }
+      if (args[0] === 'project' && args[1] === 'view') {
+        return commandResult(JSON.stringify({ number: 7, title: 'Snake' }));
+      }
+      if (args[0] === 'api' && args[1] === 'user') return commandResult('octocat\n');
+      return commandResult('true\n');
+    },
   });
   assert.equal(completed.profile, 'typescript-development');
   assert.equal(completed.repository, 'owner/repository');
   assert.deepEqual(completed.branches, ['main', 'int']);
-  assert.equal(completed.reviewBaseline.length, 40);
+  assert.equal(completed.reviewBaseline, undefined);
   assert.deepEqual(completed.board, {
     owner: 'owner',
-    number: '7',
+    number: 7,
     statusField: 'Status',
     statusMap: { 'go:yes': 'Ready', 'go:done': 'Done' },
     secret: 'secrets.HEROES_PROJECT_TOKEN',
   });
-  assert.ok(asked.includes('Model for reqeng'));
-  assert.ok(asked.includes('Model for work'));
-  assert.ok(asked.includes('Model for review'));
+  assert.deepEqual(selected.slice(0, 3).map(({ label }) => label), [
+    'Default model for reqeng',
+    'Default model for work',
+    'Default model for review',
+  ]);
+  assert.deepEqual(selected.slice(0, 3).map(({ current }) => current), [
+    'mai-code-2',
+    'claude-sonnet-5.5',
+    'gpt-6.1-terra',
+  ]);
+  assert.ok(selected.slice(0, 3).every(({ choices }) => choices.every((choice) => VERIFIED_MODEL_FALLBACK.includes(choice))));
+  assert.ok(!asked.some((label) => label.startsWith('Default model')));
+  assert.equal(completed.board.owner, 'owner');
+  assert.ok(!asked.includes('Project owner'));
+  assert.ok(!asked.includes('Project number'));
+  assert.ok(ghCalls.some((call) => call.slice(1, 3).join(' ') === 'project list'));
+});
+
+test('interactive German model labels and discovery fallback are explicit', async () => {
+  const labels = [];
+  const output = [];
+  const original = process.stdout.write;
+  process.stdout.write = (chunk) => {
+    output.push(String(chunk));
+    return true;
+  };
+  try {
+    await completeInteractiveOptions({
+      profile: 'typescript-development',
+      repository: 'owner/repository',
+      language: 'de',
+      branches: ['main'],
+      models: { reqeng: 'mai-code-2', work: 'claude-sonnet-5.5', review: 'gpt-6.1-terra' },
+      explicitModels: {},
+      boardSync: false,
+      board: {},
+    }, null, async (label, fallback) => label.startsWith('Enable') ? 'N' : fallback, async (label, choices, current) => {
+      labels.push(label);
+      return current;
+    }, {
+      spawn(command, args) {
+        if (command === 'copilot') return { status: 1, stdout: '', stderr: '' };
+        if (args[0] === 'api' && args[1] === 'user') return commandResult('octocat\n');
+        return commandResult('true\n');
+      },
+    });
+  } finally {
+    process.stdout.write = original;
+  }
+  assert.deepEqual(labels, [
+    'Standardmodell für reqeng',
+    'Standardmodell für work',
+    'Standardmodell für review',
+  ]);
+  assert.match(output.join(''), /verifizierte Ersatz-Menü/u);
+});
+
+test('GitHub preflight diagnoses host, auth and repository permission failures before writes', () => {
+  const root = fixture();
+  try {
+    const failures = [
+      [{ error: { code: 'ENOENT' }, status: null }, /GitHub CLI is unavailable/u],
+      [{ status: 1, stdout: '', stderr: '' }, /gh auth login/u],
+    ];
+    for (const [result, message] of failures) {
+      assert.throws(() => buildInstallPlan(root, options, {
+        spawn: () => result,
+      }), message);
+      assert.equal(existsSync(path.join(root, '.squad/heroes.json')), false);
+    }
+    let call = 0;
+    assert.throws(() => assertGithubWriteAccess('owner/repository', {
+      spawn: () => {
+        call += 1;
+        if (call === 3) return commandResult('false\n');
+        if (call === 4) return commandResult('true\n');
+        if (call === 2) return commandResult('octocat\n');
+        return commandResult();
+      },
+    }), /Repository read permission/u);
+    call = 0;
+    assert.throws(() => assertGithubWriteAccess('owner/repository', {
+      spawn: () => {
+        call += 1;
+        if (call === 2) return commandResult('octocat\n');
+        if (call === 3) return commandResult('true\n');
+        if (call === 4) return commandResult('false\n');
+        return commandResult();
+      },
+    }), /Repository push permission/u);
+  } finally {
+    cleanup(root);
+  }
+});
+
+test('board project resolution derives owner and handles one, many, zero and inaccessible projects', async () => {
+  const list = (projects, viewStatus = 0) => (command, args) => {
+    if (args[0] === 'project' && args[1] === 'list') {
+      return commandResult(JSON.stringify({ projects }));
+    }
+    if (args[0] === 'project' && args[1] === 'view') {
+      return viewStatus === 0
+        ? commandResult(JSON.stringify({ number: Number(args[2]) }))
+        : { status: viewStatus, stdout: '', stderr: '' };
+    }
+    return commandResult();
+  };
+  const board = {};
+  resolveBoardProject('dakoenig/squad-heroes-snake', board, {
+    spawn: list([{ number: 4, title: 'Delivery' }]),
+  });
+  assert.deepEqual(board, { owner: 'dakoenig', number: 4 });
+
+  assert.throws(() => resolveBoardProject('owner/repository', {}, {
+    spawn: list([{ number: 1 }, { number: 2 }]),
+  }), /Multiple GitHub Projects/u);
+  assert.throws(() => resolveBoardProject('owner/repository', {}, {
+    spawn: list([]),
+  }), /No GitHub Project/u);
+  assert.throws(() => resolveBoardProject('owner/repository', { number: 4 }, {
+    spawn: list([], 1),
+  }), /could not be read/u);
+  assert.throws(() => resolveBoardProject('owner/repository', { owner: 'other', number: 4 }), /derived/u);
+});
+
+test('multiple discovered Projects are selected only through the interactive menu', async () => {
+  const selections = [];
+  const completed = await completeInteractiveOptions({
+    profile: 'typescript-development',
+    repository: 'owner/repository',
+    language: 'en',
+    branches: ['main'],
+    models: { reqeng: 'mai-code-2', work: 'claude-sonnet-5.5', review: 'gpt-6.1-terra' },
+    explicitModels: {},
+    boardSync: true,
+    board: {
+      statusField: 'Status',
+      statusMap: { 'go:yes': 'Ready' },
+      secret: 'secrets.HEROES_PROJECT_TOKEN',
+    },
+  }, null, async (label, fallback) => fallback, async (label, choices, current) => {
+    selections.push({ label, choices, current });
+    return label === 'GitHub Project' ? choices[1] : current;
+  }, {
+    spawn(command, args) {
+      if (command === 'copilot') return { status: 1, stdout: '', stderr: '' };
+      if (args[0] === 'api' && args[1] === 'user') return commandResult('octocat\n');
+      if (args[0] === 'project' && args[1] === 'list') {
+        return commandResult(JSON.stringify({
+          projects: [{ number: 1, title: 'Roadmap' }, { number: 2, title: 'Delivery' }],
+        }));
+      }
+      if (args[0] === 'project' && args[1] === 'view') {
+        return commandResult(JSON.stringify({ number: 2, title: 'Delivery' }));
+      }
+      return commandResult('true\n');
+    },
+  });
+  assert.equal(completed.board.number, 2);
+  assert.equal(completed.board.owner, 'owner');
+  assert.deepEqual(selections.at(-1).choices, ['1 — Roadmap', '2 — Delivery']);
+});
+
+test('dry-run board opt-in uses only read checks and writes no active targets', () => {
+  const root = fixture();
+  try {
+    const calls = [];
+    const boardOptions = {
+      ...options,
+      boardSync: true,
+      board: {
+        owner: 'owner',
+        number: 7,
+        statusField: 'Status',
+        statusMap: { 'go:yes': 'Ready', 'go:done': 'Done' },
+        secret: 'secrets.HEROES_PROJECT_TOKEN',
+      },
+    };
+    const injected = {
+      spawn(command, args) {
+        calls.push([command, ...args]);
+        if (args[0] === 'api' && args[1] === 'user') return commandResult('octocat\n');
+        if (args[0] === 'project' && args[1] === 'view') {
+          return commandResult(JSON.stringify({ number: 7 }));
+        }
+        return commandResult('true\n');
+      },
+    };
+    const plan = buildInstallPlan(root, boardOptions, injected);
+    const result = applyPlan(root, plan, { dryRun: true }, injected);
+    assert.equal(result.changed, 0);
+    assert.equal(existsSync(path.join(root, '.squad/heroes.json')), false);
+    assert.equal(existsSync(path.join(root, 'scripts/start-work.mjs')), false);
+    assert.ok(calls.filter(([command]) => command === 'gh').every((call) => {
+      const joined = call.join(' ');
+      return !/\b(item-add|item-edit|field-create|label create)\b/u.test(joined);
+    }));
+  } finally {
+    cleanup(root);
+  }
+});
+
+test('Project access failure blocks board installation before its first write', () => {
+  const root = fixture();
+  try {
+    assert.throws(() => buildInstallPlan(root, {
+      ...options,
+      boardSync: true,
+      board: { number: 9, statusField: 'Status', statusMap: { 'go:yes': 'Ready' }, secret: 'secrets.HEROES_PROJECT_TOKEN' },
+    }, {
+      spawn(command, args) {
+        if (args[0] === 'api' && args[1] === 'user') return commandResult('octocat\n');
+        if (args[0] === 'project' && args[1] === 'view') {
+          return { status: 1, stdout: '', stderr: 'forbidden' };
+        }
+        return commandResult('true\n');
+      },
+    }), /could not be read/u);
+    assert.equal(existsSync(path.join(root, '.squad/heroes.json')), false);
+  } finally {
+    cleanup(root);
+  }
 });
 
 test('fresh dry-run plans plugin and companion separately without mutation', () => {

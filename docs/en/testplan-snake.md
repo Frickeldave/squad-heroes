@@ -171,14 +171,27 @@ node .squad/templates/squad-heroes/companion/scripts/install \
   --deployment-branches 1 \
   --deployment-branch-1 main \
   --language en \
+  --model-reqeng mai-code-2 \
+  --model-work claude-sonnet-5.5 \
+  --model-review gpt-6.1-terra \
   --dry-run
 ```
 
-Require approved model IDs and complete noninteractive inputs. Expect the
+Require approved model IDs and complete noninteractive inputs. Verify dry-run
+performs only `gh auth status`, authenticated-account/repository permission
+queries and, when opted in, Project read queries. Expect the
 separate **Companion activation plan** to show `scripts/start-work.mjs`, other
 `scripts/` targets, `.github/prompts/`, and
 `.github/workflows/heroes-ci.yml`. It performs no writes, passes both version
 gates, avoids credential prompts, and keeps plugin/Companion ownership separate.
+
+Also run the installer on a TTY once without model flags. Confirm the labels
+`Default model for reqeng/work/review` are numbered menus, arbitrary text cannot
+be accepted, and the displayed current value is the only default. If board sync
+is enabled, confirm owner `\{owner\}` is derived and Project `\#` is auto-selected
+or chosen from a menu—never typed. Verify the one/multiple/zero Project cases.
+Run a separate launcher invocation with `--model` and confirm the override is
+used unchanged for that run.
 
 Run the same command without `--dry-run`, then:
 
