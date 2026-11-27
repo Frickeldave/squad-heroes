@@ -57,7 +57,10 @@ for (const fixtureId of [1, 2]) test(`real Squad lifecycle works in neutral Type
   write(root, '.squad/heroes.json', companion.metadata);
   try {
     mustRun(root, ['validate', product]);
-    mustRun(root, ['dry-run', product]);
+    const dryRun = mustRun(root, ['dry-run', product]);
+    assert.match(dryRun.stdout, /templates\/squad-heroes\/agents\/tony\.en\.md/u);
+    assert.match(dryRun.stdout, /prompts\/squad-heroes\/prompts\/startwork\.en\.md/u);
+    assert.doesNotMatch(dryRun.stdout, /scripts\/start-work\.mjs|\.github\/workflows\/heroes-ci\.yml/u);
     mustRun(root, ['install', product]);
     mustRun(root, ['enable', 'squad-heroes']);
     mustRun(root, ['list', '--json']);

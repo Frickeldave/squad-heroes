@@ -71,7 +71,7 @@ diesen bereits geplanten Companion-Befehl ohne `--dry-run` separat aus:
 node scripts/install.mjs --target /repo --repository owner/repository \
   --profile typescript-development \
   --deployment-branches 1 --deployment-branch-1 prd \
-  --language de --dry-run
+  --language de
 ```
 
 `TypeScript Development` ist das einzige MVP-Profil. Es installiert Tony,

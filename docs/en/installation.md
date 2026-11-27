@@ -72,7 +72,7 @@ already reviewed command without `--dry-run`:
 node scripts/install.mjs --target /repo --repository owner/repository \
   --profile typescript-development \
   --deployment-branches 1 --deployment-branch-1 prd \
-  --language en --dry-run
+  --language en
 ```
 
 `TypeScript Development` is the only MVP profile and installs Tony, Pepper,

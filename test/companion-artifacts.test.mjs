@@ -142,6 +142,7 @@ test('board workflow and script are absent without opt-in and complete when enab
     assert.match(workflow, /vars\.HEROES_BOARD_SYNC == 'enabled'/u);
     assert.match(workflow, /HEROES_PROJECT_STATUS_FIELD: "Status"/u);
     assert.doesNotMatch(workflow, /HEROES_BOARD_SYNC == 'enabled'.*Project-Write/u);
+    assert.ok(existsSync(path.join(root, 'scripts/sync-project-board.mjs')));
   } finally {
     cleanup(root);
   }
