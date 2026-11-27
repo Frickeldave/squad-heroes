@@ -15,17 +15,18 @@ ersetzen niemals `.squad/plugins/*`.
 
 Der installierte Einstiegspunkt liest diesen Stand aus dem Consumer, nicht aus
 dem ursprünglichen Plugin-Checkout. Interaktive Updates zeigen Bestandswerte
-als beschriftete Vorgaben. Die drei Standardmodelle werden in Menüs gewählt;
-CLI-Flags bleiben maßgeblich. Review-Baseline und Board-Konfiguration werden
-erneut validiert.
+als beschriftete Vorgaben. Die drei Standardmodelle werden mit einem
+Pfeiltasten-Picker gewählt; CLI-Flags bleiben maßgeblich. Review-Baseline und
+Board-Konfiguration werden erneut validiert.
 
 ## Modelle
 
 Der Installations-**Standard** jedes Flows wird als `Standardmodell für reqeng`,
-`work` oder `review` gewählt. Interaktive Eingabe ist auf ein nummeriertes
-Katalogmenü beschränkt; die Erkennung nutzt `copilot help config`. Ist sie nicht
-verfügbar, wird ein verifiziertes Ersatzmenü sichtbar angekündigt. Die
-Installationsflags heißen `--model-reqeng`, `--model-work` und
+`work` oder `review` gewählt. Interaktiv bewegen Hoch/Runter oder `j`/`k`,
+Enter bestätigt und Escape/`q` bricht ab; Zifferneingabe wird ignoriert. Die
+Erkennung nutzt `copilot help config`. Ist sie nicht verfügbar, wird ein
+verifiziertes Ersatzmenü sichtbar angekündigt. Die Installationsflags heißen
+`--model-reqeng`, `--model-work` und
 `--model-review`.
 Es gibt keinen `auto`-, Cache-, Family-, Team-,
 Prompt- oder Cross-Flow-Fallback. Das Modell wird einmal aufgelöst und unverändert
@@ -67,7 +68,8 @@ Board-Sync ist nur mit kompletter, versionierter Extension-Konfiguration
 aktivierbar. Der Repository-Owner wird abgeleitet und nie geraten. Fehlen
 `--project-number` und gespeicherte Nummer, wählt eine lesende
 `gh project list`-Prüfung einen einzelnen Kandidaten automatisch, zeigt bei
-mehreren ein Menü und stoppt bei null mit menschlicher Einrichtungsanleitung.
+mehreren denselben Pfeiltasten-Picker und stoppt bei null mit menschlicher
+Einrichtungsanleitung.
 Das gewählte Project wird vor dem Plan mit `gh project view` verifiziert; eine
 explizite Nummer passiert denselben Check. Ohne Opt-in wird weder Workflow
 installiert noch ein Secret gelesen oder eine Project-Permission angefordert.

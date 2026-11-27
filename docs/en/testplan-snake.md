@@ -186,10 +186,13 @@ separate **Companion activation plan** to show `scripts/start-work.mjs`, other
 gates, avoids credential prompts, and keeps plugin/Companion ownership separate.
 
 Also run the installer on a TTY once without model flags. Confirm the labels
-`Default model for reqeng/work/review` are numbered menus, arbitrary text cannot
-be accepted, and the displayed current value is the only default. If board sync
-is enabled, confirm owner `\{owner\}` is derived and Project `\#` is auto-selected
-or chosen from a menu—never typed. Verify the one/multiple/zero Project cases.
+`Default model for reqeng/work/review` use an in-place picker: Up/Down or `j`/`k`
+moves, Enter confirms, Escape/`q` aborts, and typed numbers or arbitrary text
+cannot select an item. The displayed current value is highlighted and is the
+default. Without a TTY, expect a clear noninteractive-flags error rather than a
+number-entry fallback. If board sync is enabled, confirm owner `\{owner\}` is
+derived and Project `\#` is auto-selected or chosen with the same arrow-key
+picker—never typed. Verify the one/multiple/zero Project cases.
 Run a separate launcher invocation with `--model` and confirm the override is
 used unchanged for that run.
 

@@ -61,8 +61,11 @@ Erst ein ausdrücklicher Lauf dieses kopierten Installers ohne `--dry-run`
 materialisiert aktive Ziele.
 
 Im Terminal prüft der Wizard zuerst die Host-Authentifizierung sowie
-Repository-Lese- und Push-Rechte. Die drei **Standardmodelle** werden über
-nummerierte Menüs ausgewählt, nicht als Freitext; die Modelle aus dem
+Repository-Lese- und Push-Rechte. Die drei **Standardmodelle** und mehrere
+Projects werden mit einer TTY-Auswahl navigiert: Pfeil hoch/runter oder `j`/`k`
+bewegen, Enter bestätigt, Escape oder `q` bricht ab. Nummerneingabe ist keine
+Auswahlmethode. Ohne TTY muss der Installer vollständig nicht-interaktiv mit
+den Modell- und ggf. Project-Flags aufgerufen werden. Die Modelle aus dem
 installierten Copilot-Katalog werden benutzt, andernfalls sichtbar ein
 verifiziertes Ersatzmenü. Launcher dürfen `--model` weiterhin pro Lauf
 überschreiben. Profile, Sprache, Branches und die optionale Review-Baseline
@@ -70,7 +73,7 @@ bleiben Wizard-Eingaben. Die Baseline wird als lokaler Commit validiert.
 
 Bei Board-Sync wird der Project-Owner aus `owner/repository` abgeleitet.
 Project-Nummer und Zugriff werden ausschließlich lesend geprüft: ein Project
-wird automatisch gewählt, mehrere erscheinen als Menü, keines stoppt mit
+wird automatisch gewählt, mehrere erscheinen in derselben Pfeiltasten-Auswahl, keines stoppt mit
 konkreten Einrichtungshinweisen. `--project-owner`/`--project-number` bleiben
 validierte CI-Overrides; Tokens werden nie abgefragt oder gespeichert.
 

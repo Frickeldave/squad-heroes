@@ -56,15 +56,18 @@ node .squad/templates/squad-heroes/companion/scripts/install \
 ```
 
 On a TTY, a wizard gathers the profile, repository, language and deployment
-branch count/names. The three **default flow models** use numbered menus from
-Copilot's documented model catalog; if discovery fails, a visible verified
-fallback menu is used. The launcher runtime `--model` override remains
+branch count/names. The three **default flow models** and multiple-Project
+choices use an in-place arrow-key picker: Up/Down or `j`/`k` moves, Enter
+confirms, and Escape/`q` cancels. Numeric entry is not accepted. Without a TTY,
+the installer fails closed and instructs automation to provide the
+noninteractive model/project flags. If model discovery fails, a visible
+verified fallback list is used. The launcher runtime `--model` override remains
 independent. The optional review baseline is clearly labeled and must resolve
 to a commit in the target repository.
 
 Project board opt-in never asks for owner or number. Owner is always derived
 from `--repository`; the available Projects are read through `gh`. One Project
-is selected automatically, multiple Projects use a menu, and zero stops before
+is selected automatically, multiple Projects use the same arrow-key picker, and zero stops before
 planning with setup/access instructions. Explicit `--project-number` (and a
 matching derived-owner `--project-owner`) may be used by CI but is always
 validated through the API. Dry-run performs only these read checks. Empty

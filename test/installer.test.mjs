@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { applyPlan, buildInstallPlan, printPlan } from '../src/installer.mjs';
 import {
@@ -9,8 +10,9 @@ import {
   VERIFIED_MODEL_FALLBACK,
 } from '../src/preflight.mjs';
 import { parseJsonFile } from '../src/io.mjs';
-import { completeInteractiveOptions } from '../scripts/install.mjs';
+import { completeInteractiveOptions, selectWithArrowKeys } from '../scripts/install.mjs';
 import { cleanup, commandResult, fixture, write } from './helpers.mjs';
+import { EventEmitter } from 'node:events';
 
 const productRoot = path.resolve(import.meta.dirname, '..');
 const options = {
@@ -72,7 +74,9 @@ test('interactive Companion wizard collects required and opt-in configuration', 
         return commandResult('  `model`: AI model\n    - "mai-code-2"\n    - "claude-sonnet-5.5"\n    - "gpt-6.1-terra"\n\n  `next`: x\n');
       }
       if (args[0] === 'project' && args[1] === 'list') {
-        return commandResult(JSON.stringify({ projects: [{ number: 7, title: 'Snake' }] }));
+        return commandResult(JSON.stringify({
+          projects: [{ number: 7, title: 'Snake' }, { number: 8, title: 'Roadmap' }],
+        }));
       }
       if (args[0] === 'project' && args[1] === 'view') {
         return commandResult(JSON.stringify({ number: 7, title: 'Snake' }));
@@ -106,6 +110,11 @@ test('interactive Companion wizard collects required and opt-in configuration', 
     'gpt-6.1-terra',
   ]);
   assert.ok(selected.slice(0, 3).every(({ choices }) => choices.every((choice) => VERIFIED_MODEL_FALLBACK.includes(choice))));
+  assert.deepEqual(selected[3], {
+    label: 'GitHub Project',
+    choices: ['7 — Snake', '8 — Roadmap'],
+    current: '7 — Snake',
+  });
   assert.ok(!asked.some((label) => label.startsWith('Default model')));
   assert.equal(completed.board.owner, 'owner');
   assert.ok(!asked.includes('Project owner'));
@@ -153,6 +162,98 @@ test('interactive German model labels and discovery fallback are explicit', asyn
     'Standardmodell für review',
   ]);
   assert.match(output.join(''), /verifizierte Ersatz-Menü/u);
+});
+
+function pickerTerminal({ tty = true } = {}) {
+  const input = new EventEmitter();
+  const rawModes = [];
+  input.isTTY = tty;
+  input.isRaw = false;
+  input.setRawMode = (enabled) => {
+    rawModes.push(enabled);
+    input.isRaw = enabled;
+  };
+  input.resume = () => {};
+  const writes = [];
+  const output = {
+    isTTY: tty,
+    write(chunk) {
+      writes.push(String(chunk));
+      return true;
+    },
+  };
+  return { input, output, rawModes, writes };
+}
+
+test('arrow-key picker navigates, ignores numeric entry, confirms, and restores terminal state', async () => {
+  const terminal = pickerTerminal();
+  const selection = selectWithArrowKeys(
+    'Default model for work',
+    ['model-a', 'model-b', 'model-c'],
+    'model-b',
+    { ...terminal, emitKeypressEventsFn() {} }
+  );
+
+  terminal.input.emit('keypress', '3', { name: '3' });
+  terminal.input.emit('keypress', '', { name: 'down' });
+  terminal.input.emit('keypress', '', { name: 'return' });
+
+  assert.equal(await selection, 'model-c');
+  assert.deepEqual(terminal.rawModes, [true, false]);
+  assert.equal(terminal.input.listenerCount('keypress'), 0);
+  assert.equal(terminal.input.isRaw, false);
+  assert.match(terminal.writes.join(''), /\x1B\[\?25l/u);
+  assert.match(terminal.writes.join(''), /\x1B\[\?25h/u);
+  assert.ok(terminal.writes.join('').includes('model-c'));
+});
+
+test('arrow-key picker supports j/k and cancellation aborts predictably', async () => {
+  const terminal = pickerTerminal();
+  const selected = selectWithArrowKeys('GitHub Project', ['one', 'two'], 'two', {
+    ...terminal,
+    language: 'en',
+    emitKeypressEventsFn() {},
+  });
+  terminal.input.emit('keypress', 'k', { name: 'k' });
+  terminal.input.emit('keypress', 'j', { name: 'j' });
+  terminal.input.emit('keypress', '\r', { name: 'enter' });
+  assert.equal(await selected, 'two');
+
+  const cancelledTerminal = pickerTerminal();
+  const cancelled = selectWithArrowKeys('GitHub Project', ['one', 'two'], 'one', {
+    ...cancelledTerminal,
+    emitKeypressEventsFn() {},
+  });
+  cancelledTerminal.input.emit('keypress', '', { name: 'escape' });
+  await assert.rejects(cancelled, /Selection cancelled/u);
+  assert.deepEqual(cancelledTerminal.rawModes, [true, false]);
+  assert.equal(cancelledTerminal.input.listenerCount('keypress'), 0);
+});
+
+test('arrow-key picker fails closed when no TTY is available', () => {
+  const terminal = pickerTerminal({ tty: false });
+  assert.throws(
+    () => selectWithArrowKeys('Default model for reqeng', ['model-a'], 'model-a', terminal),
+    /--model-reqeng.*--model-work.*--model-review/u
+  );
+  assert.deepEqual(terminal.rawModes, []);
+  assert.equal(terminal.writes.length, 0);
+});
+
+test('non-TTY initial wizard fails closed with explicit model flags guidance', () => {
+  const result = spawnSync(process.execPath, [
+    path.join(productRoot, 'scripts/install.mjs'),
+    '--target', process.cwd(),
+    '--repository', 'owner/repository',
+    '--profile', 'typescript-development',
+    '--language', 'en',
+    '--deployment-branches', '1',
+    '--deployment-branch-1', 'main',
+    '--dry-run',
+  ], { encoding: 'utf8' });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /--model-reqeng.*--model-work.*--model-review/u);
+  assert.doesNotMatch(result.stdout, /Select 1-/u);
 });
 
 test('GitHub preflight diagnoses host, auth and repository permission failures before writes', () => {
@@ -221,7 +322,7 @@ test('board project resolution derives owner and handles one, many, zero and ina
   assert.throws(() => resolveBoardProject('owner/repository', { owner: 'other', number: 4 }), /derived/u);
 });
 
-test('multiple discovered Projects are selected only through the interactive menu', async () => {
+test('multiple discovered Projects are selected only through the interactive picker', async () => {
   const selections = [];
   const completed = await completeInteractiveOptions({
     profile: 'typescript-development',

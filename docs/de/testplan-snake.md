@@ -196,10 +196,13 @@ Version-Gates, fordert keinen Token an und hält Plugin-/Companion-Ownership
 getrennt.
 
 Den Installer zusätzlich einmal auf einem TTY ohne Modell-Flags starten.
-`Standardmodell für reqeng/work/review` müssen nummerierte Menüs sein;
-beliebiger Freitext darf nicht akzeptiert werden. Nur der angezeigte aktuelle
-Wert ist Vorgabe. Bei Board-Sync muss Owner `\{owner\}` abgeleitet und die
-Project-Nummer automatisch beziehungsweise im Menü gewählt werden—niemals als
+`Standardmodell für reqeng/work/review` müssen In-place-Picker sein: Hoch/Runter
+oder `j`/`k` bewegen, Enter bestätigt, Escape/`q` bricht ab. Eingegebene Zahlen
+oder beliebiger Freitext dürfen nichts auswählen. Der angezeigte aktuelle Wert
+ist hervorgehoben und die Vorgabe. Ohne TTY muss eine klare Meldung zu
+nicht-interaktiven Flags statt einer Nummerneingabe erscheinen. Bei Board-Sync
+muss Owner `\{owner\}` abgeleitet und die Project-Nummer automatisch
+beziehungsweise mit derselben Pfeiltasten-Auswahl gewählt werden—niemals als
 Freitext. Einzel-, Mehrfach- und Null-Project-Fall prüfen. Einen Launcher mit
 `--model` starten und nachweisen, dass der Override für diesen Lauf unverändert
 genutzt wird.

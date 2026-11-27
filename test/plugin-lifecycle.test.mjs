@@ -15,6 +15,9 @@ const companionArgs = [
   '--deployment-branches', '1',
   '--deployment-branch-1', 'main',
   '--language', 'en',
+  '--model-reqeng', 'mai-code-2',
+  '--model-work', 'claude-sonnet-5.5',
+  '--model-review', 'gpt-6.1-terra',
 ];
 
 function run(root, args) {
@@ -111,7 +114,8 @@ exit 0
     mustRun(root, ['install', product]);
     assert.equal(existsSync(installedEntry), true);
     const installedInstaller = readFileSync(installedEntry, 'utf8');
-    assert.match(installedInstaller, /choose one/u);
+    assert.match(installedInstaller, /selectWithArrowKeys/u);
+    assert.match(installedInstaller, /picker_help/u);
     assert.match(installedInstaller, /default_model_\$\{flow\}/u);
     assert.doesNotMatch(installedInstaller, /ask\(`Model for/u);
     assert.match(

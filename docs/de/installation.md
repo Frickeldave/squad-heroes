@@ -57,16 +57,19 @@ node .squad/templates/squad-heroes/companion/scripts/install \
 ```
 
 An einem TTY erfragt ein Wizard Profil, Repository, Sprache und
-Deployment-Branches. Die drei **Standardmodelle der Flows** werden aus
-nummerierten Menüs des dokumentierten Copilot-Modellkatalogs gewählt; ist
-Erkennung nicht verfügbar, wird sichtbar ein verifiziertes Ersatzmenü benutzt.
-Der Launcher-Override `--model` bleibt pro Lauf verfügbar. Die optionale
+Deployment-Branches. Die drei **Standardmodelle der Flows** und mehrere
+Projects nutzen eine Pfeiltasten-Auswahl: Hoch/Runter oder `j`/`k` bewegen,
+Enter bestätigt, Escape/`q` bricht ab. Nummerneingabe wird nicht akzeptiert.
+Ohne TTY wird interaktiv abgebrochen und Automation auf die
+nicht-interaktiven Modell-/Project-Flags verwiesen. Ist Erkennung nicht
+verfügbar, wird sichtbar eine verifizierte Ersatzliste benutzt. Der
+Launcher-Override `--model` bleibt pro Lauf verfügbar. Die optionale
 Review-Baseline ist eindeutig beschriftet und muss im Ziel als Commit auflösbar
 sein.
 
 Beim Board-Opt-in werden Owner und Nummer nicht eingegeben: Der Owner wird stets
 aus `--repository` abgeleitet, Projects werden lesend über `gh` erkannt. Ein
-Project wird automatisch gewählt, mehrere erscheinen im Menü, keines stoppt
+Project wird automatisch gewählt, mehrere erscheinen in derselben Pfeiltasten-Auswahl, keines stoppt
 vor Planung mit konkreter Setup-/Zugriffsanleitung. Für CI bleiben
 `--project-number` und ein dazu passender `--project-owner` als stets per API
 validierte Overrides möglich. Dry-run führt nur Leseprüfungen aus. Leere

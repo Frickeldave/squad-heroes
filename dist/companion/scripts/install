@@ -12,6 +12,7 @@ import {
 } from '../src/preflight';
 import { resolveLanguage, supportedLanguage, translate } from '../src/messages';
 import { createInterface } from 'node:readline/promises';
+import { emitKeypressEvents } from 'node:readline';
 
 const HELP = `Usage:
   node .squad/templates/squad-heroes/companion/scripts/install --target /path/to/repository --repository owner/name --profile typescript-development --deployment-branches N \\
@@ -27,9 +28,9 @@ command that lists the complete versioned Companion distribution below
 templates/squad-heroes/companion/. It does not directly target active consumer
 paths.
 
-Interactive model selection is a menu, backed by the installed Copilot model
-catalog or a visible verified fallback. CI may override a flow at launch with
---model; installation flags --model-reqeng/--model-work/--model-review remain
+Interactive model and Project selection use an in-place arrow-key picker
+(Up/Down or j/k, Enter, Escape/q). CI must supply noninteractive flags, including
+--model-reqeng/--model-work/--model-review. The runtime --model override remains
 available.
 
 With --enable-board-sync, Project owner is derived from --repository. Project
@@ -138,6 +139,109 @@ export async function completeInteractiveOptions(options, existing, ask, choose,
   return options;
 }
 
+export function supportsArrowKeyPicker({ input = process.stdin, output = process.stdout } = {}) {
+  return Boolean(
+    input.isTTY &&
+    output.isTTY &&
+    typeof input.setRawMode === 'function'
+  );
+}
+
+/**
+ * Select one value with terminal keypresses. This intentionally has no
+ * numeric-entry fallback: non-TTY automation must provide CLI flags.
+ */
+export function selectWithArrowKeys(label, choices, current = '', options = {}) {
+  const input = options.input ?? process.stdin;
+  const output = options.output ?? process.stdout;
+  const language = options.language ?? 'en';
+  const emitKeypressEventsFn = options.emitKeypressEventsFn ?? emitKeypressEvents;
+  const values = [...new Set(choices.filter(Boolean))];
+  if (current && !values.includes(current)) values.unshift(current);
+  if (values.length === 0) throw new Error(`No choices are available for ${label}`);
+  if (!supportsArrowKeyPicker({ input, output })) {
+    throw new Error(wizardText(language, 'picker_tty_required'));
+  }
+
+  const currentIndex = values.indexOf(current);
+  let selectedIndex = currentIndex >= 0 ? currentIndex : 0;
+  let cleanedUp = false;
+  let renderedLines = 0;
+  let rawModeBefore = Boolean(input.isRaw);
+  const help = wizardText(language, 'picker_help');
+  const currentSuffix = wizardText(language, 'picker_current');
+
+  return new Promise((resolvePromise, rejectPromise) => {
+    const render = () => {
+      const lines = [
+        label,
+        help,
+        ...values.map((value, index) => {
+          const selected = index === selectedIndex;
+          const marker = selected ? '❯' : ' ';
+          const currentText = value === current ? ` ${currentSuffix}` : '';
+          const line = `${marker} ${value}${currentText}`;
+          return selected ? `\x1B[7m${line}\x1B[0m` : line;
+        }),
+      ];
+      if (renderedLines > 0) {
+        output.write(`\r\x1B[${renderedLines}A\x1B[0J`);
+      }
+      output.write(`${lines.join('\n')}\n`);
+      renderedLines = lines.length;
+    };
+
+    const cleanup = () => {
+      if (cleanedUp) return;
+      cleanedUp = true;
+      input.off('keypress', handleKeypress);
+      if (renderedLines > 0) output.write(`\r\x1B[${renderedLines}A\x1B[0J`);
+      input.setRawMode(rawModeBefore);
+      output.write('\x1B[?25h');
+    };
+
+    const finish = (value, error) => {
+      cleanup();
+      if (error) rejectPromise(error);
+      else {
+        output.write(`${label}: ${value}\n`);
+        resolvePromise(value);
+      }
+    };
+
+    const handleKeypress = (value, key = {}) => {
+      const name = String(key.name ?? '').toLowerCase();
+      const character = String(value ?? '').toLowerCase();
+      if (name === 'escape' || name === 'q' || character === 'q') {
+        finish(null, new Error(wizardText(language, 'picker_cancelled')));
+      } else if (name === 'up' || name === 'k' || character === 'k') {
+        selectedIndex = (selectedIndex - 1 + values.length) % values.length;
+        render();
+      } else if (name === 'down' || name === 'j' || character === 'j') {
+        selectedIndex = (selectedIndex + 1) % values.length;
+        render();
+      } else if (name === 'return' || name === 'enter') {
+        finish(values[selectedIndex]);
+      } else if (key.ctrl && name === 'c') {
+        finish(null, new Error(wizardText(language, 'picker_cancelled')));
+      }
+      // Digits and other printable characters are deliberately ignored.
+    };
+
+    try {
+      emitKeypressEventsFn(input);
+      input.on('keypress', handleKeypress);
+      input.setRawMode(true);
+      input.resume();
+      output.write('\x1B[?25l');
+      render();
+    } catch (error) {
+      cleanup();
+      rejectPromise(error);
+    }
+  });
+}
+
 async function wizard(options) {
   const existing = existingOptions(options.target);
   const prompt = createInterface({ input: process.stdin, output: process.stdout });
@@ -146,18 +250,12 @@ async function wizard(options) {
     return (await prompt.question(`${label}${suffix}: `)).trim() || fallback;
   };
   const choose = async (label, choices, current = '') => {
-    const values = [...new Set(choices.filter(Boolean))];
-    if (current && !values.includes(current)) values.unshift(current);
-    if (values.length === 0) throw new Error(`No choices are available for ${label}`);
-    process.stdout.write(`${label} (choose one):\n`);
-    values.forEach((choice, index) => {
-      process.stdout.write(`  ${index + 1}. ${choice}${choice === current ? ' (current)' : ''}\n`);
-    });
-    while (true) {
-      const answer = (await prompt.question(`Select 1-${values.length}${current ? ` [${values.indexOf(current) + 1}]` : ''}: `)).trim();
-      const index = Number(answer || (current ? values.indexOf(current) + 1 : NaN)) - 1;
-      if (Number.isInteger(index) && index >= 0 && index < values.length) return values[index];
-      process.stdout.write('Invalid selection. Choose a displayed menu number.\n');
+    const language = supportedLanguage(options.language ?? existing?.language ?? process.env.LANG) ?? 'en';
+    prompt.pause();
+    try {
+      return await selectWithArrowKeys(label, choices, current, { language });
+    } finally {
+      prompt.resume();
     }
   };
   try {
@@ -174,15 +272,25 @@ export async function main() {
       process.stdout.write(HELP);
       return;
     }
-    if (process.stdin.isTTY) {
+    if (supportsArrowKeyPicker()) {
       await wizard(options);
-    } else if (options.repository) {
+    } else {
+      const existing = existingOptions(options.target);
+      const missingModelFlags = !existing && ['reqeng', 'work', 'review']
+        .some((flow) => !options.explicitModels[flow]);
       const language = supportedLanguage(options.language ?? process.env.LANG) ?? 'en';
-      const access = assertGithubWriteAccess(options.repository, {
+      if (missingModelFlags) {
+        throw new Error(wizardText(language, 'picker_tty_required'));
+      }
+      const accessRepository = options.repository ?? existing?.repository;
+      if (!accessRepository) {
+        throw new Error('--repository owner/name is required for noninteractive installation.');
+      }
+      const access = assertGithubWriteAccess(accessRepository, {
         language,
         expectedAccount: options.expectedAccount,
       });
-      if (options.boardSync) resolveBoardProject(options.repository, options.board, {
+      if (options.boardSync) resolveBoardProject(accessRepository, options.board, {
         language,
         account: access.account,
       });
