@@ -1,0 +1,4 @@
+#!/bin/sh
+if [ -n "$SQUAD_HEROES_RELEASE_BASE" ]; then
+  node scripts/check-release-label.mjs || exit 1
+fi

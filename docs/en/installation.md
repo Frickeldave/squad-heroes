@@ -2,107 +2,86 @@
 
 ## Architecture
 
-The plugin owns only versioned static files below `.squad/heroes/`. The
-companion owns materialized active targets such as agents, `.github/prompts/`,
-workflows and scripts. Squad `.squad/plugins/*` remains the only plugin
-lifecycle source.
+The Squad plugin owns only a versioned, static distribution below
+`.squad/templates/squad-heroes/companion/`. It contains the installer, extensionless
+ESM runtime modules, package metadata, templates, profiles, agents, localized
+Humanizer resources, messages, active-target catalog, scripts and workflows.
+Squad 2.0 records and copies this distribution but never executes it.
 
-Agent/prompt sources, companion adapters, launchers/automation and
-documentation/quality are four portions of the same overlay and share one
-version. They are not four separate installation products.
+The installed Companion owns the active consumer targets it materializes after
+an explicit, separate invocation. Plugin verification/update/uninstall therefore
+never owns, updates or removes those active targets.
 
 ## Preflight
 
-The installer reads `.github/agents/squad.agent.md` before planning and
-immediately before the first write. Exactly one valid stable SemVer marker at
-least `2.0.0` is accepted, including versions such as `2.0.1` and `3.0.0`.
-Build metadata is ignored for precedence; prerelease markers are rejected.
-Otherwise it exits with code 2 and reports:
+The Companion requires one stable Squad marker `<!-- version: X.Y.Z -->` in
+`.github/agents/squad.agent.md`, at least 2.0.0. It checks the marker before
+planning and again before writing. Missing, duplicate, invalid, prerelease and
+older markers stop with exit code 2.
 
-`ERROR: squad-heroes minimum Squad version 2.0.0 is required; detected
-"<value|missing|multiple|invalid>". Installation aborted before mutation.`
-
-No backup, journal, lock or partial installation is created.
-
-The diagnosis tells the operator to run `squad upgrade --self` as the normal
-user, repair a root-owned global npm installation when necessary, then upgrade
-the target repository. It does not authorize running Squad itself with `sudo`.
-
-It then runs `gh auth status` and a non-mutating repository query. Failure only
-refers to the host-side `gh auth login` flow.
+The Companion also requires successful `gh auth status` and a non-mutating push
+permission query. It never requests, accepts or persists a token. An unsupported
+Squad version must be repaired with the normal-user upgrade flow described
+below; never run Squad itself with `sudo`.
 
 ## First installation
 
-There are two separate read-only dry-runs. `squad plugin dry-run` plans only
-static marketplace templates. `scripts/install.mjs --dry-run` plans active
-Companion targets, including `scripts/`, `.github/prompts/`, workflows and
-materialized agent files. Review both plans before installation; the plugin
-dry-run is not the complete delivery plan.
+From the consumer repository, obtain the plugin source only to install it:
 
 ```bash
-git clone https://github.com/Frickeldave/squad-heroes.git
-cd /repo
-node /path/to/squad-heroes/scripts/plugin-preflight.mjs --target "$PWD"
+git clone https://github.com/Frickeldave/squad-heroes.git /path/to/squad-heroes
 squad plugin validate /path/to/squad-heroes
-# Static plugin targets only:
 squad plugin dry-run /path/to/squad-heroes
-node /path/to/squad-heroes/scripts/install.mjs \
-  --target "$PWD" --repository owner/repository \
-  --profile typescript-development \
-  --deployment-branches 1 --deployment-branch-1 prd \
-  --language en --dry-run
-node /path/to/squad-heroes/scripts/plugin-preflight.mjs --target "$PWD"
 squad plugin install /path/to/squad-heroes
 squad plugin enable squad-heroes
-squad plugin list --json
 squad plugin verify
 ```
 
-`plugin-preflight.mjs` is only a read-only compatibility and manifest gate; it
-does not install anything and owns no plugin lifecycle. Running it twice proves
-the early and final check immediately around the verified dry-run. `squad
-plugin install <local-dir>` is the only plugin installation path.
+The Squad dry-run lists the complete static package, including
+`templates/squad-heroes/companion/scripts/install`,
+`templates/squad-heroes/companion/src/installer` and packaged workflow/script
+sources. It must not list direct active consumer paths.
 
-The second dry-run must contain active targets such as
-`scripts/start-work.mjs` and `.github/workflows/heroes-ci.yml`. The
-human-triggered companion then follows as a separate operation using the
-already reviewed command without `--dry-run`:
+Invoke the copied entry point from the consumer:
 
 ```bash
-node scripts/install.mjs --target /repo --repository owner/repository \
-  --profile typescript-development \
-  --deployment-branches 1 --deployment-branch-1 prd \
-  --language en
+node .squad/templates/squad-heroes/companion/scripts/install \
+  --target "$PWD" \
+  --dry-run
 ```
 
-`TypeScript Development` is the only MVP profile and installs Tony, Pepper,
-Bruce, Clint, Maria, Natasha and Nick. `Client` is never used. Both language
-variants are materialized; `--language` selects active `charter.md` and runtime
-output.
+On a TTY, a wizard gathers the profile, repository, language, deployment branch
+count/names, review baseline, all three explicit flow models and optional Project
+board synchronization. Empty optional values use the displayed existing/default
+value. Non-interactive CI supplies the existing flags:
 
-Missing, duplicate or ambiguous branch inputs stop before the first write.
+```bash
+node .squad/templates/squad-heroes/companion/scripts/install \
+  --target "$PWD" --repository owner/repository \
+  --profile typescript-development --language en \
+  --deployment-branches 2 \
+  --deployment-branch-1 main --deployment-branch-2 int \
+  --model-reqeng mai-code-2 \
+  --model-work claude-sonnet-5.5 \
+  --model-review gpt-6.1-terra \
+  --dry-run
+```
+
+The Companion dry-run must include `scripts/start-work.mjs`,
+`.github/workflows/heroes-ci.yml` and active agent charters. Review it, then run
+the same copied command without `--dry-run`. A repeated invocation is a no-op
+unless approved configuration or package content changed.
 
 ## Repairing a root-owned global Squad installation
 
-Run `squad upgrade --self` first as the normal user. If the global npm package
-is owned by root and npm reports `EACCES` or `EPERM` while renaming it, do not
-rerun the CLI under `sudo`. With npm versions that support `--allow-scripts`,
-repair the global installation once with the verified, command-specific
-allowlist:
+Run `squad upgrade --self` first as the normal user. If a root-owned npm package
+fails with `EACCES` or `EPERM`, repair only the global npm package with:
 
 ```bash
 sudo sh -c 'umask 022 && exec npm install -g --allow-scripts=@bradygaster/squad-cli,node-pty,koffi,protobufjs @bradygaster/squad-cli@latest'
 ```
 
-The explicit `umask 022` matters: an inherited restrictive umask can recreate
-the package and launcher target as owner-only (`750`), which makes `/usr/bin/squad`
-resolve successfully for `root` but fail with `Permission denied` for a normal
-user. The allowlist covers the four packages in this dependency tree that have
-install-time scripts (`@bradygaster/squad-cli`, `node-pty`, `koffi`, and
-`protobufjs`); it does not weaken npm's persistent global policy.
-
-Restart the terminal or shell so its command cache and environment are refreshed,
-then verify the repaired launcher before any project upgrade:
+Restart the terminal and verify:
 
 ```bash
 command -v squad
@@ -110,32 +89,30 @@ ls -l "$(command -v squad)"
 squad --version
 ```
 
-Only after these commands succeed, run `squad upgrade` in the target repository
-and verify that exactly one stable SemVer marker of at least `2.0.0` remains.
-Do not run a recursive `chmod` on npm's global directory and do not use
-`--dangerously-allow-all-scripts`. For a remaining `Permission denied`, stop,
-inspect the symlink with `ls -l`, and rerun the one repair command with an
-explicit `umask`; do not guess at individual dependency permissions.
+Do not use `sudo squad`, recursive `chmod`, or
+`--dangerously-allow-all-scripts`. After the launcher succeeds, run
+`squad upgrade` in the consumer and verify its marker.
 
 ## Upgrade
 
-The installed Squad CLI has no `plugin update` command. Update from a newer
-checkout by installing that directory again:
+There is no supported `plugin update` command. Update the static distribution
+by installing a newer checkout:
 
 ```bash
 squad plugin verify &&
 squad plugin install /path/to/newer/squad-heroes &&
 squad plugin verify
-squad plugin list --json
 ```
 
-Running `verify` before `install` stops an update if a Squad-owned installed
-file has a local checksum conflict. Squad owns version, manifest and file
-checksums in `.squad/plugins/*`; repeated `install` registers the newer source
-and content there. Companion files are untouched. Reinstalling identical
-content is idempotent for delivered targets, although Squad records a fresh
-install timestamp/audit event.
+This replaces only plugin-owned distribution files. Existing active Companion
+targets do not change. Review and explicitly apply those changes by rerunning
+the newly installed local copy:
 
-`.squad/heroes.json` preserves the one-time profile identity. Profile changes
-require uninstall/reinstall. Existing charters, team sections and workflows
-change only inside managed markers; local bytes survive.
+```bash
+node .squad/templates/squad-heroes/companion/scripts/install --target "$PWD" --dry-run
+node .squad/templates/squad-heroes/companion/scripts/install --target "$PWD"
+```
+
+The installed copy is self-contained; the external source checkout is not used
+by Companion installation. `squad plugin uninstall squad-heroes` removes only
+the managed distribution, not active files already created by the Companion.

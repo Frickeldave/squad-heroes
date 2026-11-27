@@ -1,0 +1,47 @@
+# <!-- squad-heroes:workflow:heroes-configure:begin -->
+name: Heroes configure labels
+
+on:
+  push:
+    paths:
+      - .squad/team.md
+      - .ai-team/team.md
+  workflow_dispatch:
+    inputs:
+      check_only:
+        type: boolean
+        default: false
+      configure_project:
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  labels:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate roster and synchronize member labels
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEROES_CHECK_ONLY: ${{ inputs.check_only || false }}
+        run: node scripts/heroes-configure.mjs
+      - name: Require explicit project opt-in
+        if: inputs.configure_project
+        env:
+          GH_TOKEN: ${{ secrets.HEROES_PROJECT_TOKEN }}
+          HEROES_CHECK_ONLY: ${{ inputs.check_only || false }}
+          HEROES_CONFIGURE_PROJECT: "true"
+          HEROES_PROJECT_OWNER: ${{ vars.HEROES_PROJECT_OWNER }}
+          HEROES_PROJECT_NUMBER: ${{ vars.HEROES_PROJECT_NUMBER }}
+          HEROES_PROJECT_STATUS_FIELD: ${{ vars.HEROES_PROJECT_STATUS_FIELD }}
+          HEROES_PROJECT_STATUS_MAP: ${{ vars.HEROES_PROJECT_STATUS_MAP }}
+        run: |
+          test -n "$GH_TOKEN"
+          test -n "$HEROES_PROJECT_OWNER"
+          test -n "$HEROES_PROJECT_NUMBER"
+          node scripts/heroes-configure.mjs
+# <!-- squad-heroes:workflow:heroes-configure:end -->

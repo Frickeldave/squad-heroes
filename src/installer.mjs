@@ -10,6 +10,7 @@ import { validateManifest } from './manifest.mjs';
 import { createHash } from 'node:crypto';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
+const VERSION = parseJsonFile(path.join(ROOT, 'package.json')).version;
 
 export function parseInstallArguments(argv) {
   const options = {
@@ -88,7 +89,7 @@ function operationsFromCatalog(repoRoot, config, baselines = {}) {
       repository: config.repository,
       branches: JSON.stringify(config.deploymentBranches),
       language: config.language,
-      version: '0.1.0',
+      version: VERSION,
       reqengModel: config.modelDefaults.reqeng,
       workModel: config.modelDefaults.work,
       reviewModel: config.modelDefaults.review,
@@ -145,7 +146,7 @@ function addAgentOperations(config, baselines = {}) {
       id: `history-${agent.id}`,
       target: `.squad/agents/${agent.id}/history.md`,
       rendered: 'Installed by squad-heroes.\n',
-      appendId: '<!-- squad-heroes:history:v0.1.0 -->',
+      appendId: `<!-- squad-heroes:history:v${VERSION} -->`,
       owner: 'companion',
       mode: 'append-only',
     });

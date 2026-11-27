@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { applyPlan, buildInstallPlan, printPlan } from '../src/installer.mjs';
 import { parseJsonFile } from '../src/io.mjs';
+import { completeInteractiveOptions } from '../scripts/install.mjs';
 import { cleanup, commandResult, fixture, write } from './helpers.mjs';
 
 const productRoot = path.resolve(import.meta.dirname, '..');
@@ -20,6 +21,51 @@ const injected = {
   cwd: '.',
   spawn: (command, args) => args[0] === 'auth' ? commandResult() : commandResult('true\n'),
 };
+
+test('interactive Companion wizard collects required and opt-in configuration', async () => {
+  const answers = new Map([
+    ['GitHub repository (owner/name)', 'owner/repository'],
+    ['Language (de|en)', 'en'],
+    ['Deployment branch count (1-3)', '2'],
+    ['Deployment branch 1', 'main'],
+    ['Deployment branch 2', 'int'],
+    ['Review baseline commit (optional; blank keeps the configured value)', 'a'.repeat(40)],
+    ['Enable optional Project board sync (y/N)', 'y'],
+    ['Project owner', 'owner'],
+    ['Project number', '7'],
+    ['Project status field', 'Status'],
+    ['Project status map JSON', JSON.stringify({ 'go:yes': 'Ready', 'go:done': 'Done' })],
+    ['GitHub Actions secret expression', 'secrets.HEROES_PROJECT_TOKEN'],
+  ]);
+  const asked = [];
+  const completed = await completeInteractiveOptions({
+    profile: null,
+    repository: null,
+    language: null,
+    branches: null,
+    models: { reqeng: 'mai-code-2', work: 'claude-sonnet-5.5', review: 'gpt-6.1-terra' },
+    explicitModels: {},
+    boardSync: false,
+    board: {},
+  }, null, async (label, fallback) => {
+    asked.push(label);
+    return answers.get(label) || fallback;
+  });
+  assert.equal(completed.profile, 'typescript-development');
+  assert.equal(completed.repository, 'owner/repository');
+  assert.deepEqual(completed.branches, ['main', 'int']);
+  assert.equal(completed.reviewBaseline.length, 40);
+  assert.deepEqual(completed.board, {
+    owner: 'owner',
+    number: '7',
+    statusField: 'Status',
+    statusMap: { 'go:yes': 'Ready', 'go:done': 'Done' },
+    secret: 'secrets.HEROES_PROJECT_TOKEN',
+  });
+  assert.ok(asked.includes('Model for reqeng'));
+  assert.ok(asked.includes('Model for work'));
+  assert.ok(asked.includes('Model for review'));
+});
 
 test('fresh dry-run plans plugin and companion separately without mutation', () => {
   const root = fixture();

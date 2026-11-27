@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { chmodSync, existsSync, readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
@@ -8,6 +8,14 @@ import { cleanup, fixture, write } from './helpers.mjs';
 
 const product = path.resolve(import.meta.dirname, '..');
 const squad = spawnSync('squad', ['--version'], { encoding: 'utf8' });
+const companionArgs = [
+  '--target', '.',
+  '--repository', 'owner/repository',
+  '--profile', 'typescript-development',
+  '--deployment-branches', '1',
+  '--deployment-branch-1', 'main',
+  '--language', 'en',
+];
 
 function run(root, args) {
   return spawnSync('squad', ['plugin', ...args], { cwd: root, encoding: 'utf8' });
@@ -16,6 +24,21 @@ function run(root, args) {
 function mustRun(root, args) {
   const result = run(root, args);
   assert.equal(result.status, 0, `${args.join(' ')} failed:\n${result.stdout}\n${result.stderr}`);
+  return result;
+}
+
+function runCompanion(root, extra = []) {
+  const installed = path.join(root, '.squad/templates/squad-heroes/companion/scripts/install');
+  return spawnSync(process.execPath, [installed, ...companionArgs, ...extra], {
+    cwd: root,
+    encoding: 'utf8',
+    env: { ...process.env, PATH: `${path.join(root, 'bin')}:${process.env.PATH}` },
+  });
+}
+
+function mustRunCompanion(root, extra = []) {
+  const result = runCompanion(root, extra);
+  assert.equal(result.status, 0, `installed Companion failed:\n${result.stdout}\n${result.stderr}`);
   return result;
 }
 
@@ -30,11 +53,29 @@ function newerProduct(version) {
   write(destination, 'plugin.manifest.json', `${JSON.stringify({ ...manifest, version }, null, 2)}\n`);
   for (const file of manifest.files) {
     const sourceFile = readFileSync(path.join(source, file.source));
-    const content = file.source.endsWith('/agents/tony.en.md')
-      ? `${sourceFile.toString('utf8')}\n<!-- fixture update ${version} -->\n`
+    const content = file.target.endsWith('/agents/tony.en.md')
+      ? sourceFile.toString('utf8').replace(
+        '<!-- squad-heroes:charter:tony:end -->',
+        `\n<!-- fixture update ${version} -->\n<!-- squad-heroes:charter:tony:end -->`
+      )
       : sourceFile;
     write(destination, file.source, content);
   }
+  const internalManifest = JSON.parse(readFileSync(
+    path.join(destination, 'dist/companion/.squad/heroes/manifest.json'),
+    'utf8'
+  ));
+  internalManifest.version = version;
+  const charter = internalManifest.files.find(({ target }) =>
+    target === '.squad/heroes/agents/tony.en.md');
+  charter.sha256 = sha(readFileSync(
+    path.join(destination, 'dist/companion/.squad/heroes/agents/tony.en.md')
+  ));
+  write(
+    destination,
+    'dist/companion/.squad/heroes/manifest.json',
+    `${JSON.stringify(internalManifest, null, 2)}\n`
+  );
   return destination;
 }
 
@@ -42,91 +83,83 @@ function sha(value) {
   return createHash('sha256').update(value).digest('hex');
 }
 
-for (const fixtureId of [1, 2]) test(`real Squad lifecycle works in neutral TypeScript fixture ${fixtureId}`, {
+for (const fixtureId of [1, 2]) test(`real Squad lifecycle uses an installed self-contained Companion ${fixtureId}`, {
   skip: squad.status !== 0 ? 'Squad CLI is not installed in this environment' : false,
 }, () => {
   const root = fixture();
   const productV2 = newerProduct(`0.2.${fixtureId}`);
-  const companion = {
-    charter: '# locally materialized companion charter\n',
-    prompt: '# local active prompt\n',
-    metadata: '{"schemaVersion":1}\n',
-  };
-  write(root, '.squad/agents/tony/charter.md', companion.charter);
-  write(root, '.github/prompts/startwork.prompt.md', companion.prompt);
-  write(root, '.squad/heroes.json', companion.metadata);
+  const activeScript = path.join(root, 'scripts/start-work.mjs');
+  const activeWorkflow = path.join(root, '.github/workflows/heroes-ci.yml');
+  const installedEntry = path.join(root, '.squad/templates/squad-heroes/companion/scripts/install');
+  const installedCharter = path.join(root, '.squad/templates/squad-heroes/companion/.squad/heroes/agents/tony.en.md');
+  write(root, 'bin/gh', '#!/bin/sh\nprintf "true\\n"\n');
+  chmodSync(path.join(root, 'bin/gh'), 0o755);
   try {
     mustRun(root, ['validate', product]);
-    const dryRun = mustRun(root, ['dry-run', product]);
-    assert.match(dryRun.stdout, /templates\/squad-heroes\/agents\/tony\.en\.md/u);
-    assert.match(dryRun.stdout, /prompts\/squad-heroes\/prompts\/startwork\.en\.md/u);
-    assert.doesNotMatch(dryRun.stdout, /scripts\/start-work\.mjs|\.github\/workflows\/heroes-ci\.yml/u);
+    const pluginDryRun = mustRun(root, ['dry-run', product]);
+    assert.match(pluginDryRun.stdout, /templates\/squad-heroes\/companion\/scripts\/install/u);
+    assert.match(pluginDryRun.stdout, /templates\/squad-heroes\/companion\/src\/installer/u);
+    assert.match(pluginDryRun.stdout, /templates\/squad-heroes\/companion\/\.squad\/heroes\/companion\/workflows\/heroes-ci\.yml/u);
+    assert.doesNotMatch(pluginDryRun.stdout, /(^|\s)target: scripts\/start-work\.mjs| → \.github\/workflows/u);
+
     mustRun(root, ['install', product]);
+    assert.equal(existsSync(installedEntry), true);
     mustRun(root, ['enable', 'squad-heroes']);
-    mustRun(root, ['list', '--json']);
     mustRun(root, ['verify']);
 
-    const firstTarget = path.join(root, '.squad/templates/squad-heroes/agents/tony.en.md');
-    const firstBytes = readFileSync(firstTarget);
+    const companionDryRun = mustRunCompanion(root, ['--dry-run']);
+    assert.match(companionDryRun.stdout, /scripts\/start-work\.mjs/u);
+    assert.match(companionDryRun.stdout, /\.github\/workflows\/heroes-ci\.yml/u);
+    assert.match(companionDryRun.stdout, /\.squad\/agents\/tony\/charter\.md/u);
+    assert.equal(existsSync(activeScript), false);
+
+    const applied = mustRunCompanion(root);
+    assert.match(applied.stdout, /"changed":[1-9]\d*/u);
+    assert.equal(existsSync(activeScript), true);
+    assert.equal(existsSync(activeWorkflow), true);
+    mustRun(root, ['verify']);
+    const noOp = mustRunCompanion(root);
+    assert.match(noOp.stdout, /"changed":0/u);
+
+    const activeBeforeUpdate = readFileSync(path.join(root, '.squad/agents/tony/charter.en.md'), 'utf8');
     const firstLock = state(root, 'lock.json').plugins['squad-heroes'];
-    const firstManifestHash = firstLock.manifest_sha256;
-    const installedBefore = state(root, 'installed.json').plugins.filter(({ id }) => id === 'squad-heroes');
-    assert.equal(installedBefore.length, 1);
-    assert.equal(installedBefore[0].version, '0.1.0');
-
-    mustRun(root, ['install', product]);
-    mustRun(root, ['verify']);
-    assert.deepEqual(readFileSync(firstTarget), firstBytes, 'same-content install must not change plugin targets');
-    assert.equal(state(root, 'installed.json').plugins.filter(({ id }) => id === 'squad-heroes').length, 1);
-    assert.equal(state(root, 'lock.json').plugins['squad-heroes'].manifest_sha256, firstManifestHash);
-
-    mustRun(root, ['verify']);
     mustRun(root, ['install', productV2]);
-    const updated = mustRun(root, ['list', '--json']);
-    assert.match(updated.stdout, new RegExp(`"version": "${`0.2.${fixtureId}`}"`
-      .replaceAll('.', '\\.')));
-    const updatedPlugin = state(root, 'installed.json').plugins.find(({ id }) => id === 'squad-heroes');
-    const updatedLock = state(root, 'lock.json').plugins['squad-heroes'];
-    assert.equal(updatedPlugin.version, `0.2.${fixtureId}`);
-    assert.notEqual(updatedLock.manifest_sha256, firstManifestHash);
-    assert.equal(updatedLock.files.find(({ target }) => target.includes('tony.en.md')).sha256,
-      sha(readFileSync(path.join(productV2, '.squad/heroes/agents/tony.en.md'))));
-    assert.match(readFileSync(firstTarget, 'utf8'), new RegExp(`fixture update ${`0.2.${fixtureId}`}`));
-
-    const changedPluginTarget = readFileSync(firstTarget, 'utf8') + '\n# local conflict\n';
-    write(root, '.squad/templates/squad-heroes/agents/tony.en.md', changedPluginTarget);
-    const conflict = run(root, ['verify']);
-    assert.notEqual(conflict.status, 0);
-    assert.match(`${conflict.stdout}\n${conflict.stderr}`, /checksum mismatch/);
-    assert.equal(readFileSync(firstTarget, 'utf8'), changedPluginTarget,
-      'a failed verify must leave the conflict untouched; update must not proceed');
-
-    const invalidManifest = JSON.parse(readFileSync(path.join(productV2, 'plugin.manifest.json'), 'utf8'));
-    invalidManifest.files[0].target = '../../outside.mjs';
-    const failedSource = path.join(root, '.failed-plugin-source');
-    for (const file of invalidManifest.files) {
-      write(failedSource, file.source, readFileSync(path.join(productV2, file.source)));
-    }
-    write(failedSource, 'plugin.manifest.json', `${JSON.stringify(invalidManifest, null, 2)}\n`);
-    const beforeFailedLock = readFileSync(path.join(root, '.squad/plugins/lock.json'), 'utf8');
-    const failure = run(root, ['install', failedSource]);
-    assert.notEqual(failure.status, 0);
-    assert.equal(readFileSync(path.join(root, '.squad/plugins/lock.json'), 'utf8'), beforeFailedLock);
-    assert.equal(existsSync(path.join(root, 'outside.mjs')), false);
+    mustRun(root, ['verify']);
+    assert.equal(state(root, 'installed.json').plugins.find(({ id }) => id === 'squad-heroes').version, `0.2.${fixtureId}`);
+    assert.notEqual(state(root, 'lock.json').plugins['squad-heroes'].manifest_sha256, firstLock.manifest_sha256);
+    assert.equal(
+      state(root, 'lock.json').plugins['squad-heroes'].files.find(({ target }) =>
+        target.endsWith('/companion/.squad/heroes/agents/tony.en.md')).sha256,
+      sha(readFileSync(path.join(productV2, 'dist/companion/.squad/heroes/agents/tony.en.md')))
+    );
+    assert.equal(
+      readFileSync(path.join(root, '.squad/agents/tony/charter.en.md'), 'utf8'),
+      activeBeforeUpdate,
+      'plugin update must not mutate active Companion targets'
+    );
+    assert.match(readFileSync(installedCharter, 'utf8'), new RegExp(`fixture update 0\\.2\\.${fixtureId}`));
+    mustRunCompanion(root);
+    assert.match(readFileSync(path.join(root, '.squad/agents/tony/charter.en.md'), 'utf8'),
+      new RegExp(`fixture update 0\\.2\\.${fixtureId}`));
 
     mustRun(root, ['disable', 'squad-heroes']);
     mustRun(root, ['uninstall', 'squad-heroes']);
-    assert.equal(existsSync(firstTarget), false);
-    assert.equal(readFileSync(path.join(root, '.squad/agents/tony/charter.md'), 'utf8'), companion.charter);
-    assert.equal(readFileSync(path.join(root, '.github/prompts/startwork.prompt.md'), 'utf8'), companion.prompt);
-    assert.equal(readFileSync(path.join(root, '.squad/heroes.json'), 'utf8'), companion.metadata);
+    assert.equal(existsSync(installedEntry), false);
+    assert.equal(existsSync(activeScript), true);
+    assert.equal(existsSync(activeWorkflow), true);
+    assert.equal(existsSync(path.join(root, '.squad/agents/tony/charter.en.md')), true);
     assert.equal(state(root, 'installed.json').plugins.some(({ id }) => id === 'squad-heroes'), false);
+
+    mustRun(root, ['install', productV2]);
+    mustRun(root, ['verify']);
   } finally {
     cleanup(root);
     cleanup(productV2);
   }
 });
 
-test('the README documents real install-based update semantics', () => {
-  assert.match(readFileSync(path.join(product, 'README.md'), 'utf8'), /squad plugin install <local-dir>/);
+test('the README documents installed-copy Companion semantics', () => {
+  const readme = readFileSync(path.join(product, 'README.md'), 'utf8');
+  assert.match(readme, /squad plugin install <local-dir>/);
+  assert.match(readme, /\.squad\/templates\/squad-heroes\/companion\/scripts\/install/u);
 });

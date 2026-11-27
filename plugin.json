@@ -2,7 +2,7 @@
   "id": "squad-heroes",
   "name": "squad-heroes",
   "version": "0.1.0",
-  "description": "Generic TypeScript Squad overlay with static agent and prompt sources.",
+  "description": "Generic TypeScript Squad overlay with a self-contained Companion distribution.",
   "license": "MIT",
   "squad": ">=2.0.0",
   "repository": {
@@ -14,123 +14,318 @@
   },
   "files": [
     {
-      "source": ".squad/heroes/agents/bruce.de.md",
-      "target": "templates/squad-heroes/agents/bruce.de.md",
+      "source": "dist/companion/.squad/heroes/agents/bruce.de.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/agents/bruce.de.md",
       "type": "template"
     },
     {
-      "source": ".squad/heroes/agents/bruce.en.md",
-      "target": "templates/squad-heroes/agents/bruce.en.md",
+      "source": "dist/companion/.squad/heroes/agents/bruce.en.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/agents/bruce.en.md",
       "type": "template"
     },
     {
-      "source": ".squad/heroes/agents/clint.de.md",
-      "target": "templates/squad-heroes/agents/clint.de.md",
+      "source": "dist/companion/.squad/heroes/agents/clint.de.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/agents/clint.de.md",
       "type": "template"
     },
     {
-      "source": ".squad/heroes/agents/clint.en.md",
-      "target": "templates/squad-heroes/agents/clint.en.md",
+      "source": "dist/companion/.squad/heroes/agents/clint.en.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/agents/clint.en.md",
       "type": "template"
     },
     {
-      "source": ".squad/heroes/agents/maria.de.md",
-      "target": "templates/squad-heroes/agents/maria.de.md",
+      "source": "dist/companion/.squad/heroes/agents/maria.de.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/agents/maria.de.md",
       "type": "template"
     },
     {
-      "source": ".squad/heroes/agents/maria.en.md",
-      "target": "templates/squad-heroes/agents/maria.en.md",
+      "source": "dist/companion/.squad/heroes/agents/maria.en.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/agents/maria.en.md",
       "type": "template"
     },
     {
-      "source": ".squad/heroes/agents/natasha.de.md",
-      "target": "templates/squad-heroes/agents/natasha.de.md",
+      "source": "dist/companion/.squad/heroes/agents/natasha.de.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/agents/natasha.de.md",
       "type": "template"
     },
     {
-      "source": ".squad/heroes/agents/natasha.en.md",
-      "target": "templates/squad-heroes/agents/natasha.en.md",
+      "source": "dist/companion/.squad/heroes/agents/natasha.en.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/agents/natasha.en.md",
       "type": "template"
     },
     {
-      "source": ".squad/heroes/agents/nick.de.md",
-      "target": "templates/squad-heroes/agents/nick.de.md",
+      "source": "dist/companion/.squad/heroes/agents/nick.de.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/agents/nick.de.md",
       "type": "template"
     },
     {
-      "source": ".squad/heroes/agents/nick.en.md",
-      "target": "templates/squad-heroes/agents/nick.en.md",
+      "source": "dist/companion/.squad/heroes/agents/nick.en.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/agents/nick.en.md",
       "type": "template"
     },
     {
-      "source": ".squad/heroes/agents/pepper.de.md",
-      "target": "templates/squad-heroes/agents/pepper.de.md",
+      "source": "dist/companion/.squad/heroes/agents/pepper.de.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/agents/pepper.de.md",
       "type": "template"
     },
     {
-      "source": ".squad/heroes/agents/pepper.en.md",
-      "target": "templates/squad-heroes/agents/pepper.en.md",
+      "source": "dist/companion/.squad/heroes/agents/pepper.en.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/agents/pepper.en.md",
       "type": "template"
     },
     {
-      "source": ".squad/heroes/agents/tony.de.md",
-      "target": "templates/squad-heroes/agents/tony.de.md",
+      "source": "dist/companion/.squad/heroes/agents/tony.de.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/agents/tony.de.md",
       "type": "template"
     },
     {
-      "source": ".squad/heroes/agents/tony.en.md",
-      "target": "templates/squad-heroes/agents/tony.en.md",
+      "source": "dist/companion/.squad/heroes/agents/tony.en.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/agents/tony.en.md",
       "type": "template"
     },
     {
-      "source": ".squad/heroes/profiles/typescript-development.json",
-      "target": "templates/squad-heroes/profiles/typescript-development.json",
+      "source": "dist/companion/.squad/heroes/companion-targets.json",
+      "target": "templates/squad-heroes/companion/.squad/heroes/companion-targets.json",
       "type": "template"
     },
     {
-      "source": ".squad/heroes/prompts/startreqeng.de.md",
-      "target": "prompts/squad-heroes/prompts/startreqeng.de.md",
-      "type": "prompt"
-    },
-    {
-      "source": ".squad/heroes/prompts/startreqeng.en.md",
-      "target": "prompts/squad-heroes/prompts/startreqeng.en.md",
-      "type": "prompt"
-    },
-    {
-      "source": ".squad/heroes/prompts/startreview.de.md",
-      "target": "prompts/squad-heroes/prompts/startreview.de.md",
-      "type": "prompt"
-    },
-    {
-      "source": ".squad/heroes/prompts/startreview.en.md",
-      "target": "prompts/squad-heroes/prompts/startreview.en.md",
-      "type": "prompt"
-    },
-    {
-      "source": ".squad/heroes/prompts/startwork.de.md",
-      "target": "prompts/squad-heroes/prompts/startwork.de.md",
-      "type": "prompt"
-    },
-    {
-      "source": ".squad/heroes/prompts/startwork.en.md",
-      "target": "prompts/squad-heroes/prompts/startwork.en.md",
-      "type": "prompt"
-    },
-    {
-      "source": ".squad/heroes/skills/humanizer/SKILL.md",
-      "target": "templates/squad-heroes/skills/humanizer/SKILL.md",
+      "source": "dist/companion/.squad/heroes/companion/addon-layers/common.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/companion/addon-layers/common.md",
       "type": "template"
     },
     {
-      "source": ".squad/heroes/skills/humanizer/de-DE.md",
-      "target": "templates/squad-heroes/skills/humanizer/de-DE.md",
+      "source": "dist/companion/.squad/heroes/companion/addon-layers/startreqeng.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/companion/addon-layers/startreqeng.md",
       "type": "template"
     },
     {
-      "source": ".squad/heroes/skills/humanizer/en-US.md",
-      "target": "templates/squad-heroes/skills/humanizer/en-US.md",
+      "source": "dist/companion/.squad/heroes/companion/addon-layers/startreview.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/companion/addon-layers/startreview.md",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/.squad/heroes/companion/addon-layers/startwork.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/companion/addon-layers/startwork.md",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/.squad/heroes/companion/addon.config.json",
+      "target": "templates/squad-heroes/companion/.squad/heroes/companion/addon.config.json",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/.squad/heroes/companion/husky-pre-push",
+      "target": "templates/squad-heroes/companion/.squad/heroes/companion/husky-pre-push",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/.squad/heroes/companion/readme-badges.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/companion/readme-badges.md",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/.squad/heroes/companion/routing.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/companion/routing.md",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/.squad/heroes/companion/scripts/check-release-label",
+      "target": "templates/squad-heroes/companion/.squad/heroes/companion/scripts/check-release-label",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/.squad/heroes/companion/scripts/flow-shared",
+      "target": "templates/squad-heroes/companion/.squad/heroes/companion/scripts/flow-shared",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/.squad/heroes/companion/scripts/heroes-configure",
+      "target": "templates/squad-heroes/companion/.squad/heroes/companion/scripts/heroes-configure",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/.squad/heroes/companion/scripts/reqeng-block",
+      "target": "templates/squad-heroes/companion/.squad/heroes/companion/scripts/reqeng-block",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/.squad/heroes/companion/scripts/resolve-prompt",
+      "target": "templates/squad-heroes/companion/.squad/heroes/companion/scripts/resolve-prompt",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/.squad/heroes/companion/scripts/start-reqeng",
+      "target": "templates/squad-heroes/companion/.squad/heroes/companion/scripts/start-reqeng",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/.squad/heroes/companion/scripts/start-review",
+      "target": "templates/squad-heroes/companion/.squad/heroes/companion/scripts/start-review",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/.squad/heroes/companion/scripts/start-work",
+      "target": "templates/squad-heroes/companion/.squad/heroes/companion/scripts/start-work",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/.squad/heroes/companion/scripts/sync-project-board",
+      "target": "templates/squad-heroes/companion/.squad/heroes/companion/scripts/sync-project-board",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/.squad/heroes/companion/scripts/update-badges",
+      "target": "templates/squad-heroes/companion/.squad/heroes/companion/scripts/update-badges",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/.squad/heroes/companion/scripts/versionbump",
+      "target": "templates/squad-heroes/companion/.squad/heroes/companion/scripts/versionbump",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/.squad/heroes/companion/team.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/companion/team.md",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/.squad/heroes/companion/workflows/heroes-ci.yml",
+      "target": "templates/squad-heroes/companion/.squad/heroes/companion/workflows/heroes-ci.yml",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/.squad/heroes/companion/workflows/heroes-configure.yml",
+      "target": "templates/squad-heroes/companion/.squad/heroes/companion/workflows/heroes-configure.yml",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/.squad/heroes/companion/workflows/heroes-release-label.yml",
+      "target": "templates/squad-heroes/companion/.squad/heroes/companion/workflows/heroes-release-label.yml",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/.squad/heroes/companion/workflows/heroes-sync-project-board.yml",
+      "target": "templates/squad-heroes/companion/.squad/heroes/companion/workflows/heroes-sync-project-board.yml",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/.squad/heroes/companion/workflows/heroes-update-badges.yml",
+      "target": "templates/squad-heroes/companion/.squad/heroes/companion/workflows/heroes-update-badges.yml",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/.squad/heroes/manifest.json",
+      "target": "templates/squad-heroes/companion/.squad/heroes/manifest.json",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/.squad/heroes/profiles/typescript-development.json",
+      "target": "templates/squad-heroes/companion/.squad/heroes/profiles/typescript-development.json",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/.squad/heroes/prompts/startreqeng.de.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/prompts/startreqeng.de.md",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/.squad/heroes/prompts/startreqeng.en.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/prompts/startreqeng.en.md",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/.squad/heroes/prompts/startreview.de.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/prompts/startreview.de.md",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/.squad/heroes/prompts/startreview.en.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/prompts/startreview.en.md",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/.squad/heroes/prompts/startwork.de.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/prompts/startwork.de.md",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/.squad/heroes/prompts/startwork.en.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/prompts/startwork.en.md",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/.squad/heroes/skills/humanizer/SKILL.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/skills/humanizer/SKILL.md",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/.squad/heroes/skills/humanizer/de-DE.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/skills/humanizer/de-DE.md",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/.squad/heroes/skills/humanizer/en-US.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/skills/humanizer/en-US.md",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/package.json",
+      "target": "templates/squad-heroes/companion/package.json",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/resources/messages.de.json",
+      "target": "templates/squad-heroes/companion/resources/messages.de.json",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/resources/messages.en.json",
+      "target": "templates/squad-heroes/companion/resources/messages.en.json",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/scripts/install",
+      "target": "templates/squad-heroes/companion/scripts/install",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/src/config",
+      "target": "templates/squad-heroes/companion/src/config",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/src/errors",
+      "target": "templates/squad-heroes/companion/src/errors",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/src/installer",
+      "target": "templates/squad-heroes/companion/src/installer",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/src/io",
+      "target": "templates/squad-heroes/companion/src/io",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/src/manifest",
+      "target": "templates/squad-heroes/companion/src/manifest",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/src/messages",
+      "target": "templates/squad-heroes/companion/src/messages",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/src/plan",
+      "target": "templates/squad-heroes/companion/src/plan",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/src/preflight",
+      "target": "templates/squad-heroes/companion/src/preflight",
       "type": "template"
     }
   ]

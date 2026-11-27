@@ -113,8 +113,9 @@ find .squad/plugins -maxdepth 2 -type f -print -exec sha256sum {} \;
 ```
 
 The `squad plugin dry-run` plan must print only static templates such as
-`templates/squad-heroes/agents/tony.en.md`; active `scripts/`,
-`.github/prompts/`, and workflows must not appear there. This is not the
+`templates/squad-heroes/companion/.squad/heroes/agents/tony.en.md`; the package entries must all remain below
+`templates/squad-heroes/companion/`; direct active `scripts/`, `.github/prompts/`,
+and workflow targets must not appear there. This is not the
 complete product plan.
 
 Expect only declared targets below `.squad/`; `.squad/plugins/*` must be the
@@ -157,9 +158,9 @@ Idempotency and actual update behavior:
 ## 5. Companion and supplied flows
 
 ```bash
-cd {heroes-dir}
-node scripts/install.mjs --help
-node scripts/install.mjs \
+cd {snake-dir}
+node .squad/templates/squad-heroes/companion/scripts/install --help
+node .squad/templates/squad-heroes/companion/scripts/install \
   --target {snake-dir} \
   --repository {owner}/squad-heroes-snake \
   --profile typescript-development \
@@ -182,7 +183,7 @@ cd {snake-dir}
 git status --short
 git diff -- . ':!package-lock.json'
 find scripts .github/prompts .github/workflows .squad/agents -type f -print
-node scripts/install.mjs --help
+node .squad/templates/squad-heroes/companion/scripts/install --help
 node scripts/start-reqeng.mjs --help
 node scripts/start-work.mjs --help
 node scripts/start-review.mjs --help
@@ -200,8 +201,11 @@ record all three versions/options. An unresolved conflict stops before writes;
 then apply exactly one documented decision. `history.md` must append only.
 A profile change must fail closed.
 
-Update from `{heroes-new-dir}`, resolve visible conflicts, and repeat the
-idempotency check. `.squad/plugins/*` must remain byte-identical.
+After plugin update, explicitly rerun the copied Companion and repeat the
+idempotency check. Confirm active target bytes changed only on that explicit
+rerun. Disable and uninstall the plugin, then verify that the active
+`scripts/`, workflows and charters still exist before reinstalling the plugin.
+`.squad/plugins/*` is unchanged by the Companion rerun.
 
 ## 6. Create the Snake ticket
 

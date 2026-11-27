@@ -1,0 +1,11 @@
+{
+  "plan_heading": "Installationsplan",
+  "companion_plan_scope": "Companion-Plan für aktive Skripte, Prompts, Workflows und Agent-Ziele. `squad plugin dry-run` ist ein separater Plan und zeigt ausschließlich die kopierte statische Distribution.",
+  "dry_run_complete": "Dry-run abgeschlossen. Es wurden keine Dateien geändert.",
+  "install_complete": "Installation abgeschlossen: {count} Dateien geschrieben.",
+  "conflicts_block": "Installation angehalten: {count} ungeklärte Konflikte.",
+  "incompatible": "Squad-Version inkompatibel.",
+  "gate_ok": "Preflight erfolgreich.",
+  "external_approval_required": "Extern sichtbare Aktionen erfordern eine explizite Bestätigung.",
+  "fallback_visible": "Übersetzung verwendet Sprache {language} als sichtbaren Fallback."
+}

@@ -12,9 +12,15 @@ targets. An unchanged upstream state can update automatically, while local
 drift remains a conflict until an explicit decision. Decisions remain in that
 same recovery structure and never replace `.squad/plugins/*`.
 
+The installed entry point loads this state from the consumer repository, not
+from the original plugin checkout. On an interactive update it displays the
+stored repository, branches, language, models, review baseline and board
+configuration as wizard defaults; CLI flags remain authoritative.
+
 ## Models
 
-Each flow uses only `--model ID` > its matching `modelDefaults` value > stop.
+Each flow uses only its `--model-reqeng`, `--model-work` or `--model-review`
+value > matching `modelDefaults` value > stop.
 There is no `auto`, cache, family, team, prompt or cross-flow fallback. The model
 is resolved once and passed unchanged.
 Before launch, the Companion probes the ID with an isolated

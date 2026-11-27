@@ -16,6 +16,12 @@ keep the local state, restore the installed state, or explicitly reinstall after
 review. `verify` and `list --json` expose the authoritative state. This guard
 applies only to Squad-owned plugin targets.
 
+If installed files under `.squad/templates/squad-heroes/companion/` are
+corrupt, restore them through `squad plugin install` after `verify`; never
+repair the active consumer targets from that operation. Re-run the copied
+Companion separately to update active targets. Plugin uninstall intentionally
+leaves active targets and `.squad/heroes.json` in place.
+
 `--dry-run` shows every operation and conflict. Record one decision per target in
 JSON and pass it with `--decisions`:
 

@@ -119,7 +119,7 @@ find .squad/plugins -maxdepth 2 -type f -print -exec sha256sum {} \;
 ```
 
 Der `squad plugin dry-run`-Plan muss ausschließlich statische Templates wie
-`templates/squad-heroes/agents/tony.en.md` ausgeben; aktive `scripts/`,
+`templates/squad-heroes/companion/.squad/heroes/agents/tony.en.md` ausgeben; aktive `scripts/`,
 `.github/prompts/` und Workflows dürfen dort nicht erscheinen. Das ist nicht
 der vollständige Produktplan.
 
@@ -166,9 +166,9 @@ Idempotenz und realer Updatepfad:
 ## 5. Companion und bereitgestellte Flows
 
 ```bash
-cd {heroes-dir}
-node scripts/install.mjs --help
-node scripts/install.mjs \
+cd {snake-dir}
+node .squad/templates/squad-heroes/companion/scripts/install --help
+node .squad/templates/squad-heroes/companion/scripts/install \
   --target {snake-dir} \
   --repository {owner}/squad-heroes-snake \
   --profile typescript-development \
@@ -192,7 +192,7 @@ cd {snake-dir}
 git status --short
 git diff -- . ':!package-lock.json'
 find scripts .github/prompts .github/workflows .squad/agents -type f -print
-node scripts/install.mjs --help
+node .squad/templates/squad-heroes/companion/scripts/install --help
 node scripts/start-reqeng.mjs --help
 node scripts/start-work.mjs --help
 node scripts/start-review.mjs --help
@@ -212,9 +212,11 @@ bei ungeklärtem Konflikt; anschließend genau eine dokumentierte Entscheidung
 anwenden. `history.md` darf nur append-only wachsen. Ein Profilwechsel muss
 fail-closed abbrechen.
 
-Update: `{heroes-new-dir}` mit dem Companion erneut planen, Konflikte sichtbar
-entscheiden und denselben Idempotenzlauf wiederholen. Der laufende Plugin-State
-unter `.squad/plugins/*` muss bytegleich bleiben.
+Nach dem Plugin-Update den kopierten Companion ausdrücklich erneut ausführen
+und den Idempotenzlauf wiederholen. Aktive Zielbytes dürfen sich nur bei
+diesem expliziten Lauf ändern. Plugin deaktivieren/deinstallieren und prüfen,
+dass aktive `scripts/`, Workflows und Charters bestehen bleiben; danach Plugin
+neu installieren. `.squad/plugins/*` bleibt beim Companion-Rerun unverändert.
 
 ## 6. Snake-Ticket erstellen
 

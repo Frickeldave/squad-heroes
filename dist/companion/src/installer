@@ -1,0 +1,281 @@
+import { existsSync, mkdirSync, renameSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+import { assertSquadCompatibility, assertGithubWriteAccess } from './preflight';
+import { buildHeroesConfig, validateHeroesConfig } from './config';
+import { classifyOperation, assertPlanSafe, summarizePlan, recoveryBaselines } from './plan';
+import { parseJsonFile, readUtf8, assertSafeTarget } from './io';
+import { fail } from './errors';
+import { resolveLanguage, translate, validateMessageCatalogs } from './messages';
+import { validateManifest } from './manifest';
+import { createHash } from 'node:crypto';
+
+const ROOT = path.resolve(import.meta.dirname, '..');
+const VERSION = parseJsonFile(path.join(ROOT, 'package.json')).version;
+
+export function parseInstallArguments(argv) {
+  const options = {
+    dryRun: false,
+    verify: false,
+    boardSync: false,
+    board: {},
+    repository: null,
+    profile: null,
+    language: null,
+    models: { reqeng: 'mai-code-2', work: 'claude-sonnet-5.5', review: 'gpt-6.1-terra' },
+    explicitModels: {},
+    branches: null,
+  };
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === '--dry-run') options.dryRun = true;
+    else if (arg === '--verify') options.verify = true;
+    else if (arg === '--enable-board-sync') options.boardSync = true;
+    else if (arg === '--project-owner') options.board.owner = argv[++index];
+    else if (arg === '--project-number') options.board.number = argv[++index];
+    else if (arg === '--project-status-field') options.board.statusField = argv[++index];
+    else if (arg === '--project-status-map') options.board.statusMap = parseJsonFile(argv[++index]);
+    else if (arg === '--project-secret') options.board.secret = argv[++index];
+    else if (arg === '--review-baseline') options.reviewBaseline = argv[++index];
+    else if (arg === '--repository') options.repository = argv[++index];
+    else if (arg === '--profile') options.profile = argv[++index];
+    else if (arg === '--language') options.language = argv[++index];
+    else if (arg === '--target') options.target = argv[++index];
+    else if (arg === '--deployment-branches') options.branchCount = Number(argv[++index]);
+    else if (arg.match(/^--deployment-branch-[123]$/u)) {
+      options.branches ??= [];
+      options.branches[Number(arg.at(-1)) - 1] = argv[++index];
+    }
+    else if (arg === '--model-reqeng') {
+      options.models.reqeng = argv[++index];
+      options.explicitModels.reqeng = true;
+    }
+    else if (arg === '--model-work') {
+      options.models.work = argv[++index];
+      options.explicitModels.work = true;
+    }
+    else if (arg === '--model-review') {
+      options.models.review = argv[++index];
+      options.explicitModels.review = true;
+    }
+    else if (arg === '--decisions') options.decisionFile = argv[++index];
+    else if (arg === '--help' || arg === '-h') options.help = true;
+    else fail('argument', `Unknown argument: ${arg}`);
+  }
+  if (options.branchCount !== undefined && ![1, 2, 3].includes(options.branchCount)) {
+    fail('branch_count', '--deployment-branches must be 1, 2 or 3');
+  }
+  if (options.branches && options.branchCount !== undefined && options.branches.length !== options.branchCount) {
+    fail('branch_count', 'The branch count must match the number of branch values');
+  }
+  if (options.profile === 'TypeScript Development') options.profile = 'typescript-development';
+  return options;
+}
+
+function render(source, values) {
+  return Object.entries(values).reduce(
+    (text, [key, value]) => text.replaceAll(`{{${key}}}`, String(value)),
+    source
+  );
+}
+
+function operationsFromCatalog(repoRoot, config, baselines = {}) {
+  const catalog = parseJsonFile(path.join(ROOT, '.squad/heroes/companion-targets.json'));
+  return catalog.targets.filter((entry) => !entry.extension || config.extensions?.[entry.extension]?.enabled).map((entry) => {
+    const sourcePath = render(entry.source, { language: config.language });
+    const source = readUtf8(path.join(ROOT, sourcePath));
+    let target = render(entry.target, { language: config.language });
+    let rendered = render(source, {
+      product: 'squad-heroes',
+      repository: config.repository,
+      branches: JSON.stringify(config.deploymentBranches),
+      language: config.language,
+      version: VERSION,
+      reqengModel: config.modelDefaults.reqeng,
+      workModel: config.modelDefaults.work,
+      reviewModel: config.modelDefaults.review,
+      projectOwner: config.extensions?.['board-sync']?.owner ?? '',
+      projectNumber: config.extensions?.['board-sync']?.number ?? '',
+      projectStatusField: config.extensions?.['board-sync']?.statusField ?? '',
+      projectStatusMap: JSON.stringify(config.extensions?.['board-sync']?.statusMap ?? {}),
+      projectSecret: config.extensions?.['board-sync']?.secret ?? '',
+    });
+    if (target.includes('{{agent}}')) {
+      fail('catalog_render', 'Unresolved agent placeholder in companion target catalog');
+    }
+    return {
+      ...entry,
+      target,
+      rendered,
+      owner: 'companion',
+      baselineHash: baselines[target],
+    };
+  });
+}
+
+function addAgentOperations(config, baselines = {}) {
+  const profile = parseJsonFile(path.join(ROOT, '.squad/heroes/profiles/typescript-development.json'));
+  const operations = [];
+  for (const agent of profile.agents) {
+    for (const language of ['de', 'en']) {
+      const content = readUtf8(path.join(ROOT, `.squad/heroes/agents/${agent.id}.${language}.md`));
+      operations.push({
+        id: `agent-${agent.id}-${language}`,
+        target: `.squad/agents/${agent.id}/charter.${language}.md`,
+        source: `.squad/heroes/agents/${agent.id}.${language}.md`,
+        rendered: content,
+        owner: 'companion',
+        mode: 'managed-section',
+        section: `charter:${agent.id}`,
+        baselineHash: baselines[`.squad/agents/${agent.id}/charter.${language}.md`],
+      });
+    }
+    const selected = readUtf8(
+      path.join(ROOT, `.squad/heroes/agents/${agent.id}.${config.selectedLanguage ?? config.language}.md`)
+    );
+    operations.push({
+      id: `agent-${agent.id}`,
+      target: `.squad/agents/${agent.id}/charter.md`,
+      source: `.squad/heroes/agents/${agent.id}.${config.language}.md`,
+      rendered: selected,
+      owner: 'companion',
+      mode: 'managed-section',
+      section: `charter:${agent.id}`,
+      baselineHash: baselines[`.squad/agents/${agent.id}/charter.md`],
+    });
+    operations.push({
+      id: `history-${agent.id}`,
+      target: `.squad/agents/${agent.id}/history.md`,
+      rendered: 'Installed by squad-heroes.\n',
+      appendId: `<!-- squad-heroes:history:v${VERSION} -->`,
+      owner: 'companion',
+      mode: 'append-only',
+    });
+  }
+  return operations;
+}
+
+export function buildInstallPlan(repoRoot, options = {}, injected = {}) {
+  assertSquadCompatibility(repoRoot);
+  validateMessageCatalogs();
+  const manifest = parseJsonFile(path.join(ROOT, '.squad/heroes/manifest.json'));
+  validateManifest(ROOT, manifest);
+
+  const configPath = path.join(repoRoot, '.squad/heroes.json');
+  const existing = existsSync(configPath) ? parseJsonFile(configPath) : null;
+  if (existing) validateHeroesConfig(existing);
+  const accessRepository = options.repository ?? existing?.repository;
+  if (!accessRepository) fail('repository_missing', '--repository owner/name is required for initial installation');
+  assertGithubWriteAccess(accessRepository, injected);
+  const selectedProfile = options.profile ?? existing?.profile;
+  if (!selectedProfile) fail('profile_missing', 'Choose --profile typescript-development for non-interactive installation');
+  if (existing && selectedProfile !== existing.profile) {
+    fail('profile_change', 'The selected profile is immutable; uninstall/reinstall before changing profile.');
+  }
+  if (!options.branches && !existing?.deploymentBranches) {
+    fail('branches_missing', 'Pass --deployment-branches and the matching --deployment-branch-N values');
+  }
+  const language = resolveLanguage(options.language, existing?.language, options.locale ?? process.env.LANG).language;
+  const config = existing
+    ? validateHeroesConfig({
+        ...existing,
+        modelDefaults: {
+          ...existing.modelDefaults,
+          ...Object.fromEntries(Object.keys(options.explicitModels ?? {}).map((flow) => [flow, options.models[flow]])),
+        },
+        deploymentBranches: options.branches ?? existing.deploymentBranches,
+        extensions: options.boardSync
+          ? buildHeroesConfig({
+              repository: existing.repository,
+              language: existing.language,
+              modelDefaults: existing.modelDefaults,
+              branches: options.branches ?? existing.deploymentBranches,
+              boardSync: true,
+              board: options.board,
+            }).extensions
+          : existing.extensions,
+        ...(options.reviewBaseline ? { reviewBaseline: options.reviewBaseline } : {}),
+      })
+    : buildHeroesConfig({
+        repository: options.repository,
+        language,
+        modelDefaults: options.models,
+        branches: options.branches,
+        boardSync: options.boardSync,
+        board: options.board,
+        reviewBaseline: options.reviewBaseline,
+      });
+  const decisions = options.decisionFile ? parseJsonFile(path.resolve(options.decisionFile)) : {};
+  const operations = [
+    ...operationsFromCatalog(repoRoot, config, existing?.recovery?.targets),
+    ...addAgentOperations(
+      { ...config, selectedLanguage: language },
+      existing?.recovery?.targets
+    ),
+  ];
+  operations.push({
+    id: 'heroes-state',
+    target: '.squad/heroes.json',
+    rendered: `${JSON.stringify(config, null, 2)}\n`,
+    owner: 'companion',
+    mode: 'whole-file',
+  });
+  operations.push({
+    id: 'package-scripts',
+    target: 'package.json',
+    rendered: JSON.stringify({
+      'start-reqeng': 'node scripts/start-reqeng.mjs',
+      'start-work': 'node scripts/start-work.mjs',
+      'start-review': 'node scripts/start-review.mjs',
+      'badges': 'node scripts/update-badges.mjs',
+      'badges:check': 'node scripts/update-badges.mjs --check',
+      'versionbump': 'node scripts/versionbump.mjs',
+      'check-release-label': 'node scripts/check-release-label.mjs',
+    }, null, 2),
+    owner: 'companion',
+    mode: 'package-json',
+  });
+  const planned = operations.map((entry) => classifyOperation(repoRoot, entry, decisions));
+  const fingerprint = createHash('sha256').update(JSON.stringify(summarizePlan(planned))).digest('hex');
+  const completed = {
+    ...config,
+    recovery: {
+      planVersion: 1,
+      lastCompletedPlan: fingerprint,
+      targets: recoveryBaselines(planned),
+      decisions,
+    },
+  };
+  const stateOperation = planned.find((entry) => entry.target === '.squad/heroes.json');
+  if (stateOperation) stateOperation.content = `${JSON.stringify(completed, null, 2)}\n`;
+  assertPlanSafe(planned);
+  return { config: completed, operations: planned, conflicts: planned.filter((item) => item.action === 'conflict') };
+}
+
+export function applyPlan(repoRoot, plan, { dryRun = false, verify = false } = {}, injected = {}) {
+  const conflicts = plan.conflicts;
+  if (conflicts.length) {
+    const list = summarizePlan(plan.operations);
+    fail('conflicts', `Installation stopped: ${conflicts.length} unresolved conflicts. ${JSON.stringify(list)}`);
+  }
+  if (verify || dryRun) return { changed: 0, plan: summarizePlan(plan.operations) };
+  assertSquadCompatibility(repoRoot);
+  if (plan.config.repository) assertGithubWriteAccess(plan.config.repository, injected);
+  let changed = 0;
+  for (const operation of [...plan.operations.filter(({ id }) => id !== 'heroes-state'),
+                           ...plan.operations.filter(({ id }) => id === 'heroes-state')]) {
+    if (operation.action === 'noop') continue;
+    const target = assertSafeTarget(repoRoot, operation.target);
+    mkdirSync(path.dirname(target), { recursive: true });
+    const staging = `${target}.squad-heroes-staging`;
+    writeFileSync(staging, operation.content, { encoding: 'utf8', mode: 0o600 });
+    renameSync(staging, target);
+    changed += 1;
+  }
+  return { changed, plan: summarizePlan(plan.operations) };
+}
+
+export function printPlan(plan, language = 'en') {
+  const heading = translate(language, 'plan_heading').text;
+  const scope = translate(language, 'companion_plan_scope').text;
+  process.stdout.write(`${scope}\n${heading}: ${JSON.stringify(summarizePlan(plan.operations), null, 2)}\n`);
+}

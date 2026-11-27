@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 import { resolve } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
 import { applyPlan, buildInstallPlan, parseInstallArguments, printPlan } from '../src/installer.mjs';
 import { HeroesError, INCOMPATIBLE_SQUAD_EXIT } from '../src/errors.mjs';
 import { createInterface } from 'node:readline/promises';
 
 const HELP = `Usage:
-  node scripts/install.mjs --target /path/to/repository --repository owner/name --profile typescript-development --deployment-branches N \\
+  node .squad/templates/squad-heroes/companion/scripts/install --target /path/to/repository --repository owner/name --profile typescript-development --deployment-branches N \\
     --deployment-branch-1 main [--deployment-branch-2 int ...] [--language de|en] [--dry-run]
 
 Squad 2.0.0 or higher must be installed in the target repository. The installer
@@ -14,11 +15,83 @@ as a substitute for companion materialization, and does not ask for credentials.
 
 This is the Companion plan for active scripts, prompts, workflows, and agent
 targets. \`squad plugin dry-run <squad-heroes-dir>\` is a separate Squad lifecycle
-command that lists only static plugin templates.
+command that lists only the installed static Companion distribution.
 
 Model selection is --model-reqeng/--model-work/--model-review or the persisted
 flow defaults in .squad/heroes.json; there is no fallback.
 `;
+
+function existingOptions(target) {
+  const configPath = resolve(target ?? process.cwd(), '.squad/heroes.json');
+  if (!existsSync(configPath)) return null;
+  return JSON.parse(readFileSync(configPath, 'utf8'));
+}
+
+export async function completeInteractiveOptions(options, existing, ask) {
+  options.profile ??= await ask('Project profile', existing?.profile ?? 'typescript-development');
+  if (!['typescript-development', 'TypeScript Development'].includes(options.profile)) {
+    throw new Error('Only TypeScript Development is available in this MVP');
+  }
+  if (options.profile === 'TypeScript Development') options.profile = 'typescript-development';
+  options.repository ??= await ask('GitHub repository (owner/name)', existing?.repository ?? '');
+  options.language ??= await ask('Language (de|en)', existing?.language ?? 'en');
+
+  if (!options.branches && !existing?.deploymentBranches) {
+    const count = Number(await ask('Deployment branch count (1-3)', '1'));
+    if (![1, 2, 3].includes(count)) throw new Error('Deployment branch count must be 1, 2 or 3');
+    options.branches = [];
+    for (let index = 0; index < count; index += 1) {
+      options.branches.push(await ask(`Deployment branch ${index + 1}`, index === 0 ? 'main' : ''));
+    }
+  }
+
+  for (const flow of ['reqeng', 'work', 'review']) {
+    if (!options.explicitModels?.[flow]) {
+      const fallback = existing?.modelDefaults?.[flow] ?? options.models[flow];
+      options.models[flow] = await ask(`Model for ${flow}`, fallback);
+      options.explicitModels[flow] = true;
+    }
+  }
+  options.reviewBaseline ??= await ask(
+    'Review baseline commit (optional; blank keeps the configured value)',
+    existing?.reviewBaseline ?? ''
+  ) || undefined;
+
+  if (!options.boardSync) {
+    const current = existing?.extensions?.['board-sync'];
+    const enable = (await ask('Enable optional Project board sync (y/N)', current ? 'y' : 'N')).toLowerCase();
+    options.boardSync = ['y', 'yes'].includes(enable);
+  }
+  if (options.boardSync) {
+    const current = existing?.extensions?.['board-sync'];
+    options.board.owner ??= await ask('Project owner', current?.owner ?? '');
+    options.board.number ??= await ask('Project number', String(current?.number ?? ''));
+    options.board.statusField ??= await ask('Project status field', current?.statusField ?? 'Status');
+    options.board.statusMap ??= JSON.parse(await ask(
+      'Project status map JSON',
+      JSON.stringify(current?.statusMap ?? { 'go:yes': 'Ready', 'go:done': 'Done' })
+    ));
+    options.board.secret ??= await ask(
+      'GitHub Actions secret expression',
+      current?.secret ?? 'secrets.HEROES_PROJECT_TOKEN'
+    );
+  }
+  return options;
+}
+
+async function wizard(options) {
+  const existing = existingOptions(options.target);
+  const prompt = createInterface({ input: process.stdin, output: process.stdout });
+  const ask = async (label, fallback = '') => {
+    const suffix = fallback ? ` [${fallback}]` : '';
+    return (await prompt.question(`${label}${suffix}: `)).trim() || fallback;
+  };
+  try {
+    return await completeInteractiveOptions(options, existing, ask);
+  } finally {
+    prompt.close();
+  }
+}
 
 export async function main() {
   try {
@@ -27,20 +100,8 @@ export async function main() {
       process.stdout.write(HELP);
       return;
     }
-    if (!options.profile) {
-      if (!process.stdin.isTTY) {
-        throw new Error('Non-interactive installation requires --profile typescript-development');
-      }
-      const prompt = createInterface({ input: process.stdin, output: process.stdout });
-      try {
-        options.profile = (await prompt.question('Project profile (TypeScript Development): ')).trim() || 'typescript-development';
-      } finally {
-        prompt.close();
-      }
-      if (!['typescript-development', 'TypeScript Development'].includes(options.profile)) {
-        throw new Error('Only TypeScript Development is available in this MVP');
-      }
-      if (options.profile === 'TypeScript Development') options.profile = 'typescript-development';
+    if (process.stdin.isTTY) {
+      await wizard(options);
     }
     const repoRoot = resolve(options.target ?? process.cwd());
     const plan = buildInstallPlan(repoRoot, options);

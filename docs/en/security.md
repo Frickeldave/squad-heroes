@@ -3,12 +3,14 @@
 ## Write boundaries
 
 - Plugin lifecycle: only `.squad/plugins/*`, managed by Squad.
-- Plugin content: only static sources below `.squad/heroes/`.
+- Plugin content: only the static distribution below
+  `.squad/templates/squad-heroes/companion/`.
 - Companion: only explicitly cataloged active targets.
 - Prompt layers: only `.github/prompts/addon.config.json`.
 
 The same target is never owned concurrently. Plugin lifecycle commands do not
-change active companion files; the companion does not change plugin sources.
+change active Companion files; the Companion is resolved from the installed
+distribution and never changes its own plugin-managed bundle.
 
 ## Permissions and approval
 

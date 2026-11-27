@@ -1,132 +1,123 @@
 # squad-heroes
 
-Ein marketplace-fähiges Squad-Overlay und ein separat versionierter Companion
-für TypeScript-Projekte mit GitHub Copilot.
+Ein marketplace-fähiges Squad-Overlay und ein separat versionierter, lokal
+ausgeführter Companion für TypeScript-Projekte.
 
 <!-- BEGIN GENERATED BADGES -->
 [![Version](https://img.shields.io/badge/version-0.1.0-blue)](package.json)
 <!-- END GENERATED BADGES -->
 
-## Überblick
+## Übersicht
 
-`squad-heroes` besteht bewusst aus zwei getrennten Zonen:
+Der Squad-Plugin-Lifecycle verwaltet **nur** die statische, versionierte
+Distribution unter:
 
-1. **Marketplace-Plugin:** ausschließlich statische, gehashte Quellen unter
-   `.squad/heroes/`; keine aktiven Agent-, GitHub-, Workflow- oder Paketdateien.
-2. **Companion:** das menschlich gestartete Node-Skript `scripts/install.mjs`,
-   das genehmigte Ziele materialisiert, Konflikte sichtbar plant und idempotent
-   aktualisiert.
-
-Vier Lieferbestandteile — Agent-/Prompt-Quellen, Companion-Adapter,
-Launcher/Automatisierung und Dokumentation/Qualität — bilden dabei **ein**
-versioniertes Overlay-Produkt. Sie sind keine vier unabhängigen Installate.
-
-**Zwei Dry-runs, zwei Ownership-Bereiche:** `squad plugin dry-run
-/pfad/zum/squad-heroes` ist ausschließlich der statische Squad-Plugin-Plan.
-Er listet weder aktive `scripts/` noch Workflows oder Companion-Prompts.
-Nur `node /pfad/zum/squad-heroes/scripts/install.mjs ... --dry-run` zeigt den
-vollständigen Companion-Plan für diese aktiven Ziele. Beide read-only Pläne
-vor der Installation prüfen; keiner ersetzt den anderen.
-
-Der Installer unterstützt ein bereits installiertes Squad `2.0.0` oder höher.
-Die Version kommt genau aus einem einzelnen gültigen SemVer-Marker
-`<!-- version: X.Y.Z -->` in `.github/agents/squad.agent.md`. Prerelease-Marker
-werden fail-closed abgewiesen.
-
-## Voraussetzungen
-
-- Linux
-- Node.js 20+ und npm
-- Squad `2.0.0` oder höher (keine Prereleases)
-- `gh` mit authentifizierter Host-Konfiguration und Push-Recht
-- lokal ausgechecktes Zielrepository
-
-Vor der Arbeit muss Squad im normalen Benutzerkontext ausführbar sein:
-
-```bash
-command -v squad
-ls -l "$(command -v squad)"
-squad --version
+```text
+.squad/templates/squad-heroes/companion/
 ```
 
-Falls eine root-eigene globale npm-Installation bei
-`squad upgrade --self` mit `EACCES`/`EPERM` abbricht, nicht `sudo squad`
-verwenden. Unter npm mit `--allow-scripts` wird nur die Installation über diesen
-befehlslokalen, expliziten Script-Allowlist repariert:
+`squad plugin install` kopiert diesen vollständigen Companion in das
+Consumer-Repository. Dazu gehören Installer, Node-Laufzeitmodule, Katalog,
+Profile, Agenten, Prompts, Workflows, Templates, Ressourcen und die
+zweisprachigen Humanizer-Dateien. Der Plugin-Install schreibt oder startet
+nichts Aktives; insbesondere führt er den Companion nicht automatisch aus.
+Der unterstützte Befehl ist `squad plugin install <local-dir>`.
 
-```bash
-sudo sh -c 'umask 022 && exec npm install -g --allow-scripts=@bradygaster/squad-cli,node-pty,koffi,protobufjs @bradygaster/squad-cli@latest'
-```
-
-Anschließend das Terminal neu starten und die drei Prüfbefehle wiederholen.
-Erst nach erfolgreicher Ausführung wird im Ziel-Repository `squad upgrade`
-gestartet. Ein `Permission denied` darf nicht mit einem rekursiven
-`chmod` behoben werden; der Installationsbefehl mit `umask 022` stellt die
-Verzeichnis- und Binärrechte kontrolliert wieder her.
+Squad 2.0.0 lehnt ausführbare Dateiendungen in statischen Plugin-Manifesten
+ab. Deshalb liegen die JavaScript-Module im verwalteten Bundle ohne Endung;
+`node` erkennt sie durch das mitgelieferte `type: module` als ESM. Beim
+Companion-Lauf werden aktive Consumer-Skripte wieder als `.mjs` materialisiert.
 
 ## Schnellstart
 
+Vom Zielrepository aus:
+
 ```bash
-git clone https://github.com/Frickeldave/squad-heroes.git
-cd squad-heroes
-cd /pfad/zum/projekt
-SQUAD_HEROES_PREFLIGHT=/pfad/zum/squad-heroes/scripts/plugin-preflight.mjs
-node "$SQUAD_HEROES_PREFLIGHT" --target "$PWD"
+git clone https://github.com/Frickeldave/squad-heroes.git /pfad/zum/squad-heroes
+
 squad plugin validate /pfad/zum/squad-heroes
-# Nur statische Plugin-Templates (keine Companion-Skripte/Workflows):
 squad plugin dry-run /pfad/zum/squad-heroes
-# Aktive Companion-Ziele inklusive scripts/ und Workflows sichtbar machen:
-node /pfad/zum/squad-heroes/scripts/install.mjs --target "$PWD" \
-  --repository owner/repository \
-  --profile typescript-development \
-  --deployment-branches 1 \
-  --deployment-branch-1 main \
-  --language de \
-  --dry-run
-node "$SQUAD_HEROES_PREFLIGHT" --target "$PWD"
 squad plugin install /pfad/zum/squad-heroes
 squad plugin enable squad-heroes
-squad plugin list --json
 squad plugin verify
 ```
 
-`squad plugin install <local-dir>` ist der **primäre Squad-native
-Plugin-Lifecycle**. Aktualisierungen erfolgen
-nicht über `plugin update` (dieses Kommando existiert in der unterstützten
-CLI nicht), sondern durch erneutes Ausführen von:
+Der Plugin-Dry-run listet ausschließlich Einträge unter
+`templates/squad-heroes/companion/`. Danach den **kopierten** Companion
+lokalisieren und zuerst prüfen:
 
 ```bash
-squad plugin verify && squad plugin install /pfad/zum/aktuelleren/squad-heroes
-squad plugin list --json
-squad plugin verify
+node .squad/templates/squad-heroes/companion/scripts/install --target "$PWD" --dry-run
 ```
 
-`squad plugin verify` vor der Aktualisierung ist verpflichtend: Squad überschreibt
-bei `install` seine verwalteten Ziele. Bei einer lokalen Änderung meldet
-`verify` einen Checksum-Fehler und `&&` verhindert den Update-Aufruf; erst nach
-bewusster Lösung des Konflikts darf `install` erneut laufen. Derselbe Stand ist
-idempotent. Alle Plugin-Ziele und der Plugin-State liegen unter `.squad/`;
-`.squad/plugins/*` ist ausschließlich autoritativ.
+Dieser zweite Lauf zeigt den vollständigen Companion-Plan für aktive Ziele.
 
-Der Companion-Installationsplan oben muss vor der Mutation geprüft werden.
-Danach materialisiert derselbe separate, menschlich gestartete Companion seine
-eigenen aktiven Ziele. Er ist kein Plugin-Installer, verwaltet keine
-`.squad/plugins/*`-Daten und ist kein Ersatz für `squad plugin install`:
+In einem Terminal fragt der Wizard nach Profil, Repository, Sprache,
+Deployment-Branches, Review-Baseline, Modellen und optionalem Board-Sync.
+Initial werden Repository und Branches benötigt; leere optionale Eingaben
+verwenden angezeigte Standardwerte bzw. bleiben deaktiviert. Der Wizard fragt
+nie nach Tokens und persistiert keine Credentials.
+
+Für CI/Tests bleibt alles explizit und nicht-interaktiv:
 
 ```bash
-cd /pfad/zum/squad-heroes
-node scripts/install.mjs --target /pfad/zum/projekt \
+node .squad/templates/squad-heroes/companion/scripts/install \
+  --target "$PWD" \
   --repository owner/repository \
   --profile typescript-development \
-  --deployment-branches 2 \
-  --deployment-branch-1 int \
-  --deployment-branch-2 prd \
   --language de \
+  --deployment-branches 2 \
+  --deployment-branch-1 main \
+  --deployment-branch-2 int \
+  --model-reqeng mai-code-2 \
+  --model-work claude-sonnet-5.5 \
+  --model-review gpt-6.1-terra \
   --dry-run
 ```
 
-Nach Prüfung des vollständigen Plans wird derselbe Befehl ohne `--dry-run`
-ausgeführt. Der Installer fragt nie nach Tokens und persistiert keine Credentials.
+Nach Prüfung denselben lokal installierten Companion-Befehl ohne `--dry-run`
+ausführen. Erst dieser Schritt materialisiert aktive Ziele wie
+`scripts/start-work.mjs`, Workflows, Prompts und Agent-Charters. Er ist
+konfliktsicher und wiederholte Ausführung ist ein No-op.
+
+## Update und Entfernung
+
+Squad 2.0.0 besitzt keinen `plugin update`-Befehl. Ein neuer Checkout wird
+wieder über `install` eingespielt:
+
+```bash
+squad plugin verify &&
+squad plugin install /pfad/zum/neueren/squad-heroes &&
+squad plugin verify
+```
+
+Das aktualisiert ausschließlich das verwaltete Bundle. Aktive Companion-Ziele
+bleiben unverändert. Erst ein expliziter erneuter Aufruf des lokal kopierten
+Companions aktualisiert diese Ziele:
+
+```bash
+node .squad/templates/squad-heroes/companion/scripts/install --target "$PWD" --dry-run
+node .squad/templates/squad-heroes/companion/scripts/install --target "$PWD"
+```
+
+Bei vorhandener `.squad/heroes.json` werden Konfigurationswerte für dieses
+Companion-Rerun übernommen, außer ausdrücklich angegebene Flags. Profile,
+Repository, Branches, Sprache und Modelle werden weiterhin sichtbar geplant.
+
+`squad plugin uninstall squad-heroes` entfernt nur die Bundle-Dateien und den
+Plugin-State; aktive, vom Companion erzeugte Dateien bleiben bestehen.
+
+## Voraussetzungen und Sicherheit
+
+- Node.js 20+, npm für die Produktentwicklung
+- Squad `2.0.0` oder höher, stabil (kein Prerelease)
+- lokal installierter `gh`, authentifiziert und mit Push-Recht
+- genau ein stabiler `<!-- version: X.Y.Z -->`-Marker in
+  `.github/agents/squad.agent.md`
+
+Der Companion prüft Squad, GitHub-Authentifizierung und Push-Recht, fordert
+niemals Token an und speichert keine Credentials. Konflikte werden vor dem
+ersten Schreibzugriff angezeigt.
 
 ## Dokumentation
 
@@ -137,16 +128,17 @@ ausgeführt. Der Installer fragt nie nach Tokens und persistiert keine Credentia
   [Security](docs/en/security.md), [Recovery](docs/en/recovery.md),
   [End-to-end test plan](docs/en/testplan-snake.md)
 
-## Grenzen
-
-Das Produkt installiert Squad nicht, besitzt keinen globalen Installer und
-verspricht kein globales Rollback. Board-Sync ist optional und bleibt ohne
-vollständigen Opt-in aus. Details: [Nicht-Ziele](docs/de/nicht-ziele.md).
-
 ## Entwicklung
 
 ```bash
 npm ci
 npm run check
 npm run smoke
+squad plugin validate .
+git diff --check
 ```
+
+Bereits installierte Consumer, die noch die frühere direkte Quell-Installation
+verwenden: Plugin aus diesem Stand erneut installieren, dann ausschließlich
+die oben dokumentierte kopierte Companion-Installation verwenden. Der externe
+Checkout wird nur noch benötigt, um das Plugin zu installieren/aktualisieren.

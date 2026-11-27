@@ -17,8 +17,17 @@ test('manifest is static, checksummed and plugin files never target outside .squ
   assert.ok(!manifest.files.some(({ source }) => /scripts\/install\.mjs$/u.test(source)));
   const marketplace = parseJsonFile(path.join(root, 'plugin.manifest.json'));
   assert.equal(marketplace.squad, '>=2.0.0');
-  assert.ok(marketplace.files.length > 10);
-  assert.ok(marketplace.files.every(({ source }) => !/\.(?:mjs|js|sh|ts)$/u.test(source)));
+  assert.ok(marketplace.files.length > 50);
+  assert.ok(marketplace.files.every(({ target }) =>
+    target.startsWith('templates/squad-heroes/companion/')));
+  assert.ok(marketplace.files.some(({ target }) =>
+    target === 'templates/squad-heroes/companion/scripts/install'));
+  assert.ok(marketplace.files.some(({ target }) =>
+    target === 'templates/squad-heroes/companion/src/installer'));
+  assert.ok(marketplace.files.some(({ target }) =>
+    target === 'templates/squad-heroes/companion/.squad/heroes/companion-targets.json'));
+  assert.ok(marketplace.files.every(({ target }) =>
+    !/^\.github\/|^scripts\/|^\.squad\/agents\//u.test(target)));
 });
 
 test('companion targets are explicit, unique and board sync is separately gated', () => {
@@ -94,7 +103,7 @@ test('documentation has parallel chapters and required root entry point', () => 
   const readme = readFileSync(path.join(root, 'README.md'), 'utf8');
   assert.match(readme, /docs\/de\/installation\.md/);
   assert.match(readme, /docs\/en\/installation\.md/);
-  assert.match(readme, /squad plugin dry-run[\s\S]*scripts\/install\.mjs[\s\S]*--dry-run/u);
+  assert.match(readme, /squad plugin dry-run[\s\S]*companion\/scripts\/install[\s\S]*--dry-run/u);
   assert.match(readme, /vollständigen Companion-Plan/u);
 });
 
@@ -103,7 +112,7 @@ test('installation docs and test plans distinguish plugin and Companion dry-runs
     const installation = readFileSync(path.join(root, 'docs', language, 'installation.md'), 'utf8');
     const testplan = readFileSync(path.join(root, 'docs', language, 'testplan-snake.md'), 'utf8');
     assert.match(installation, /squad plugin dry-run/u);
-    assert.match(installation, /scripts\/install\.mjs[\s\S]*--dry-run/u);
+    assert.match(installation, /companion\/scripts\/install[\s\S]*--dry-run/u);
     assert.match(installation, /scripts\/start-work\.mjs/u);
     assert.match(installation, /\.github\/workflows\/heroes-ci\.yml/u);
     assert.match(testplan, /squad plugin dry-run/u);
@@ -121,9 +130,9 @@ test('plugin preflight points directly to the Companion dry-run', () => {
       target,
     ], { encoding: 'utf8' });
     assert.equal(result.status, 0, result.stderr);
-    assert.match(result.stdout, /squad plugin dry-run.+only static/u);
-    assert.match(result.stdout, /Companion dry-run separately/u);
-    assert.match(result.stdout, /scripts\/install\.mjs/u);
+    assert.match(result.stdout, /squad plugin dry-run.+static, versioned distribution/u);
+    assert.match(result.stdout, /copied Companion/u);
+    assert.match(result.stdout, /templates\/squad-heroes\/companion\/scripts\/install/u);
     assert.match(result.stdout, /--profile typescript-development/u);
     assert.match(result.stdout, /--dry-run/u);
   } finally {

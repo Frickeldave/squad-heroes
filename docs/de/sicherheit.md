@@ -3,12 +3,14 @@
 ## Schreibgrenzen
 
 - Plugin-Lifecycle: ausschließlich `.squad/plugins/*` durch Squad.
-- Plugin-Inhalte: ausschließlich statische Quellen unter `.squad/heroes/`.
+- Plugin-Inhalte: ausschließlich die statische Distribution unter
+  `.squad/templates/squad-heroes/companion/`.
 - Companion: ausschließlich explizit katalogisierte aktive Ziele.
 - Prompt-Layer: ausschließlich `.github/prompts/addon.config.json`.
 
 Dieselben Ziele werden nie parallel besessen. Plugin-Lifecycle-Befehle verändern
-keine aktiven Companion-Dateien; der Companion verändert keine Plugin-Quellen.
+keine aktiven Companion-Dateien; der Companion nutzt die installierte
+Distribution und verändert sein Plugin-verwaltetes Bundle selbst nicht.
 
 ## Rechte und Zustimmung
 

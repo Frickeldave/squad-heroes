@@ -27,7 +27,11 @@ test('Humanizer has a shared router and both localized rule sets in every distri
   const targets = json('.squad/heroes/companion-targets.json').targets;
   for (const source of sourcePaths) {
     assert.ok(manifest.files.some((file) => file.source === source), source);
-    assert.ok(marketplace.files.some((file) => file.source === source), source);
+    const distributed = `dist/companion/${source}`;
+    assert.ok(marketplace.files.some((file) =>
+      file.source === distributed &&
+      file.target === `templates/squad-heroes/companion/${source}`
+    ), source);
   }
   for (const file of files) {
     assert.ok(targets.some((entry) =>

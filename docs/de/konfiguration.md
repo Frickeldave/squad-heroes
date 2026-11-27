@@ -13,10 +13,16 @@ aktualisierbar, während lokaler Drift bis zur expliziten Entscheidung als
 Konflikt bleibt. Entscheidungen liegen in derselben Recovery-Struktur; sie
 ersetzen niemals `.squad/plugins/*`.
 
+Der installierte Einstiegspunkt liest diesen Stand aus dem Consumer, nicht aus
+dem ursprünglichen Plugin-Checkout. Im interaktiven Update erscheinen
+Repository, Branches, Sprache, Modelle, Review-Baseline und Board-Konfiguration
+als Wizard-Vorgaben; CLI-Flags bleiben maßgeblich.
+
 ## Modelle
 
-Je Flow gilt ausschließlich `--model ID` > zugehöriger Wert in
-`modelDefaults` > Abbruch. Es gibt keinen `auto`-, Cache-, Family-, Team-,
+Je Flow gilt ausschließlich `--model-reqeng`, `--model-work` oder
+`--model-review` > zugehöriger Wert in `modelDefaults` > Abbruch.
+Es gibt keinen `auto`-, Cache-, Family-, Team-,
 Prompt- oder Cross-Flow-Fallback. Das Modell wird einmal aufgelöst und unverändert
 weitergegeben.
 Vor dem Start prüft das Companion-Profil die ID mit einer isolierten
