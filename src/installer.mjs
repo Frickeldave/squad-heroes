@@ -122,6 +122,7 @@ function addAgentOperations(config, baselines = {}) {
         target: `.squad/agents/${agent.id}/charter.${language}.md`,
         source: `.squad/heroes/agents/${agent.id}.${language}.md`,
         rendered: content,
+        owner: 'companion',
         mode: 'managed-section',
         section: `charter:${agent.id}`,
         baselineHash: baselines[`.squad/agents/${agent.id}/charter.${language}.md`],
@@ -135,6 +136,7 @@ function addAgentOperations(config, baselines = {}) {
       target: `.squad/agents/${agent.id}/charter.md`,
       source: `.squad/heroes/agents/${agent.id}.${config.language}.md`,
       rendered: selected,
+      owner: 'companion',
       mode: 'managed-section',
       section: `charter:${agent.id}`,
       baselineHash: baselines[`.squad/agents/${agent.id}/charter.md`],
@@ -144,6 +146,7 @@ function addAgentOperations(config, baselines = {}) {
       target: `.squad/agents/${agent.id}/history.md`,
       rendered: 'Installed by squad-heroes.\n',
       appendId: '<!-- squad-heroes:history:v0.1.0 -->',
+      owner: 'companion',
       mode: 'append-only',
     });
   }
@@ -212,6 +215,7 @@ export function buildInstallPlan(repoRoot, options = {}, injected = {}) {
     id: 'heroes-state',
     target: '.squad/heroes.json',
     rendered: `${JSON.stringify(config, null, 2)}\n`,
+    owner: 'companion',
     mode: 'whole-file',
   });
   operations.push({
@@ -226,6 +230,7 @@ export function buildInstallPlan(repoRoot, options = {}, injected = {}) {
       'versionbump': 'node scripts/versionbump.mjs',
       'check-release-label': 'node scripts/check-release-label.mjs',
     }, null, 2),
+    owner: 'companion',
     mode: 'package-json',
   });
   const planned = operations.map((entry) => classifyOperation(repoRoot, entry, decisions));
@@ -270,5 +275,6 @@ export function applyPlan(repoRoot, plan, { dryRun = false, verify = false } = {
 
 export function printPlan(plan, language = 'en') {
   const heading = translate(language, 'plan_heading').text;
-  process.stdout.write(`${heading}: ${JSON.stringify(summarizePlan(plan.operations), null, 2)}\n`);
+  const scope = translate(language, 'companion_plan_scope').text;
+  process.stdout.write(`${scope}\n${heading}: ${JSON.stringify(summarizePlan(plan.operations), null, 2)}\n`);
 }

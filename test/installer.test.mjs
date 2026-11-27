@@ -2,9 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { applyPlan, buildInstallPlan } from '../src/installer.mjs';
+import { applyPlan, buildInstallPlan, printPlan } from '../src/installer.mjs';
+import { parseJsonFile } from '../src/io.mjs';
 import { cleanup, commandResult, fixture, write } from './helpers.mjs';
 
+const productRoot = path.resolve(import.meta.dirname, '..');
 const options = {
   repository: 'owner/repository',
   profile: 'typescript-development',
@@ -23,12 +25,39 @@ test('fresh dry-run plans plugin and companion separately without mutation', () 
   const root = fixture();
   try {
     const plan = buildInstallPlan(root, options, injected);
+    const defaultScripts = parseJsonFile(path.join(productRoot, '.squad/heroes/companion-targets.json'))
+      .targets
+      .filter(({ target, extension }) => !extension && /^scripts\/.+\.mjs$/u.test(target));
+    for (const { target } of defaultScripts) {
+      assert.ok(plan.operations.some((entry) => entry.target === target), `missing planned script: ${target}`);
+    }
     assert.ok(plan.operations.some((entry) => entry.target === '.github/workflows/heroes-ci.yml'));
+    assert.ok(plan.operations.some((entry) => entry.target === 'scripts/start-work.mjs'));
+    assert.ok(plan.operations.some((entry) => entry.target === 'scripts/check-release-label.mjs'));
     assert.ok(plan.operations.some((entry) => entry.target === '.squad/agents/clint/charter.md'));
     assert.ok(!plan.operations.some((entry) => entry.target.endsWith('heroes-sync-project-board.yml')));
     const result = applyPlan(root, plan, { dryRun: true }, injected);
     assert.equal(result.changed, 0);
+    assert.ok(result.plan.some((entry) => entry.target === 'scripts/start-work.mjs'));
+    assert.ok(result.plan.some((entry) => entry.target === '.github/workflows/heroes-ci.yml'));
+    assert.ok(result.plan.every((entry) => entry.owner === 'companion'));
     assert.equal(existsSync(path.join(root, '.squad/heroes.json')), false);
+
+    const writes = [];
+    const originalWrite = process.stdout.write;
+    process.stdout.write = (chunk) => {
+      writes.push(String(chunk));
+      return true;
+    };
+    try {
+      printPlan(plan, 'en');
+    } finally {
+      process.stdout.write = originalWrite;
+    }
+    const output = writes.join('');
+    assert.match(output, /separate plan/u);
+    assert.match(output, /scripts\/start-work\.mjs/u);
+    assert.match(output, /\.github\/workflows\/heroes-ci\.yml/u);
   } finally {
     cleanup(root);
   }
@@ -42,6 +71,14 @@ test('installation materializes both languages and an identical second run is a 
     assert.ok(installed.changed > 20);
     assert.ok(existsSync(path.join(root, '.squad/agents/tony/charter.de.md')));
     assert.ok(existsSync(path.join(root, '.squad/agents/tony/charter.en.md')));
+    const installedScriptTargets = parseJsonFile(
+      path.join(productRoot, '.squad/heroes/companion-targets.json')
+    ).targets
+      .filter(({ target, extension }) => !extension && /^scripts\/.+\.mjs$/u.test(target))
+      .map(({ target }) => target);
+    for (const target of installedScriptTargets) {
+      assert.ok(existsSync(path.join(root, target)), `missing installed script: ${target}`);
+    }
     const state = JSON.parse(readFileSync(path.join(root, '.squad/heroes.json'), 'utf8'));
     assert.equal(state.profile, 'typescript-development');
     const rerun = applyPlan(root, buildInstallPlan(root, options, injected), {}, injected);

@@ -1,9 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { parseJsonFile, safeRelativePath } from '../src/io.mjs';
 import { validateManifest } from '../src/manifest.mjs';
+import { cleanup, fixture } from './helpers.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
 
@@ -92,4 +94,39 @@ test('documentation has parallel chapters and required root entry point', () => 
   const readme = readFileSync(path.join(root, 'README.md'), 'utf8');
   assert.match(readme, /docs\/de\/installation\.md/);
   assert.match(readme, /docs\/en\/installation\.md/);
+  assert.match(readme, /squad plugin dry-run[\s\S]*scripts\/install\.mjs[\s\S]*--dry-run/u);
+  assert.match(readme, /vollständigen Companion-Plan/u);
+});
+
+test('installation docs and test plans distinguish plugin and Companion dry-runs', () => {
+  for (const language of ['de', 'en']) {
+    const installation = readFileSync(path.join(root, 'docs', language, 'installation.md'), 'utf8');
+    const testplan = readFileSync(path.join(root, 'docs', language, 'testplan-snake.md'), 'utf8');
+    assert.match(installation, /squad plugin dry-run/u);
+    assert.match(installation, /scripts\/install\.mjs[\s\S]*--dry-run/u);
+    assert.match(installation, /scripts\/start-work\.mjs/u);
+    assert.match(installation, /\.github\/workflows\/heroes-ci\.yml/u);
+    assert.match(testplan, /squad plugin dry-run/u);
+    assert.match(testplan, /scripts\/start-work\.mjs/u);
+    assert.match(testplan, /\.github\/workflows\/heroes-ci\.yml/u);
+  }
+});
+
+test('plugin preflight points directly to the Companion dry-run', () => {
+  const target = fixture();
+  try {
+    const result = spawnSync(process.execPath, [
+      path.join(root, 'scripts/plugin-preflight.mjs'),
+      '--target',
+      target,
+    ], { encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /squad plugin dry-run.+only static/u);
+    assert.match(result.stdout, /Companion dry-run separately/u);
+    assert.match(result.stdout, /scripts\/install\.mjs/u);
+    assert.match(result.stdout, /--profile typescript-development/u);
+    assert.match(result.stdout, /--dry-run/u);
+  } finally {
+    cleanup(target);
+  }
 });

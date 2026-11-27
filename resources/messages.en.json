@@ -1,5 +1,6 @@
 {
   "plan_heading": "Installation plan",
+  "companion_plan_scope": "Companion plan for active scripts, prompts, workflows, and agent targets. `squad plugin dry-run` is a separate plan and shows only static plugin templates.",
   "dry_run_complete": "Dry run complete. No files were changed.",
   "install_complete": "Installation complete: {count} files written.",
   "conflicts_block": "Installation stopped: {count} unresolved conflicts.",

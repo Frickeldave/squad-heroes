@@ -33,12 +33,24 @@ refers to the host-side `gh auth login` flow.
 
 ## First installation
 
+There are two separate read-only dry-runs. `squad plugin dry-run` plans only
+static marketplace templates. `scripts/install.mjs --dry-run` plans active
+Companion targets, including `scripts/`, `.github/prompts/`, workflows and
+materialized agent files. Review both plans before installation; the plugin
+dry-run is not the complete delivery plan.
+
 ```bash
 git clone https://github.com/Frickeldave/squad-heroes.git
 cd /repo
 node /path/to/squad-heroes/scripts/plugin-preflight.mjs --target "$PWD"
 squad plugin validate /path/to/squad-heroes
+# Static plugin targets only:
 squad plugin dry-run /path/to/squad-heroes
+node /path/to/squad-heroes/scripts/install.mjs \
+  --target "$PWD" --repository owner/repository \
+  --profile typescript-development \
+  --deployment-branches 1 --deployment-branch-1 prd \
+  --language en --dry-run
 node /path/to/squad-heroes/scripts/plugin-preflight.mjs --target "$PWD"
 squad plugin install /path/to/squad-heroes
 squad plugin enable squad-heroes
@@ -51,10 +63,14 @@ does not install anything and owns no plugin lifecycle. Running it twice proves
 the early and final check immediately around the verified dry-run. `squad
 plugin install <local-dir>` is the only plugin installation path.
 
-The human-triggered companion follows as a separate operation:
+The second dry-run must contain active targets such as
+`scripts/start-work.mjs` and `.github/workflows/heroes-ci.yml`. The
+human-triggered companion then follows as a separate operation using the
+already reviewed command without `--dry-run`:
 
 ```bash
 node scripts/install.mjs --target /repo --repository owner/repository \
+  --profile typescript-development \
   --deployment-branches 1 --deployment-branch-1 prd \
   --language en --dry-run
 ```

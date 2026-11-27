@@ -112,6 +112,11 @@ git status --short
 find .squad/plugins -maxdepth 2 -type f -print -exec sha256sum {} \;
 ```
 
+The `squad plugin dry-run` plan must print only static templates such as
+`templates/squad-heroes/agents/tony.en.md`; active `scripts/`,
+`.github/prompts/`, and workflows must not appear there. This is not the
+complete product plan.
+
 Expect only declared targets below `.squad/`; `.squad/plugins/*` must be the
 authoritative installed state. `list --json` must report `squad-heroes@0.1.0`
 or the exact released version under test. `verify` succeeds. Companion targets
@@ -164,9 +169,11 @@ node scripts/install.mjs \
   --dry-run
 ```
 
-Require approved model IDs and complete noninteractive inputs. Expect a full
-plan, no writes, both version gates, no credential prompt, and separate
-plugin/Companion ownership.
+Require approved model IDs and complete noninteractive inputs. Expect the
+separate Companion plan to show `scripts/start-work.mjs`, other `scripts/`
+targets, and `.github/workflows/heroes-ci.yml`; it must perform no writes,
+pass both version gates, avoid credential prompts, and keep plugin/Companion
+ownership separate.
 
 Run the same command without `--dry-run`, then:
 

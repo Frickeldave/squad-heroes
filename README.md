@@ -21,6 +21,13 @@ Vier Lieferbestandteile — Agent-/Prompt-Quellen, Companion-Adapter,
 Launcher/Automatisierung und Dokumentation/Qualität — bilden dabei **ein**
 versioniertes Overlay-Produkt. Sie sind keine vier unabhängigen Installate.
 
+**Zwei Dry-runs, zwei Ownership-Bereiche:** `squad plugin dry-run
+/pfad/zum/squad-heroes` ist ausschließlich der statische Squad-Plugin-Plan.
+Er listet weder aktive `scripts/` noch Workflows oder Companion-Prompts.
+Nur `node /pfad/zum/squad-heroes/scripts/install.mjs ... --dry-run` zeigt den
+vollständigen Companion-Plan für diese aktiven Ziele. Beide read-only Pläne
+vor der Installation prüfen; keiner ersetzt den anderen.
+
 Der Installer unterstützt ein bereits installiertes Squad `2.0.0` oder höher.
 Die Version kommt genau aus einem einzelnen gültigen SemVer-Marker
 `<!-- version: X.Y.Z -->` in `.github/agents/squad.agent.md`. Prerelease-Marker
@@ -63,11 +70,20 @@ Verzeichnis- und Binärrechte kontrolliert wieder her.
 git clone https://github.com/Frickeldave/squad-heroes.git
 cd squad-heroes
 cd /pfad/zum/projekt
-squad-plugin-preflight=/pfad/zum/squad-heroes/scripts/plugin-preflight.mjs
-node "$squad-plugin-preflight" --target "$PWD"
+SQUAD_HEROES_PREFLIGHT=/pfad/zum/squad-heroes/scripts/plugin-preflight.mjs
+node "$SQUAD_HEROES_PREFLIGHT" --target "$PWD"
 squad plugin validate /pfad/zum/squad-heroes
+# Nur statische Plugin-Templates (keine Companion-Skripte/Workflows):
 squad plugin dry-run /pfad/zum/squad-heroes
-node "$squad-plugin-preflight" --target "$PWD"
+# Aktive Companion-Ziele inklusive scripts/ und Workflows sichtbar machen:
+node /pfad/zum/squad-heroes/scripts/install.mjs --target "$PWD" \
+  --repository owner/repository \
+  --profile typescript-development \
+  --deployment-branches 1 \
+  --deployment-branch-1 main \
+  --language de \
+  --dry-run
+node "$SQUAD_HEROES_PREFLIGHT" --target "$PWD"
 squad plugin install /pfad/zum/squad-heroes
 squad plugin enable squad-heroes
 squad plugin list --json
@@ -92,7 +108,8 @@ bewusster Lösung des Konflikts darf `install` erneut laufen. Derselbe Stand ist
 idempotent. Alle Plugin-Ziele und der Plugin-State liegen unter `.squad/`;
 `.squad/plugins/*` ist ausschließlich autoritativ.
 
-Danach materialisiert der separate, menschlich gestartete Companion seine
+Der Companion-Installationsplan oben muss vor der Mutation geprüft werden.
+Danach materialisiert derselbe separate, menschlich gestartete Companion seine
 eigenen aktiven Ziele. Er ist kein Plugin-Installer, verwaltet keine
 `.squad/plugins/*`-Daten und ist kein Ersatz für `squad plugin install`:
 
@@ -100,6 +117,7 @@ eigenen aktiven Ziele. Er ist kein Plugin-Installer, verwaltet keine
 cd /pfad/zum/squad-heroes
 node scripts/install.mjs --target /pfad/zum/projekt \
   --repository owner/repository \
+  --profile typescript-development \
   --deployment-branches 2 \
   --deployment-branch-1 int \
   --deployment-branch-2 prd \

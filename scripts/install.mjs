@@ -5,12 +5,16 @@ import { HeroesError, INCOMPATIBLE_SQUAD_EXIT } from '../src/errors.mjs';
 import { createInterface } from 'node:readline/promises';
 
 const HELP = `Usage:
-  node scripts/install.mjs --target /path/to/repository --repository owner/name --deployment-branches N \\
+  node scripts/install.mjs --target /path/to/repository --repository owner/name --profile typescript-development --deployment-branches N \\
     --deployment-branch-1 main [--deployment-branch-2 int ...] [--language de|en] [--dry-run]
 
 Squad 2.0.0 or higher must be installed in the target repository. The installer
 is human-triggered, performs two version checks, never calls plugin installation
 as a substitute for companion materialization, and does not ask for credentials.
+
+This is the Companion plan for active scripts, prompts, workflows, and agent
+targets. \`squad plugin dry-run <squad-heroes-dir>\` is a separate Squad lifecycle
+command that lists only static plugin templates.
 
 Model selection is --model-reqeng/--model-work/--model-review or the persisted
 flow defaults in .squad/heroes.json; there is no fallback.

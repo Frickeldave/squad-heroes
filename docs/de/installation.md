@@ -32,12 +32,24 @@ Fehlern wird ausschließlich zum hostseitigen `gh auth login` verwiesen.
 
 ## Erstinstallation
 
+Es gibt zwei getrennte, read-only Dry-runs. `squad plugin dry-run` plant nur die
+statischen Marketplace-Templates. `scripts/install.mjs --dry-run` plant die
+aktiven Companion-Ziele, darunter `scripts/`, `.github/prompts/`, Workflows und
+materialisierte Agent-Dateien. Vor einer Installation müssen beide Pläne
+geprüft werden; der Plugin-Dry-run ist nicht der vollständige Lieferplan.
+
 ```bash
 git clone https://github.com/Frickeldave/squad-heroes.git
 cd /repo
 node /pfad/zum/squad-heroes/scripts/plugin-preflight.mjs --target "$PWD"
 squad plugin validate /pfad/zum/squad-heroes
+# Nur statische Plugin-Ziele:
 squad plugin dry-run /pfad/zum/squad-heroes
+node /pfad/zum/squad-heroes/scripts/install.mjs \
+  --target "$PWD" --repository owner/repository \
+  --profile typescript-development \
+  --deployment-branches 1 --deployment-branch-1 prd \
+  --language de --dry-run
 node /pfad/zum/squad-heroes/scripts/plugin-preflight.mjs --target "$PWD"
 squad plugin install /pfad/zum/squad-heroes
 squad plugin enable squad-heroes
@@ -51,10 +63,13 @@ Die zweimalige Prüfung belegt frühe und letzte Prüfung vor dem realen
 Squad-Befehl. `squad plugin install <local-dir>` ist der einzige
 Plugin-Installationsweg.
 
-Anschließend führt der Mensch den Companion separat aus:
+Der zweite Dry-run muss aktive Ziele wie `scripts/start-work.mjs` und
+`.github/workflows/heroes-ci.yml` enthalten. Anschließend führt der Mensch
+diesen bereits geplanten Companion-Befehl ohne `--dry-run` separat aus:
 
 ```bash
 node scripts/install.mjs --target /repo --repository owner/repository \
+  --profile typescript-development \
   --deployment-branches 1 --deployment-branch-1 prd \
   --language de --dry-run
 ```
