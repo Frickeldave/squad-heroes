@@ -117,6 +117,21 @@
       "source": ".squad/heroes/prompts/startwork.en.md",
       "target": "prompts/squad-heroes/prompts/startwork.en.md",
       "type": "prompt"
+    },
+    {
+      "source": ".squad/heroes/skills/humanizer/SKILL.md",
+      "target": "templates/squad-heroes/skills/humanizer/SKILL.md",
+      "type": "template"
+    },
+    {
+      "source": ".squad/heroes/skills/humanizer/de-DE.md",
+      "target": "templates/squad-heroes/skills/humanizer/de-DE.md",
+      "type": "template"
+    },
+    {
+      "source": ".squad/heroes/skills/humanizer/en-US.md",
+      "target": "templates/squad-heroes/skills/humanizer/en-US.md",
+      "type": "template"
     }
   ]
 }

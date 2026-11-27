@@ -12,7 +12,7 @@
     { "id": "natasha", "role": "Frontend Engineer" },
     { "id": "nick", "role": "DevOps Specialist" }
   ],
-  "skills": [],
+  "skills": ["humanizer"],
   "workflows": [
     "heroes-ci.yml",
     "heroes-configure.yml",

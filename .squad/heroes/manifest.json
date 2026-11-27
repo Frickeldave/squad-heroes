@@ -8,105 +8,105 @@
       "source": ".squad/heroes/agents/bruce.de.md",
       "target": ".squad/heroes/agents/bruce.de.md",
       "owner": "plugin",
-      "sha256": "2be095e77676cf6d9112dfb5e433c2922f18948f5d3d9ad8dc011e8104e73bcf"
+      "sha256": "7d3b6bf3c64e64b66d782d1bfb16c7df583ba8cf9427fedaf5f1036d133517fb"
     },
     {
       "id": ".squad:heroes:agents:bruce.en.md",
       "source": ".squad/heroes/agents/bruce.en.md",
       "target": ".squad/heroes/agents/bruce.en.md",
       "owner": "plugin",
-      "sha256": "d0c8eca2efa0cb82551b3d0b22740d98a51aa5288b3960901c8a061678ea5587"
+      "sha256": "e9f72c1ac6b4eaf344b0f072b0de9781714a3b74146f5c2d4378f6a6496db9c2"
     },
     {
       "id": ".squad:heroes:agents:clint.de.md",
       "source": ".squad/heroes/agents/clint.de.md",
       "target": ".squad/heroes/agents/clint.de.md",
       "owner": "plugin",
-      "sha256": "1c36724ffad47cbadf3e7b5587473a1e1a7da32f5e969ac853adf5c72a93efe2"
+      "sha256": "22779dade1a96f58c4c2f9f486a0c5d1be716cb3c5f9d4b59a5045ac9fcf6c38"
     },
     {
       "id": ".squad:heroes:agents:clint.en.md",
       "source": ".squad/heroes/agents/clint.en.md",
       "target": ".squad/heroes/agents/clint.en.md",
       "owner": "plugin",
-      "sha256": "4334431d3f3a6f31b5f96161a2e7ec82627ec5f2211215e1030121c408367c91"
+      "sha256": "e4f17364b1de56639e45633ca50916d0974cfa2e3be6f1f0d2891caffe48636b"
     },
     {
       "id": ".squad:heroes:agents:maria.de.md",
       "source": ".squad/heroes/agents/maria.de.md",
       "target": ".squad/heroes/agents/maria.de.md",
       "owner": "plugin",
-      "sha256": "2b900be8205fe38f2267ad234f065152156e79752368190e817af774647a2ef0"
+      "sha256": "6fc6c476cab1bcb10600c1d674e1f98d6cf828cebe20820337707252c725d7cf"
     },
     {
       "id": ".squad:heroes:agents:maria.en.md",
       "source": ".squad/heroes/agents/maria.en.md",
       "target": ".squad/heroes/agents/maria.en.md",
       "owner": "plugin",
-      "sha256": "501769031159f6b95afcc36d31ce3cef6aea1729f83d8dd8746f30ddae7367ab"
+      "sha256": "2bac0fbed8c9341282afb2d58b1373e519db7f2f2713ab014f7ed39b205470f3"
     },
     {
       "id": ".squad:heroes:agents:natasha.de.md",
       "source": ".squad/heroes/agents/natasha.de.md",
       "target": ".squad/heroes/agents/natasha.de.md",
       "owner": "plugin",
-      "sha256": "7f62b7b68291d305fe12ec1c3c33d3acb0a0198d7b5755fb0d004aa947fc01da"
+      "sha256": "2c0655527c66970e43f8f25cb806ae218057b81c41fbe09a400860b6c75ae3b7"
     },
     {
       "id": ".squad:heroes:agents:natasha.en.md",
       "source": ".squad/heroes/agents/natasha.en.md",
       "target": ".squad/heroes/agents/natasha.en.md",
       "owner": "plugin",
-      "sha256": "59b77412815c808a905f2544f0da8649c3ac3c390e79b79c3368b0560c5dbcb5"
+      "sha256": "922d85df22a103936a16be011e861fdce09307b16b272897a78ef8b4f8acd14d"
     },
     {
       "id": ".squad:heroes:agents:nick.de.md",
       "source": ".squad/heroes/agents/nick.de.md",
       "target": ".squad/heroes/agents/nick.de.md",
       "owner": "plugin",
-      "sha256": "62d017c397c96e8b61dd54c7b003019025db9b903478423c668a95444303ea02"
+      "sha256": "c7e27c986c67e6260149de1b9026e9b05978f809840afeae45a209d30c4330fe"
     },
     {
       "id": ".squad:heroes:agents:nick.en.md",
       "source": ".squad/heroes/agents/nick.en.md",
       "target": ".squad/heroes/agents/nick.en.md",
       "owner": "plugin",
-      "sha256": "5be700b142e5a792d02df7815822649539fde520b63f6ced9b0decf1c02e631f"
+      "sha256": "88940edbaaab65a645c817984c38bd25e88c23cc1d4ba3b01e1381db288de1c9"
     },
     {
       "id": ".squad:heroes:agents:pepper.de.md",
       "source": ".squad/heroes/agents/pepper.de.md",
       "target": ".squad/heroes/agents/pepper.de.md",
       "owner": "plugin",
-      "sha256": "a0bbf4d73b6ac81c01c8373b8610fb7a10d90021ed9237ff82b4df0ee7668ad1"
+      "sha256": "b7539c0f7eb520285aa59df4885c3d9aab059bb2a0775b0795739c581baed508"
     },
     {
       "id": ".squad:heroes:agents:pepper.en.md",
       "source": ".squad/heroes/agents/pepper.en.md",
       "target": ".squad/heroes/agents/pepper.en.md",
       "owner": "plugin",
-      "sha256": "3f54431fbb2029be99c5e8f6ed58200a292a688215584d0e936604f8c462b2f1"
+      "sha256": "4355e1bb304171c4d273f1b609dd59a014c9de611270c005710d309b634539d0"
     },
     {
       "id": ".squad:heroes:agents:tony.de.md",
       "source": ".squad/heroes/agents/tony.de.md",
       "target": ".squad/heroes/agents/tony.de.md",
       "owner": "plugin",
-      "sha256": "e563b035a4db549ea4cb1652bd651e5607ef7537e93cc0d3a2286b2bcbd3535d"
+      "sha256": "d7608f20fbd2bdedb3dbfe8af07051e2bcfcb4d24ca0e82215fc314173f7409d"
     },
     {
       "id": ".squad:heroes:agents:tony.en.md",
       "source": ".squad/heroes/agents/tony.en.md",
       "target": ".squad/heroes/agents/tony.en.md",
       "owner": "plugin",
-      "sha256": "f7ad3e8d53bdc616e5abaae916865f5e5356f80f658591b2569da7529c780a81"
+      "sha256": "ffcf1b4cefd28f7124c5ff43487380a18aeb4dbb38e178d8ea3e73107c60c41a"
     },
     {
       "id": ".squad:heroes:companion-targets.json",
       "source": ".squad/heroes/companion-targets.json",
       "target": ".squad/heroes/companion-targets.json",
       "owner": "companion",
-      "sha256": "e188cf1a383f489ecb2b3b19ccac2c8b65631e272e785e0a2e247cd648a428d0"
+      "sha256": "6995057bacbeb63388541870654c94d2bf5924899676b4503e9f25ba7760e0c0"
     },
     {
       "id": ".squad:heroes:companion:addon-layers:common.md",
@@ -288,7 +288,7 @@
       "source": ".squad/heroes/profiles/typescript-development.json",
       "target": ".squad/heroes/profiles/typescript-development.json",
       "owner": "plugin",
-      "sha256": "92ad979a220b392c1b51ae9a9381f6a111d669a70741a40746c716d7c395b879"
+      "sha256": "afb7b15193bc63c1e7bb60be10e269b67e6e51cdb3ed685e6e536cd05f3fedb6"
     },
     {
       "id": ".squad:heroes:prompts:startreqeng.de.md",
@@ -331,6 +331,27 @@
       "target": ".squad/heroes/prompts/startwork.en.md",
       "owner": "plugin",
       "sha256": "d8a166696e1e960e4873f25cb674cce59df821ee8afb1738154705499fb94046"
+    },
+    {
+      "id": ".squad:heroes:skills:humanizer:SKILL.md",
+      "source": ".squad/heroes/skills/humanizer/SKILL.md",
+      "target": ".squad/heroes/skills/humanizer/SKILL.md",
+      "owner": "plugin",
+      "sha256": "f14931749dec2596b20cc8aa32462a197cc9b54c2ba42448126361c74832a8f3"
+    },
+    {
+      "id": ".squad:heroes:skills:humanizer:de-DE.md",
+      "source": ".squad/heroes/skills/humanizer/de-DE.md",
+      "target": ".squad/heroes/skills/humanizer/de-DE.md",
+      "owner": "plugin",
+      "sha256": "9314169577eccbab2429e3440c9660093e316df0a41e04772c2b0cdafeba7743"
+    },
+    {
+      "id": ".squad:heroes:skills:humanizer:en-US.md",
+      "source": ".squad/heroes/skills/humanizer/en-US.md",
+      "target": ".squad/heroes/skills/humanizer/en-US.md",
+      "owner": "plugin",
+      "sha256": "6b8adec2f6a96640b2e26bb270d762863541d32b663938d760ab9e5dc47d5bf4"
     }
   ]
 }
