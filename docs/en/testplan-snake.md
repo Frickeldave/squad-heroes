@@ -112,16 +112,20 @@ git status --short
 find .squad/plugins -maxdepth 2 -type f -print -exec sha256sum {} \;
 ```
 
-The `squad plugin dry-run` plan must print only static templates such as
-`templates/squad-heroes/companion/.squad/heroes/agents/tony.en.md`; the package entries must all remain below
-`templates/squad-heroes/companion/`; direct active `scripts/`, `.github/prompts/`,
-and workflow targets must not appear there. This is not the
-complete product plan.
+The **plugin distribution plan** from `squad plugin dry-run` must include the
+complete versioned companion: its installer and static copies of runtime,
+script, `.squad/heroes/`, workflow, resource, and Humanizer files. Require
+representative entries such as
+`templates/squad-heroes/companion/.squad/heroes/agents/tony.en.md`,
+`templates/squad-heroes/companion/src/installer`, and
+`templates/squad-heroes/companion/.squad/heroes/companion/workflows/heroes-ci.yml`.
+Every entry remains below `templates/squad-heroes/companion/`; it must not
+target active root `scripts/`, `.github/prompts/`, or `.github/workflows/`.
 
-Expect only declared targets below `.squad/`; `.squad/plugins/*` must be the
+Expect declared plugin targets under `.squad/`; `.squad/plugins/*` must be the
 authoritative installed state. `list --json` must report `squad-heroes@0.1.0`
-or the exact released version under test. `verify` succeeds. Companion targets
-remain untouched.
+or the exact released version under test. `verify` succeeds. Active Companion
+targets remain untouched.
 
 Idempotency and actual update behavior:
 
@@ -171,10 +175,10 @@ node .squad/templates/squad-heroes/companion/scripts/install \
 ```
 
 Require approved model IDs and complete noninteractive inputs. Expect the
-separate Companion plan to show `scripts/start-work.mjs`, other `scripts/`
-targets, and `.github/workflows/heroes-ci.yml`; it must perform no writes,
-pass both version gates, avoid credential prompts, and keep plugin/Companion
-ownership separate.
+separate **Companion activation plan** to show `scripts/start-work.mjs`, other
+`scripts/` targets, `.github/prompts/`, and
+`.github/workflows/heroes-ci.yml`. It performs no writes, passes both version
+gates, avoids credential prompts, and keeps plugin/Companion ownership separate.
 
 Run the same command without `--dry-run`, then:
 

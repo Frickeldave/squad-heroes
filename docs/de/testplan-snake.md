@@ -118,16 +118,21 @@ git status --short
 find .squad/plugins -maxdepth 2 -type f -print -exec sha256sum {} \;
 ```
 
-Der `squad plugin dry-run`-Plan muss ausschließlich statische Templates wie
-`templates/squad-heroes/companion/.squad/heroes/agents/tony.en.md` ausgeben; aktive `scripts/`,
-`.github/prompts/` und Workflows dürfen dort nicht erscheinen. Das ist nicht
-der vollständige Produktplan.
+Der **Plugin-Distributionsplan** aus `squad plugin dry-run` muss den
+vollständigen versionierten Companion zeigen: Installer und statische Kopien
+der Laufzeit, Skripte, `.squad/heroes/`, Workflows, Ressourcen sowie
+Humanizer-Dateien. Repräsentative Einträge sind etwa
+`templates/squad-heroes/companion/.squad/heroes/agents/tony.en.md`,
+`templates/squad-heroes/companion/src/installer` und
+`templates/squad-heroes/companion/.squad/heroes/companion/workflows/heroes-ci.yml`.
+Jeder Eintrag bleibt unter `templates/squad-heroes/companion/`; aktive
+Root-Pfade `scripts/`, `.github/prompts/` oder `.github/workflows/` werden nicht
+direkt angezielt.
 
-Erwartet: nur deklarierte Ziele unter `.squad/` wurden geschrieben;
+Erwartet: deklarierte Ziele unter `.squad/` wurden geschrieben;
 `.squad/plugins/*` enthält den autoritativen installierten Zustand.
 `list --json` weist `squad-heroes@0.1.0` oder die aktuell geprüfte Produktversion
-aus. `verify` endet erfolgreich. Companion-Dateien außerhalb der Plugin-Ziele
-sind noch unverändert.
+aus. `verify` endet erfolgreich. Aktive Companion-Dateien sind noch unverändert.
 
 Idempotenz und realer Updatepfad:
 
@@ -179,9 +184,9 @@ node .squad/templates/squad-heroes/companion/scripts/install \
 ```
 
 Vorbedingungen: freigegebene Modell-IDs und vollständige nicht-interaktive
-Eingaben liegen vor. Erwartet: der separate Companion-Plan zeigt
-`scripts/start-work.mjs`, weitere `scripts/`-Ziele und
-`.github/workflows/heroes-ci.yml`, verursacht keine Writes, passiert beide
+Eingaben liegen vor. Erwartet: der separate **Companion-Aktivierungsplan**
+zeigt `scripts/start-work.mjs`, weitere `scripts/`-Ziele, `.github/prompts/` und
+`.github/workflows/heroes-ci.yml`. Er verursacht keine Writes, passiert beide
 Version-Gates, fordert keinen Token an und hält Plugin-/Companion-Ownership
 getrennt.
 

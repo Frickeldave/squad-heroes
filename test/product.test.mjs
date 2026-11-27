@@ -25,6 +25,16 @@ test('manifest is static, checksummed and plugin files never target outside .squ
   assert.ok(marketplace.files.some(({ target }) =>
     target === 'templates/squad-heroes/companion/src/installer'));
   assert.ok(marketplace.files.some(({ target }) =>
+    target === 'templates/squad-heroes/companion/.squad/heroes/companion/scripts/start-work'));
+  assert.ok(marketplace.files.some(({ target }) =>
+    target === 'templates/squad-heroes/companion/.squad/heroes/companion/workflows/heroes-ci.yml'));
+  assert.ok(marketplace.files.some(({ target }) =>
+    target === 'templates/squad-heroes/companion/.squad/heroes/skills/humanizer/de-DE.md'));
+  assert.ok(marketplace.files.some(({ target }) =>
+    target === 'templates/squad-heroes/companion/.squad/heroes/skills/humanizer/en-US.md'));
+  assert.ok(marketplace.files.some(({ target }) =>
+    target === 'templates/squad-heroes/companion/resources/messages.en.json'));
+  assert.ok(marketplace.files.some(({ target }) =>
     target === 'templates/squad-heroes/companion/.squad/heroes/companion-targets.json'));
   assert.ok(marketplace.files.every(({ target }) =>
     !/^\.github\/|^scripts\/|^\.squad\/agents\//u.test(target)));
@@ -104,7 +114,8 @@ test('documentation has parallel chapters and required root entry point', () => 
   assert.match(readme, /docs\/de\/installation\.md/);
   assert.match(readme, /docs\/en\/installation\.md/);
   assert.match(readme, /squad plugin dry-run[\s\S]*companion\/scripts\/install[\s\S]*--dry-run/u);
-  assert.match(readme, /vollständigen Companion-Plan/u);
+  assert.match(readme, /zwei getrennte Pläne/u);
+  assert.match(readme, /vollständige versionierte Distribution/u);
 });
 
 test('installation docs and test plans distinguish plugin and Companion dry-runs', () => {
@@ -118,7 +129,40 @@ test('installation docs and test plans distinguish plugin and Companion dry-runs
     assert.match(testplan, /squad plugin dry-run/u);
     assert.match(testplan, /scripts\/start-work\.mjs/u);
     assert.match(testplan, /\.github\/workflows\/heroes-ci\.yml/u);
+    assert.match(testplan, /templates\/squad-heroes\/companion\/src\/installer/u);
+    assert.match(testplan, /\.squad\/heroes\/companion\/workflows\/heroes-ci\.yml/u);
+    assert.match(testplan, /(?:Plugin-Distributionsplan|plugin distribution plan)/u);
+    assert.match(testplan, /(?:Companion-Aktivierungsplan|Companion activation plan)/u);
   }
+});
+
+test('documentation and runtime copy describe two separate installation phases', () => {
+  const files = [
+    'README.md',
+    'docs/de/installation.md',
+    'docs/de/recovery.md',
+    'docs/de/sicherheit.md',
+    'docs/de/testplan-snake.md',
+    'docs/en/installation.md',
+    'docs/en/recovery.md',
+    'docs/en/security.md',
+    'docs/en/testplan-snake.md',
+    'resources/messages.de.json',
+    'resources/messages.en.json',
+    'scripts/install.mjs',
+    'scripts/plugin-preflight.mjs',
+  ];
+  const content = files.map((file) => readFileSync(path.join(root, file), 'utf8')).join('\n');
+  const stale = [
+    /(?:must|plan).{0,30}only.{0,20}static/u,
+    /ausschlie(?:ß|ss)lich.{0,20}statische Templates/iu,
+    /(?:scripts|Workflows).{0,30}(?:may.{1,3}not.{1,3}appear|dürfen.{1,3}dort.{1,3}nicht.{1,3}erscheinen)/iu,
+    /not (?:the )?complete.{1,5}product plan/iu,
+    /nicht der.{1,5}ständige Produktplan/iu,
+  ];
+  for (const pattern of stale) assert.doesNotMatch(content, pattern);
+  assert.match(content, /templates\/squad-heroes\/companion\//u);
+  assert.match(content, /\.squad\/heroes\/companion\/workflows\/heroes-ci\.yml/u);
 });
 
 test('plugin preflight points directly to the Companion dry-run', () => {
@@ -130,7 +174,8 @@ test('plugin preflight points directly to the Companion dry-run', () => {
       target,
     ], { encoding: 'utf8' });
     assert.equal(result.status, 0, result.stderr);
-    assert.match(result.stdout, /squad plugin dry-run.+static, versioned distribution/u);
+    assert.match(result.stdout, /squad plugin dry-run.+complete versioned distribution/u);
+    assert.match(result.stdout, /templates\/squad-heroes\/companion\//u);
     assert.match(result.stdout, /copied Companion/u);
     assert.match(result.stdout, /templates\/squad-heroes\/companion\/scripts\/install/u);
     assert.match(result.stdout, /--profile typescript-development/u);

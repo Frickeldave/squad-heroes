@@ -3,14 +3,19 @@
 ## Write boundaries
 
 - Plugin lifecycle: only `.squad/plugins/*`, managed by Squad.
-- Plugin content: only the static distribution below
-  `.squad/templates/squad-heroes/companion/`.
-- Companion: only explicitly cataloged active targets.
+- Plugin content: the complete versioned distribution below
+  `.squad/templates/squad-heroes/companion/`, including static copies of
+  installer, runtime, scripts, `.squad/heroes/`, workflows, resources, and
+  Humanizer files.
+- Companion: explicitly cataloged active consumer targets in its separate
+  activation plan.
 - Prompt layers: only `.github/prompts/addon.config.json`.
 
-The same target is never owned concurrently. Plugin lifecycle commands do not
-change active Companion files; the Companion is resolved from the installed
-distribution and never changes its own plugin-managed bundle.
+The same target is never owned concurrently. The plugin distribution plan
+does not directly target root `scripts/`, `.github/prompts/`, or
+`.github/workflows/`. Plugin lifecycle commands do not change active Companion
+files. The Companion is resolved from the installed distribution and never
+changes its own plugin-managed bundle.
 
 ## Permissions and approval
 

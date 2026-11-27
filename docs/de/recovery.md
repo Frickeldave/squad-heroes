@@ -18,13 +18,16 @@ neu installiert. `verify` und `list --json` liefern den nachweisbaren aktuellen
 Stand. Dieser Konfliktschutz gilt nur für Squad-eigene Plugin-Ziele.
 
 Korrupte Dateien unter `.squad/templates/squad-heroes/companion/` werden nach
-`verify` über `squad plugin install` wiederhergestellt; aktive Consumer-Ziele
-werden dadurch nie repariert. Dafür den kopierten Companion separat erneut
-ausführen. Plugin-Uninstall lässt aktive Ziele und `.squad/heroes.json`
-absichtlich bestehen.
+`verify` über `squad plugin install` als vollständige Plugin-Distribution
+wiederhergestellt. Dabei werden Root-`scripts/`, `.github/prompts/` und
+`.github/workflows/` nie direkt installiert oder repariert. Dafür den kopierten
+Companion separat erneut ausführen und seinen Aktivierungsplan prüfen. Ein
+Plugin-Uninstall lässt aktive Ziele und `.squad/heroes.json` absichtlich
+bestehen.
 
-`--dry-run` zeigt alle Operationen und Konflikte. Entscheidungen werden in einer
-JSON-Datei je Zielpfad dokumentiert und mit `--decisions` übergeben:
+Der `--dry-run` des kopierten Companions zeigt alle aktiven Operationen und
+Konflikte. Entscheidungen werden in einer JSON-Datei je aktivem Zielpfad
+dokumentiert und mit `--decisions` übergeben:
 
 ```json
 {

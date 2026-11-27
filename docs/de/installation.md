@@ -2,12 +2,12 @@
 
 ## Architektur
 
-Das Squad-Plugin besitzt nur eine versionierte, statische Distribution unter
-`.squad/templates/squad-heroes/companion/`. Sie enthält Installer,
-endunglose ESM-Laufzeitmodule, Paketmetadaten, Vorlagen, Profile, Agenten,
-lokalisierte Humanizer-Ressourcen, Meldungen, Zielkatalog, Skripte und
-Workflows. Squad 2.0 erfasst und kopiert diese Distribution, führt sie aber nie
-aus.
+Das Squad-Plugin besitzt die vollständige versionierte Distribution unter
+`.squad/templates/squad-heroes/companion/`. Sie enthält den Installer sowie
+statische Quellkopien der Laufzeit unter `src/`, von Skripten, `.squad/heroes/`,
+Workflows, Vorlagen, Ressourcen, lokalisierten Humanizer-Dateien und
+Paketmetadaten. Squad 2.0 erfasst und kopiert diese Distribution, führt sie
+aber nie aus.
 
 Der installierte Companion besitzt seine später ausdrücklich materialisierten
 aktiven Consumer-Ziele. Plugin verify/update/uninstall besitzen, aktualisieren
@@ -38,10 +38,13 @@ squad plugin enable squad-heroes
 squad plugin verify
 ```
 
-Der Squad-Dry-run listet das vollständige statische Paket, einschließlich
+Es gibt zwei Pläne. Der **Plugin-Distributionsplan** listet das vollständige
+versionierte Paket, einschließlich
 `templates/squad-heroes/companion/scripts/install`,
-`templates/squad-heroes/companion/src/installer` und Workflow-/Skriptquellen.
-Direkte aktive Consumer-Pfade dürfen nicht erscheinen.
+`templates/squad-heroes/companion/src/installer`, Skript- und
+Workflowquellen, Ressourcen sowie Humanizer-Dateien. Jedes Ziel bleibt unter
+`templates/squad-heroes/companion/`; aktive Root-Pfade wie `scripts/`,
+`.github/prompts/` oder `.github/workflows/` werden nicht direkt angezielt.
 
 Den kopierten Einstiegspunkt aus dem Consumer aufrufen:
 
@@ -68,10 +71,12 @@ node .squad/templates/squad-heroes/companion/scripts/install \
   --dry-run
 ```
 
-Der Companion-Dry-run muss `scripts/start-work.mjs`,
-`.github/workflows/heroes-ci.yml` und aktive Agent-Charters enthalten. Nach
-Prüfung denselben kopierten Befehl ohne `--dry-run` ausführen. Wiederholung ist
-ein No-op, solange genehmigte Konfiguration und Paketinhalt gleich bleiben.
+Das ist der separate **Companion-Aktivierungsplan**. Er zeigt aktive Ziele wie
+`scripts/start-work.mjs`, `.github/prompts/`,
+`.github/workflows/heroes-ci.yml` und Agent-Dateien. Nach Prüfung denselben
+kopierten Befehl ohne `--dry-run` ausführen. Nur dieser ausdrückliche Lauf
+schreibt aktive Dateien. Wiederholung ist ein No-op, solange genehmigte
+Konfiguration und Paketinhalt gleich bleiben.
 
 ## Root-eigene globale Squad-Installation reparieren
 

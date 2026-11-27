@@ -13,8 +13,8 @@ try {
   const targetRoot = path.resolve(args[targetFlag + 1]);
   assertSquadCompatibility(targetRoot);
   validateManifest(productRoot, parseJsonFile(path.join(productRoot, '.squad/heroes/manifest.json')));
-  console.log('Plugin preflight passed for static marketplace content.');
-  console.log('`squad plugin dry-run <squad-heroes-dir>` shows only the static, versioned distribution.');
+  console.log('Plugin preflight passed for the complete marketplace distribution.');
+  console.log('`squad plugin dry-run <squad-heroes-dir>` shows the complete versioned distribution under templates/squad-heroes/companion/.');
   console.log('After plugin install, inspect active scripts, prompts, workflows, and agents with its copied Companion:');
   console.log(
     `node ${JSON.stringify(path.join(targetRoot, '.squad/templates/squad-heroes/companion/scripts/install'))} ` +

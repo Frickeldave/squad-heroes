@@ -15,7 +15,9 @@ as a substitute for companion materialization, and does not ask for credentials.
 
 This is the Companion plan for active scripts, prompts, workflows, and agent
 targets. \`squad plugin dry-run <squad-heroes-dir>\` is a separate Squad lifecycle
-command that lists only the installed static Companion distribution.
+command that lists the complete versioned Companion distribution below
+templates/squad-heroes/companion/. It does not directly target active consumer
+paths.
 
 Model selection is --model-reqeng/--model-work/--model-review or the persisted
 flow defaults in .squad/heroes.json; there is no fallback.

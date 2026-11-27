@@ -9,18 +9,19 @@ ausgeführter Companion für TypeScript-Projekte.
 
 ## Übersicht
 
-Der Squad-Plugin-Lifecycle verwaltet **nur** die statische, versionierte
-Distribution unter:
+Der Squad-Plugin-Lifecycle verwaltet die vollständige statische, versionierte
+Distribution. Diese liegt unter:
 
 ```text
 .squad/templates/squad-heroes/companion/
 ```
 
 `squad plugin install` kopiert diesen vollständigen Companion in das
-Consumer-Repository. Dazu gehören Installer, Node-Laufzeitmodule, Katalog,
-Profile, Agenten, Prompts, Workflows, Templates, Ressourcen und die
-zweisprachigen Humanizer-Dateien. Der Plugin-Install schreibt oder startet
-nichts Aktives; insbesondere führt er den Companion nicht automatisch aus.
+Consumer-Repository. Dazu gehören Installer und statische Quellen des
+Laufzeitcodes unter `src/` sowie von `scripts/`, `.squad/heroes/`, Workflows,
+Templates, Ressourcen und Humanizer-Dateien. Der Plugin-Install schreibt oder
+startet nichts Aktives; insbesondere führt er den Companion nicht automatisch
+aus.
 Der unterstützte Befehl ist `squad plugin install <local-dir>`.
 
 Squad 2.0.0 lehnt ausführbare Dateiendungen in statischen Plugin-Manifesten
@@ -42,15 +43,22 @@ squad plugin enable squad-heroes
 squad plugin verify
 ```
 
-Der Plugin-Dry-run listet ausschließlich Einträge unter
-`templates/squad-heroes/companion/`. Danach den **kopierten** Companion
-lokalisieren und zuerst prüfen:
+Es gibt zwei getrennte Pläne:
+
+1. Der Plugin-Distributionsplan listet die vollständige versionierte Distribution
+   unter `templates/squad-heroes/companion/`. Das umfasst auch die statischen
+   Quellen für Laufzeitmodule, Skripte, Workflows, Humanizer und Agenten. Er
+   zielt nicht direkt auf aktive Consumer-Pfade wie Root-`scripts/`,
+   `.github/prompts/` oder `.github/workflows/`.
+2. Nach dem Plugin-Install zeigt der **kopierte Companion** in einem separaten
+   Aktivierungs-Dry-run die aktiven Consumer-Ziele:
 
 ```bash
 node .squad/templates/squad-heroes/companion/scripts/install --target "$PWD" --dry-run
 ```
 
-Dieser zweite Lauf zeigt den vollständigen Companion-Plan für aktive Ziele.
+Erst ein ausdrücklicher Lauf dieses kopierten Installers ohne `--dry-run`
+materialisiert aktive Ziele.
 
 In einem Terminal fragt der Wizard nach Profil, Repository, Sprache,
 Deployment-Branches, Review-Baseline, Modellen und optionalem Board-Sync.
@@ -91,8 +99,8 @@ squad plugin install /pfad/zum/neueren/squad-heroes &&
 squad plugin verify
 ```
 
-Das aktualisiert ausschließlich das verwaltete Bundle. Aktive Companion-Ziele
-bleiben unverändert. Erst ein expliziter erneuter Aufruf des lokal kopierten
+Das aktualisiert das verwaltete Bundle. Aktive Companion-Ziele bleiben
+unverändert. Erst ein expliziter erneuter Aufruf des lokal kopierten
 Companions aktualisiert diese Ziele:
 
 ```bash

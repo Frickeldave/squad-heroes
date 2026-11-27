@@ -2,11 +2,11 @@
 
 ## Architecture
 
-The Squad plugin owns only a versioned, static distribution below
-`.squad/templates/squad-heroes/companion/`. It contains the installer, extensionless
-ESM runtime modules, package metadata, templates, profiles, agents, localized
-Humanizer resources, messages, active-target catalog, scripts and workflows.
-Squad 2.0 records and copies this distribution but never executes it.
+The Squad plugin owns the complete versioned distribution below
+`.squad/templates/squad-heroes/companion/`. It contains the installer; static
+source copies of the `src/` runtime, scripts, `.squad/heroes/` data, workflows,
+templates, resources, localized Humanizer files, and package metadata. Squad
+2.0 records and copies this distribution but never executes it.
 
 The installed Companion owns the active consumer targets it materializes after
 an explicit, separate invocation. Plugin verification/update/uninstall therefore
@@ -37,10 +37,13 @@ squad plugin enable squad-heroes
 squad plugin verify
 ```
 
-The Squad dry-run lists the complete static package, including
+There are two plans. The first is the **plugin distribution plan**. The Squad
+dry-run lists the complete versioned package, including
 `templates/squad-heroes/companion/scripts/install`,
-`templates/squad-heroes/companion/src/installer` and packaged workflow/script
-sources. It must not list direct active consumer paths.
+`templates/squad-heroes/companion/src/installer`, packaged script and workflow
+sources, resources, and Humanizer files. Every target remains below
+`templates/squad-heroes/companion/`; the plan does not directly target active
+root `scripts/`, `.github/prompts/`, or `.github/workflows/`.
 
 Invoke the copied entry point from the consumer:
 
@@ -67,10 +70,11 @@ node .squad/templates/squad-heroes/companion/scripts/install \
   --dry-run
 ```
 
-The Companion dry-run must include `scripts/start-work.mjs`,
-`.github/workflows/heroes-ci.yml` and active agent charters. Review it, then run
-the same copied command without `--dry-run`. A repeated invocation is a no-op
-unless approved configuration or package content changed.
+This is the **Companion activation plan**. It must separately include active
+`scripts/start-work.mjs`, `.github/prompts/`, `.github/workflows/heroes-ci.yml`
+and agent targets. Review it, then run the same copied command without
+`--dry-run`. Only that explicit human run writes active files. A repeated
+invocation is a no-op unless approved configuration or package content changed.
 
 ## Repairing a root-owned global Squad installation
 
@@ -95,7 +99,7 @@ Do not use `sudo squad`, recursive `chmod`, or
 
 ## Upgrade
 
-There is no supported `plugin update` command. Update the static distribution
+There is no supported `plugin update` command. Update the versioned distribution
 by installing a newer checkout:
 
 ```bash

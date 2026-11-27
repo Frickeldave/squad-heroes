@@ -101,7 +101,8 @@ test('fresh dry-run plans plugin and companion separately without mutation', () 
       process.stdout.write = originalWrite;
     }
     const output = writes.join('');
-    assert.match(output, /separate plan/u);
+    assert.match(output, /activation plan/u);
+    assert.match(output, /complete versioned distribution/u);
     assert.match(output, /scripts\/start-work\.mjs/u);
     assert.match(output, /\.github\/workflows\/heroes-ci\.yml/u);
   } finally {

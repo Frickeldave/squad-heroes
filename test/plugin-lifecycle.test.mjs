@@ -99,8 +99,10 @@ for (const fixtureId of [1, 2]) test(`real Squad lifecycle uses an installed sel
     const pluginDryRun = mustRun(root, ['dry-run', product]);
     assert.match(pluginDryRun.stdout, /templates\/squad-heroes\/companion\/scripts\/install/u);
     assert.match(pluginDryRun.stdout, /templates\/squad-heroes\/companion\/src\/installer/u);
+    assert.match(pluginDryRun.stdout, /templates\/squad-heroes\/companion\/\.squad\/heroes\/companion\/scripts\/start-work/u);
     assert.match(pluginDryRun.stdout, /templates\/squad-heroes\/companion\/\.squad\/heroes\/companion\/workflows\/heroes-ci\.yml/u);
-    assert.doesNotMatch(pluginDryRun.stdout, /(^|\s)target: scripts\/start-work\.mjs| → \.github\/workflows/u);
+    assert.match(pluginDryRun.stdout, /templates\/squad-heroes\/companion\/\.squad\/heroes\/skills\/humanizer\/en-US\.md/u);
+    assert.doesNotMatch(pluginDryRun.stdout, /(?:^|\n)\s*(?:scripts\/|\.github\/prompts\/|\.github\/workflows\/)/u);
 
     mustRun(root, ['install', product]);
     assert.equal(existsSync(installedEntry), true);
@@ -109,6 +111,7 @@ for (const fixtureId of [1, 2]) test(`real Squad lifecycle uses an installed sel
 
     const companionDryRun = mustRunCompanion(root, ['--dry-run']);
     assert.match(companionDryRun.stdout, /scripts\/start-work\.mjs/u);
+    assert.match(companionDryRun.stdout, /\.github\/prompts\/startwork\.prompt\.md/u);
     assert.match(companionDryRun.stdout, /\.github\/workflows\/heroes-ci\.yml/u);
     assert.match(companionDryRun.stdout, /\.squad\/agents\/tony\/charter\.md/u);
     assert.equal(existsSync(activeScript), false);

@@ -17,13 +17,15 @@ review. `verify` and `list --json` expose the authoritative state. This guard
 applies only to Squad-owned plugin targets.
 
 If installed files under `.squad/templates/squad-heroes/companion/` are
-corrupt, restore them through `squad plugin install` after `verify`; never
-repair the active consumer targets from that operation. Re-run the copied
-Companion separately to update active targets. Plugin uninstall intentionally
-leaves active targets and `.squad/heroes.json` in place.
+corrupt, restore the complete plugin distribution through `squad plugin install`
+after `verify`; that operation never installs root `scripts/`,
+`.github/prompts/`, or `.github/workflows/`. Re-run the copied Companion
+separately to review its activation plan and update those active targets.
+Plugin uninstall intentionally leaves active targets and `.squad/heroes.json`
+in place.
 
-`--dry-run` shows every operation and conflict. Record one decision per target in
-JSON and pass it with `--decisions`:
+The copied Companion's `--dry-run` shows every active operation and conflict.
+Record one decision per active target in JSON and pass it with `--decisions`:
 
 ```json
 {
