@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
-import { applyPlan, buildInstallPlan, printPlan } from '../src/installer.mjs';
+import { applyPlan, buildInstallPlan, parseInstallArguments, printPlan } from '../src/installer.mjs';
 import {
   assertGithubWriteAccess,
   resolveBoardProject,
@@ -31,6 +31,7 @@ const injected = {
     if (args[0] === 'api' && args[1].startsWith('repos/')) {
       return commandResult('{"pull":true,"push":true,"admin":false,"triage":false}\n');
     }
+    if (args[0] === 'project' && args[1] === 'list') return commandResult('{"projects":[]}\n');
     return commandResult();
   },
 };
@@ -51,6 +52,7 @@ test('interactive Companion wizard collects required and opt-in configuration', 
   const asked = [];
   const selected = [];
   const ghCalls = [];
+  const events = [];
   const completed = await completeInteractiveOptions({
     profile: null,
     repository: null,
@@ -61,15 +63,18 @@ test('interactive Companion wizard collects required and opt-in configuration', 
     boardSync: false,
     board: {},
   }, null, async (label, fallback) => {
+    events.push(`ask:${label}`);
     asked.push(label);
     return answers.get(label) || fallback;
   }, async (label, choices, current) => {
+    events.push(`choose:${label}`);
     selected.push({ label, choices, current });
     assert.ok(choices.includes(current));
     return current;
   }, {
     spawn(command, args) {
       ghCalls.push([command, ...args]);
+      events.push(`run:${command} ${args.join(' ')}`);
       if (command === 'copilot') {
         return commandResult('  `model`: AI model\n    - "mai-code-2"\n    - "claude-sonnet-5.5"\n    - "gpt-6.1-terra"\n\n  `next`: x\n');
       }
@@ -120,6 +125,100 @@ test('interactive Companion wizard collects required and opt-in configuration', 
   assert.ok(!asked.includes('Project owner'));
   assert.ok(!asked.includes('Project number'));
   assert.ok(ghCalls.some((call) => call.slice(1, 3).join(' ') === 'project list'));
+  const firstPrompt = events.findIndex((event) => event.startsWith('ask:') || event.startsWith('choose:'));
+  const promptAfterRepository = events.findIndex(
+    (event, index) => index > firstPrompt && (event.startsWith('ask:') || event.startsWith('choose:'))
+  );
+  assert.ok(events.findIndex((event) => event === 'run:gh auth status --hostname github.com') < firstPrompt);
+  assert.ok(events.findIndex((event) => event === 'run:gh api user --jq .login') < firstPrompt);
+  assert.equal(events[firstPrompt], 'ask:GitHub repository (owner/name)');
+  assert.ok(events.findIndex((event) => event === 'run:gh api repos/owner/repository --jq .permissions')
+    < promptAfterRepository);
+  assert.ok(events.findIndex((event) => event.startsWith('run:gh project list --owner owner'))
+    < promptAfterRepository);
+  assert.equal(ghCalls.filter((call) => call.slice(1, 3).join(' ') === 'project list').length, 1);
+});
+
+test('missing Project scope stops before any wizard prompt or menu', async () => {
+  let promptCalls = 0;
+  let menuCalls = 0;
+  const calls = [];
+  await assert.rejects(() => completeInteractiveOptions({
+    profile: 'typescript-development',
+    repository: 'owner/repository',
+    language: 'en',
+    branches: ['main'],
+    models: { reqeng: 'mai-code-2', work: 'claude-sonnet-5.5', review: 'gpt-6.1-terra' },
+    explicitModels: { reqeng: true, work: true, review: true },
+    boardSync: false,
+    board: {},
+  }, null, async () => {
+    promptCalls += 1;
+    return '';
+  }, async () => {
+    menuCalls += 1;
+    return '';
+  }, {
+    spawn(command, args) {
+      calls.push([command, ...args]);
+      if (args[0] === 'auth') return commandResult();
+      if (args[0] === 'api' && args[1] === 'user') return commandResult('octocat\n');
+      if (args[0] === 'api' && args[1].startsWith('repos/')) {
+        return commandResult('{"pull":true,"push":true}\n');
+      }
+      if (args[0] === 'project' && args[1] === 'list') {
+        return { status: 1, stdout: '', stderr: 'requires read:project scope' };
+      }
+      return commandResult();
+    },
+  }), (error) => error.details.category === 'project_scope');
+  assert.equal(promptCalls, 0);
+  assert.equal(menuCalls, 0);
+  assert.deepEqual(calls.map((call) => call.slice(1, 3).join(' ')), [
+    'auth status',
+    'api user',
+    'api repos/owner/repository',
+    'project list',
+  ]);
+});
+
+test('explicit full flags with board off preflight before the remaining prompt', async () => {
+  const parsed = parseInstallArguments([
+    '--repository', 'owner/repository',
+    '--profile', 'typescript-development',
+    '--language', 'en',
+    '--deployment-branches', '1',
+    '--deployment-branch-1', 'main',
+    '--model-reqeng', 'mai-code-2',
+    '--model-work', 'claude-sonnet-5.5',
+    '--model-review', 'gpt-6.1-terra',
+    '--disable-board-sync',
+  ]);
+  const events = [];
+  const completed = await completeInteractiveOptions(parsed, null, async (label, fallback) => {
+    events.push(`ask:${label}`);
+    return fallback;
+  }, async (label) => {
+    events.push(`choose:${label}`);
+    throw new Error('explicit model flags must not render a menu');
+  }, {
+    spawn(command, args) {
+      events.push(`run:${command} ${args.join(' ')}`);
+      if (command === 'copilot') return { status: 1, stdout: '', stderr: '' };
+      if (args[0] === 'api' && args[1] === 'user') return commandResult('octocat\n');
+      if (args[0] === 'api' && args[1].startsWith('repos/')) {
+        return commandResult('{"pull":true,"push":true}\n');
+      }
+      if (args[0] === 'project' && args[1] === 'list') return commandResult('{"projects":[]}\n');
+      return commandResult();
+    },
+  });
+  assert.equal(completed.boardSync, false);
+  assert.equal(events.some((event) => event === 'ask:Enable optional Project board sync (y/N)'), false);
+  assert.equal(events.some((event) => event.startsWith('choose:')), false);
+  const projectProbe = events.findIndex((event) => event.startsWith('run:gh project list --owner owner'));
+  assert.ok(projectProbe >= 0);
+  assert.ok(projectProbe < events.findIndex((event) => event.startsWith('ask:')));
 });
 
 test('interactive German model labels and discovery fallback are explicit', async () => {
@@ -150,6 +249,7 @@ test('interactive German model labels and discovery fallback are explicit', asyn
         if (args[0] === 'api' && args[1].startsWith('repos/')) {
           return commandResult('{"pull":true,"push":true}\n');
         }
+        if (args[0] === 'project' && args[1] === 'list') return commandResult('{"projects":[]}\n');
         return commandResult();
       },
     });
@@ -240,7 +340,7 @@ test('arrow-key picker fails closed when no TTY is available', () => {
   assert.equal(terminal.writes.length, 0);
 });
 
-test('non-TTY initial wizard fails closed with explicit model flags guidance', () => {
+test('non-TTY startup performs repository preflight before model flag validation', () => {
   const result = spawnSync(process.execPath, [
     path.join(productRoot, 'scripts/install.mjs'),
     '--target', process.cwd(),
@@ -252,7 +352,8 @@ test('non-TTY initial wizard fails closed with explicit model flags guidance', (
     '--dry-run',
   ], { encoding: 'utf8' });
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /--model-reqeng.*--model-work.*--model-review/u);
+  assert.match(result.stderr, /Repository check failed/u);
+  assert.doesNotMatch(result.stderr, /--model-reqeng.*--model-work.*--model-review/u);
   assert.doesNotMatch(result.stdout, /Select 1-/u);
 });
 
@@ -385,6 +486,9 @@ test('dry-run board opt-in uses only read checks and writes no active targets', 
         if (args[0] === 'project' && args[1] === 'view') {
           return commandResult(JSON.stringify({ number: 7 }));
         }
+        if (args[0] === 'project' && args[1] === 'list') {
+          return commandResult(JSON.stringify({ projects: [{ number: 7, title: 'Snake' }] }));
+        }
         if (args[0] === 'api' && args[1].startsWith('repos/')) {
           return commandResult('{"pull":true,"push":true}\n');
         }
@@ -415,6 +519,7 @@ test('Project access failure blocks board installation before its first write', 
     }, {
       spawn(command, args) {
         if (args[0] === 'api' && args[1] === 'user') return commandResult('octocat\n');
+        if (args[0] === 'project' && args[1] === 'list') return commandResult('{"projects":[]}\n');
         if (args[0] === 'project' && args[1] === 'view') {
           return { status: 1, stdout: '', stderr: 'forbidden' };
         }
@@ -424,6 +529,46 @@ test('Project access failure blocks board installation before its first write', 
         return commandResult();
       },
     }), /Project access failed/u);
+    assert.equal(existsSync(path.join(root, '.squad/heroes.json')), false);
+  } finally {
+    cleanup(root);
+  }
+});
+
+test('mutating board installation rechecks Project access immediately before writes', () => {
+  const root = fixture();
+  let views = 0;
+  let denyProject = false;
+  const gate = {
+    spawn(command, args) {
+      if (args[0] === 'api' && args[1] === 'user') return commandResult('octocat\n');
+      if (args[0] === 'api' && args[1].startsWith('repos/')) {
+        return commandResult('{"pull":true,"push":true}\n');
+      }
+      if (args[0] === 'project' && args[1] === 'list') return commandResult('{"projects":[]}\n');
+      if (args[0] === 'project' && args[1] === 'view') {
+        views += 1;
+        return denyProject
+          ? { status: 1, stdout: '', stderr: 'forbidden' }
+          : commandResult(JSON.stringify({ number: 9 }));
+      }
+      return commandResult();
+    },
+  };
+  try {
+    const plan = buildInstallPlan(root, {
+      ...options,
+      boardSync: true,
+      board: {
+        number: 9,
+        statusField: 'Status',
+        statusMap: { 'go:yes': 'Ready' },
+        secret: 'secrets.HEROES_PROJECT_TOKEN',
+      },
+    }, gate);
+    denyProject = true;
+    assert.throws(() => applyPlan(root, plan, {}, gate), /Project access failed/u);
+    assert.equal(views, 2);
     assert.equal(existsSync(path.join(root, '.squad/heroes.json')), false);
   } finally {
     cleanup(root);

@@ -20,11 +20,17 @@ Der Companion verlangt genau einen stabilen Squad-Marker
 Er prüft ihn vor der Planung und erneut vor dem Schreiben. Fehlende, doppelte,
 ungültige, Prerelease- oder ältere Marker stoppen mit Exitcode 2.
 
-Zusätzlich müssen `gh auth status`, authentifizierter Account-Zugriff sowie
-nicht-mutierende Repository-Lese- und Push-Rechteprüfungen erfolgreich sein.
-Bei Board-Opt-in wird vor der Planung zusätzlich der GitHub-Project-Lesezugriff
-bewiesen. Der Companion fragt weder Token ab noch akzeptiert oder
-persistiert er sie. Eine zu alte Squad-Version wird mit dem unten beschriebenen
+Zusätzlich werden beim Start `gh`, Host-Authentifizierung, authentifizierter
+Account und nicht-mutierende Repository-Lese-/Push-Rechte geprüft. Danach wird
+für den aus dem Repository abgeleiteten Project-Owner eine ausschließlich
+lesende `read:project`-Prüfung ausgeführt und sicher zwischengespeichert. Alle
+GitHub-Prüfungen erfolgen vor Profil-, Repository-, Modell-, Sprach-, Branch-,
+Review-Baseline- oder Project-Auswahl. Fehlt das Repository, folgt auf die
+Authentifizierung ausschließlich die unvermeidliche Repository-Abfrage. Dieser
+Project-Lesezugriff ist für jeden vollständigen Wizard-/Installationsfluss
+verpflichtend, auch wenn Board-Sync anschließend deaktiviert bleibt. Der
+Companion fragt weder Token ab noch akzeptiert oder persistiert er sie. Eine zu
+alte Squad-Version wird mit dem unten beschriebenen
 normalen Upgrade-Fluss repariert; Squad selbst nie mit `sudo` ausführen.
 
 ## Erstinstallation

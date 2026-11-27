@@ -14,6 +14,7 @@ const injected = {
     if (args[0] === 'api' && args[1].startsWith('repos/')) {
       return commandResult('{"pull":true,"push":true,"admin":false,"triage":false}\n');
     }
+    if (args[0] === 'project' && args[1] === 'list') return commandResult('{"projects":[]}\n');
     return commandResult();
   },
 };

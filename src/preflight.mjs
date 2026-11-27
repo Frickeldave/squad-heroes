@@ -117,16 +117,15 @@ function assertGhInstalled(result, options) {
   }
 }
 
-export function assertGithubWriteAccess(repository, options = {}) {
-  const slug = repositoryParts(repository).slug;
+export function assertGithubAuthentication(options = {}) {
   const auth = run('gh', ['auth', 'status', '--hostname', GITHUB_HOST], options);
   assertGhInstalled(auth, options);
   if (auth.status !== 0) {
     stop('auth_failed', options, 'gh_auth_failed', {
       host: GITHUB_HOST,
       summary: safeStatusSummary(auth),
-      repository: slug,
-    }, { summary: safeStatusSummary(auth), repository: slug });
+      repository: options.repository ?? 'not selected yet',
+    }, { summary: safeStatusSummary(auth), repository: options.repository });
   }
   const account = run('gh', ['api', 'user', '--jq', '.login'], options);
   assertGhInstalled(account, options);
@@ -135,8 +134,8 @@ export function assertGithubWriteAccess(repository, options = {}) {
     stop('auth_failed', options, 'gh_auth_failed', {
       host: GITHUB_HOST,
       summary: safeStatusSummary(account),
-      repository: slug,
-    }, { summary: safeStatusSummary(account), repository: slug });
+      repository: options.repository ?? 'not selected yet',
+    }, { summary: safeStatusSummary(account), repository: options.repository });
   }
   const expectedAccount = safeGhAccount(options.expectedAccount);
   if (options.expectedAccount && !expectedAccount) {
@@ -150,11 +149,20 @@ export function assertGithubWriteAccess(repository, options = {}) {
     fail('gh_account_mismatch', diagnostic(options, 'gh_account_mismatch', {
       active: login,
       expected: expectedAccount,
-      repository: slug,
+      repository: options.repository ?? 'not selected yet',
       host: GITHUB_HOST,
     }), { category: 'account_mismatch', host: GITHUB_HOST, activeAccount: login, expectedAccount });
   }
+  return { account: login, host: GITHUB_HOST };
+}
 
+export function assertGithubRepositoryAccess(repository, options = {}) {
+  const slug = repositoryParts(repository).slug;
+  const authentication = options.authentication ?? assertGithubAuthentication({
+    ...options,
+    repository: slug,
+  });
+  const login = authentication.account;
   const verification = run('gh', ['api', `repos/${slug}`, '--jq', '.permissions'], options);
   assertGhInstalled(verification, options);
   if (verification.status !== 0) {
@@ -226,6 +234,10 @@ export function assertGithubWriteAccess(repository, options = {}) {
     host: GITHUB_HOST,
     ...safePermissions,
   };
+}
+
+export function assertGithubWriteAccess(repository, options = {}) {
+  return assertGithubRepositoryAccess(repository, options);
 }
 
 export function discoverModels(options = {}) {
@@ -302,7 +314,7 @@ export function resolveBoardProject(repository, board = {}, options = {}) {
       fail('project_number', `Project number "${configured}" is invalid; select an available GitHub Project.`);
     }
   } else {
-    const candidates = listBoardProjects(repository, options);
+    const candidates = options.projectCatalog ?? listBoardProjects(repository, options);
     if (candidates.length === 0) {
       fail('project_missing', `No GitHub Project is available for "${owner}". Create or share a Project with the authenticated account, then rerun after granting the required Project scopes. No mutation was started.`);
     }
@@ -315,21 +327,39 @@ export function resolveBoardProject(repository, board = {}, options = {}) {
   if (!Number.isInteger(number) || number <= 0) {
     fail('project_number', 'The selected GitHub Project does not have a valid project number.');
   }
-  const viewed = run('gh', [
-    'project', 'view', String(number), '--owner', owner, '--format', 'json',
-  ], options);
-  if (viewed.status !== 0) {
-    assertGhInstalled(viewed, options);
-    projectScopeFailure(owner, repository, options, viewed, number);
-  }
-  try {
-    const value = JSON.parse(String(viewed.stdout));
-    if (Number(value.number ?? number) !== number) throw new Error('number mismatch');
-  } catch {
-    fail('gh_project', `GitHub Project #${number} for "${owner}" returned an invalid response. No mutation was started.`);
+  const cached = options.projectCatalog?.find((candidate) => Number(candidate?.number) === number);
+  if (!cached) {
+    const viewed = run('gh', [
+      'project', 'view', String(number), '--owner', owner, '--format', 'json',
+    ], options);
+    if (viewed.status !== 0) {
+      assertGhInstalled(viewed, options);
+      projectScopeFailure(owner, repository, options, viewed, number);
+    }
+    try {
+      const value = JSON.parse(String(viewed.stdout));
+      if (Number(value.number ?? number) !== number) throw new Error('number mismatch');
+    } catch {
+      fail('gh_project', `GitHub Project #${number} for "${owner}" returned an invalid response. No mutation was started.`);
+    }
   }
   board.number = number;
   return { ...board, owner, number };
+}
+
+export function preflightGithubAccess(repository, options = {}) {
+  const authentication = options.authentication ?? assertGithubAuthentication(options);
+  const access = assertGithubRepositoryAccess(repository, {
+    ...options,
+    authentication,
+    repository,
+  });
+  const projects = listBoardProjects(repository, {
+    ...options,
+    repository,
+    account: access.account,
+  });
+  return { ...access, projects };
 }
 
 export function assertReviewBaseline(repoRoot, baseline, options = {}) {

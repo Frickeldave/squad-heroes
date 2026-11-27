@@ -177,15 +177,21 @@ node .squad/templates/squad-heroes/companion/scripts/install \
   --dry-run
 ```
 
-Require approved model IDs and complete noninteractive inputs. Verify dry-run
-performs only `gh auth status`, authenticated-account/repository permission
-queries and, when opted in, Project read queries. Expect the
+Require approved model IDs and complete noninteractive inputs. Verify startup
+checks `gh`, authentication/account, repository read/push permissions, and the
+derived owner's Project read access, in that order and before every prompt,
+menu renderer, readline/raw-terminal selection, model discovery, or plan output.
+The Project read probe is required even when board sync remains off and is
+cached for later selection. Missing Project scope must produce zero prompt/menu
+calls. Expect the
 separate **Companion activation plan** to show `scripts/start-work.mjs`, other
 `scripts/` targets, `.github/prompts/`, and
 `.github/workflows/heroes-ci.yml`. It performs no writes, passes both version
 gates, avoids credential prompts, and keeps plugin/Companion ownership separate.
 
-Also run the installer on a TTY once without model flags. Confirm the labels
+Also run the installer on a TTY once without model flags. If repository is
+missing, only that one prompt may occur after auth and before repository/Project
+checks. Confirm the labels
 `Default model for reqeng/work/review` use an in-place picker: Up/Down or `j`/`k`
 moves, Enter confirms, Escape/`q` aborts, and typed numbers or arbitrary text
 cannot select an item. The displayed current value is highlighted and is the

@@ -187,15 +187,21 @@ node .squad/templates/squad-heroes/companion/scripts/install \
 ```
 
 Vorbedingungen: freigegebene Modell-IDs und vollständige nicht-interaktive
-Eingaben liegen vor. Prüfen, dass Dry-run nur `gh auth status`,
-Account-/Repository-Rechteabfragen und bei Opt-in lesende Project-Abfragen
-ausführt. Erwartet: der separate **Companion-Aktivierungsplan**
+Eingaben liegen vor. Prüfen, dass der Start `gh`, Authentifizierung/Account,
+Repository-Lese-/Push-Rechte und den lesenden Project-Zugriff des abgeleiteten
+Owners in dieser Reihenfolge vor jedem Prompt, Menü-Renderer,
+Readline-/Raw-Terminal-Auswahl, Modell-Discovery oder Planausgabe prüft. Die
+Project-Leseprüfung ist auch bei deaktiviertem Board-Sync verpflichtend und wird
+für die spätere Auswahl zwischengespeichert. Fehlender Project-Scope muss null
+Prompt-/Menü-Aufrufe erzeugen. Erwartet: der separate **Companion-Aktivierungsplan**
 zeigt `scripts/start-work.mjs`, weitere `scripts/`-Ziele, `.github/prompts/` und
 `.github/workflows/heroes-ci.yml`. Er verursacht keine Writes, passiert beide
 Version-Gates, fordert keinen Token an und hält Plugin-/Companion-Ownership
 getrennt.
 
-Den Installer zusätzlich einmal auf einem TTY ohne Modell-Flags starten.
+Den Installer zusätzlich einmal auf einem TTY ohne Modell-Flags starten. Fehlt
+das Repository, darf nach Authentifizierung nur dessen unvermeidliche Abfrage
+vor den Repository-/Project-Prüfungen erscheinen.
 `Standardmodell für reqeng/work/review` müssen In-place-Picker sein: Hoch/Runter
 oder `j`/`k` bewegen, Enter bestätigt, Escape/`q` bricht ab. Eingegebene Zahlen
 oder beliebiger Freitext dürfen nichts auswählen. Der angezeigte aktuelle Wert

@@ -4,6 +4,7 @@ import {
   assertSquadCompatibility,
   assertGithubWriteAccess,
   assertReviewBaseline,
+  preflightGithubAccess,
   resolveBoardProject,
 } from './preflight';
 import { buildHeroesConfig, validateHeroesConfig } from './config';
@@ -22,6 +23,7 @@ export function parseInstallArguments(argv) {
     dryRun: false,
     verify: false,
     boardSync: false,
+    boardSyncExplicit: false,
     board: {},
     repository: null,
     expectedAccount: null,
@@ -35,7 +37,14 @@ export function parseInstallArguments(argv) {
     const arg = argv[index];
     if (arg === '--dry-run') options.dryRun = true;
     else if (arg === '--verify') options.verify = true;
-    else if (arg === '--enable-board-sync') options.boardSync = true;
+    else if (arg === '--enable-board-sync') {
+      options.boardSync = true;
+      options.boardSyncExplicit = true;
+    }
+    else if (arg === '--disable-board-sync') {
+      options.boardSync = false;
+      options.boardSyncExplicit = true;
+    }
     else if (arg === '--project-owner') options.board.owner = argv[++index];
     else if (arg === '--project-number') options.board.number = argv[++index];
     else if (arg === '--project-status-field') options.board.statusField = argv[++index];
@@ -177,7 +186,10 @@ export function buildInstallPlan(repoRoot, options = {}, injected = {}) {
     existing?.language,
     options.locale ?? process.env.LANG
   ).language;
-  const access = assertGithubWriteAccess(accessRepository, {
+  const cachedAccess = injected.githubPreflight?.repository === accessRepository
+    ? injected.githubPreflight
+    : null;
+  const access = cachedAccess ?? preflightGithubAccess(accessRepository, {
     ...injected,
     language,
     expectedAccount: options.expectedAccount ?? injected.expectedAccount,
@@ -186,6 +198,7 @@ export function buildInstallPlan(repoRoot, options = {}, injected = {}) {
     ...injected,
     language,
     account: access.account,
+    projectCatalog: access.projects,
   });
   const reviewBaseline = assertReviewBaseline(
     repoRoot,
@@ -217,7 +230,7 @@ export function buildInstallPlan(repoRoot, options = {}, injected = {}) {
               boardSync: true,
               board: options.board,
             }).extensions
-          : existing.extensions,
+          : options.boardSyncExplicit ? {} : existing.extensions,
         ...(reviewBaseline ? { reviewBaseline } : {}),
       })
     : buildHeroesConfig({

@@ -16,7 +16,7 @@
   "picker_current": "(aktuell)",
   "picker_cancelled": "Auswahl abgebrochen; es wurden keine Änderungen vorgenommen.",
   "picker_tty_required": "Interaktive Auswahl benötigt ein TTY. Für nicht-interaktive Nutzung die Installations-Flags angeben, einschließlich --model-reqeng, --model-work, --model-review und bei Board-Sync --project-number.",
-  "github_access_verified": "Host-GitHub-Anmeldung und Repository-Zugriff für {account} wurden geprüft.",
+  "github_access_verified": "GitHub-Host-Anmeldung, Repository-Rechte und Project-Lesezugriff für {account} wurden geprüft.",
   "github_project": "GitHub-Project",
   "gh_cli_missing": "GitHub-Preflight fehlgeschlagen. Host: {host}. Aktiver gh-Account: nicht verfügbar. `gh` fehlt. GitHub CLI installieren, dann `gh auth login --hostname github.com --web` ausführen und erneut versuchen. Prüfung beginnt mit `gh auth status --hostname github.com`. Keine Mutation gestartet.",
   "gh_auth_failed": "GitHub-Authentifizierung fehlgeschlagen. Host: {host}. Aktiver gh-Account: nicht verfügbar. Repository: {repository}. Ergebnis: {summary}. `gh auth status --hostname github.com` ausführen, danach `gh auth login --hostname github.com --web` mit dem Browser-/Device-Flow. Keine Tokens werden akzeptiert oder ausgegeben. Keine Mutation gestartet.",

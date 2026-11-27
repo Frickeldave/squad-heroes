@@ -19,10 +19,15 @@ The Companion requires one stable Squad marker `<!-- version: X.Y.Z -->` in
 planning and again before writing. Missing, duplicate, invalid, prerelease and
 older markers stop with exit code 2.
 
-The Companion also requires successful `gh auth status`, authenticated account
-access, and non-mutating repository read/push permission queries. When board sync
-is selected it additionally proves GitHub Project read access before planning.
-It never requests, accepts or persists a token. An unsupported
+The Companion checks `gh`, host authentication, the authenticated account, and
+non-mutating repository read/push permissions at startup. It then performs a
+read-only `read:project` probe for the Project owner derived from the repository
+and caches that result. All GitHub checks happen before profile, repository,
+model, language, branch, review-baseline, or Project-choice menus. When the
+repository is absent, only its unavoidable prompt follows authentication. This
+Project read capability is required for every full wizard/install flow, even if
+board sync is later left disabled. The Companion never requests, accepts or
+persists a token. An unsupported
 Squad version must be repaired with the normal-user upgrade flow described
 below; never run Squad itself with `sudo`.
 

@@ -4,10 +4,11 @@ import { existsSync, readFileSync } from 'node:fs';
 import { applyPlan, buildInstallPlan, parseInstallArguments, printPlan } from '../src/installer';
 import { HeroesError, INCOMPATIBLE_SQUAD_EXIT } from '../src/errors';
 import {
-  assertGithubWriteAccess,
+  assertGithubAuthentication,
+  assertSquadCompatibility,
   assertReviewBaseline,
   discoverModels,
-  listBoardProjects,
+  preflightGithubAccess,
   resolveBoardProject,
 } from '../src/preflight';
 import { resolveLanguage, supportedLanguage, translate } from '../src/messages';
@@ -35,7 +36,9 @@ available.
 
 With --enable-board-sync, Project owner is derived from --repository. Project
 number is discovered and validated read-only; CI may use --project-number for a
-deterministic validated override. No token is accepted.
+deterministic validated override. Use --disable-board-sync to make the board-off
+choice explicit without a prompt. The startup Project read probe remains
+required. No token is accepted.
 `;
 
 function existingOptions(target) {
@@ -50,16 +53,25 @@ function wizardText(language, id) {
 
 export async function completeInteractiveOptions(options, existing, ask, choose, injected = {}) {
   if (!choose) throw new Error('Interactive selection requires a menu implementation');
-  options.repository ??= await ask('GitHub repository (owner/name)', existing?.repository ?? '');
   const preliminaryLanguage = supportedLanguage(
     options.language ?? existing?.language ?? process.env.LANG
   ) ?? 'en';
-  const repositoryAccess = assertGithubWriteAccess(options.repository, {
+  const authentication = assertGithubAuthentication({
     ...injected,
     language: preliminaryLanguage,
+    repository: options.repository ?? existing?.repository,
     expectedAccount: options.expectedAccount ?? injected.expectedAccount,
   });
-  process.stdout.write(`${wizardText(preliminaryLanguage, 'github_access_verified').replace('{account}', repositoryAccess.account)}\n`);
+  options.repository ??= await ask('GitHub repository (owner/name)', existing?.repository ?? '');
+  const repositoryAccess = preflightGithubAccess(options.repository, {
+    ...injected,
+    language: preliminaryLanguage,
+    authentication,
+    expectedAccount: options.expectedAccount ?? injected.expectedAccount,
+  });
+  options.githubPreflight = repositoryAccess;
+  process.stdout.write(`${wizardText(preliminaryLanguage, 'github_access_verified')
+    .replace('{account}', repositoryAccess.account)}\n`);
 
   options.profile ??= await ask('Project profile', existing?.profile ?? 'typescript-development');
   if (!['typescript-development', 'TypeScript Development'].includes(options.profile)) {
@@ -94,20 +106,17 @@ export async function completeInteractiveOptions(options, existing, ask, choose,
   ) || undefined;
   options.reviewBaseline = assertReviewBaseline(resolve(options.target ?? process.cwd()), options.reviewBaseline, injected);
 
-  if (!options.boardSync) {
+  if (!options.boardSync && !options.boardSyncExplicit) {
     const current = existing?.extensions?.['board-sync'];
     const enable = (await ask('Enable optional Project board sync (y/N)', current ? 'y' : 'N')).toLowerCase();
     options.boardSync = ['y', 'yes'].includes(enable);
+    options.boardSyncExplicit = true;
   }
   if (options.boardSync) {
     const current = existing?.extensions?.['board-sync'];
     const configuredNumber = options.board.number ?? current?.number;
     if (configuredNumber === undefined || configuredNumber === null || configuredNumber === '') {
-      const projects = listBoardProjects(options.repository, {
-        ...injected,
-        language,
-        account: repositoryAccess.account,
-      });
+      const projects = repositoryAccess.projects;
       if (projects.length > 1) {
         const labels = projects.map((project) =>
           `${project.number} — ${project.title ?? project.name ?? 'Project'}`
@@ -125,6 +134,7 @@ export async function completeInteractiveOptions(options, existing, ask, choose,
       configuredNumber: current?.number,
       language,
       account: repositoryAccess.account,
+      projectCatalog: repositoryAccess.projects,
     });
     options.board.statusField ??= await ask('Project status field', current?.statusField ?? 'Status');
     options.board.statusMap ??= JSON.parse(await ask(
@@ -276,27 +286,32 @@ export async function main() {
       await wizard(options);
     } else {
       const existing = existingOptions(options.target);
-      const missingModelFlags = !existing && ['reqeng', 'work', 'review']
-        .some((flow) => !options.explicitModels[flow]);
       const language = supportedLanguage(options.language ?? process.env.LANG) ?? 'en';
-      if (missingModelFlags) {
-        throw new Error(wizardText(language, 'picker_tty_required'));
-      }
+      const authentication = assertGithubAuthentication({
+        language,
+        repository: options.repository ?? existing?.repository,
+        expectedAccount: options.expectedAccount,
+      });
       const accessRepository = options.repository ?? existing?.repository;
       if (!accessRepository) {
         throw new Error('--repository owner/name is required for noninteractive installation.');
       }
-      const access = assertGithubWriteAccess(accessRepository, {
+      options.githubPreflight = preflightGithubAccess(accessRepository, {
         language,
+        authentication,
         expectedAccount: options.expectedAccount,
       });
-      if (options.boardSync) resolveBoardProject(accessRepository, options.board, {
-        language,
-        account: access.account,
-      });
+      assertSquadCompatibility(resolve(options.target ?? process.cwd()));
+      const missingModelFlags = !existing && ['reqeng', 'work', 'review']
+        .some((flow) => !options.explicitModels[flow]);
+      if (missingModelFlags) {
+        throw new Error(wizardText(language, 'picker_tty_required'));
+      }
     }
     const repoRoot = resolve(options.target ?? process.cwd());
-    const plan = buildInstallPlan(repoRoot, options);
+    const plan = buildInstallPlan(repoRoot, options, {
+      githubPreflight: options.githubPreflight,
+    });
     printPlan(plan, plan.config.language);
     const result = applyPlan(repoRoot, plan, options);
     process.stdout.write(`${JSON.stringify(result)}\n`);

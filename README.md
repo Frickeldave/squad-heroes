@@ -60,8 +60,12 @@ node .squad/templates/squad-heroes/companion/scripts/install --target "$PWD" --d
 Erst ein ausdrücklicher Lauf dieses kopierten Installers ohne `--dry-run`
 materialisiert aktive Ziele.
 
-Im Terminal prüft der Wizard zuerst die Host-Authentifizierung sowie
-Repository-Lese- und Push-Rechte. Die drei **Standardmodelle** und mehrere
+Im Terminal prüft der Wizard zuerst `gh`, Host-Authentifizierung,
+Repository-Lese-/Push-Rechte und immer den lesenden Project-Zugriff des aus dem
+Repository abgeleiteten Owners. Diese GitHub-Prüfungen laufen vor allen
+interaktiven Auswahlmenüs; ohne angegebenes Repository ist nur dessen
+unvermeidliche Abfrage nach der Host-Authentifizierung erlaubt. Die drei
+**Standardmodelle** und mehrere
 Projects werden mit einer TTY-Auswahl navigiert: Pfeil hoch/runter oder `j`/`k`
 bewegen, Enter bestätigt, Escape oder `q` bricht ab. Nummerneingabe ist keine
 Auswahlmethode. Ohne TTY muss der Installer vollständig nicht-interaktiv mit
@@ -131,7 +135,7 @@ Plugin-State; aktive, vom Companion erzeugte Dateien bleiben bestehen.
 - Node.js 20+, npm für die Produktentwicklung
 - Squad `2.0.0` oder höher, stabil (kein Prerelease)
 - lokal installierter `gh`, authentifiziert, mit Repository-Lese-/Push-Recht
-  und bei Board-Opt-in mit Project-Lesezugriff
+  und `read:project` für jeden vollständigen Companion-Installationsfluss
 - genau ein stabiler `<!-- version: X.Y.Z -->`-Marker in
   `.github/agents/squad.agent.md`
 

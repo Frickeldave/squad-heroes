@@ -16,6 +16,9 @@ const injected = {
     if (args[0] === 'project' && args[1] === 'view') {
       return commandResult(JSON.stringify({ number: Number(args[2]) }));
     }
+    if (args[0] === 'project' && args[1] === 'list') {
+      return commandResult(JSON.stringify({ projects: [] }));
+    }
     return commandResult();
   },
 };
