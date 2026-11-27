@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { parseJsonFile, safeRelativePath } from '../src/io.mjs';
 import { validateManifest } from '../src/manifest.mjs';
@@ -28,6 +28,21 @@ test('companion targets are explicit, unique and board sync is separately gated'
   }
   const sync = catalog.targets.find(({ target }) => target.endsWith('heroes-sync-project-board.yml'));
   assert.equal(sync.extension, 'board-sync');
+});
+
+test('obsolete passive skill is absent from source, distribution and generated metadata', () => {
+  const removedSkill = ['squad-heroes', 'flow', 'safety'].join('-');
+  const profile = parseJsonFile(path.join(root, '.squad/heroes/profiles/typescript-development.json'));
+  const removedSource = path.join(root, '.squad/heroes/skills', removedSkill, 'SKILL.md');
+  const sources = [
+    readFileSync(path.join(root, 'plugin.manifest.json'), 'utf8'),
+    readFileSync(path.join(root, 'plugin.json'), 'utf8'),
+    readFileSync(path.join(root, '.squad/heroes/manifest.json'), 'utf8'),
+    readFileSync(path.join(root, '.squad/heroes/companion-targets.json'), 'utf8'),
+  ];
+  assert.ok(!profile.skills.includes(removedSkill));
+  assert.equal(existsSync(removedSource), false);
+  assert.ok(sources.every((source) => !source.includes(removedSkill)));
 });
 
 test('distributed source contains no CRAFT, SupplierPulse or credential literals', () => {

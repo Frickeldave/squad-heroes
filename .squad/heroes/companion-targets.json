@@ -18,7 +18,6 @@
     { "id": "layer-reqeng", "source": ".squad/heroes/companion/addon-layers/startreqeng.md", "target": ".github/prompts/addon-layers/startreqeng.md", "mode": "whole-file" },
     { "id": "layer-work", "source": ".squad/heroes/companion/addon-layers/startwork.md", "target": ".github/prompts/addon-layers/startwork.md", "mode": "whole-file" },
     { "id": "layer-review", "source": ".squad/heroes/companion/addon-layers/startreview.md", "target": ".github/prompts/addon-layers/startreview.md", "mode": "whole-file" },
-    { "id": "skill", "source": ".squad/heroes/skills/squad-heroes-flow-safety/SKILL.md", "target": ".github/skills/squad-heroes-flow-safety/SKILL.md", "mode": "whole-file" },
     { "id": "flow-shared", "source": ".squad/heroes/companion/scripts/flow-shared.mjs", "target": "scripts/heroes-flow-shared.mjs", "mode": "whole-file" },
     { "id": "start-reqeng", "source": ".squad/heroes/companion/scripts/start-reqeng.mjs", "target": "scripts/start-reqeng.mjs", "mode": "whole-file" },
     { "id": "start-work", "source": ".squad/heroes/companion/scripts/start-work.mjs", "target": "scripts/start-work.mjs", "mode": "whole-file" },

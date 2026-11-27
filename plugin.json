@@ -117,11 +117,6 @@
       "source": ".squad/heroes/prompts/startwork.en.md",
       "target": "prompts/squad-heroes/prompts/startwork.en.md",
       "type": "prompt"
-    },
-    {
-      "source": ".squad/heroes/skills/squad-heroes-flow-safety/SKILL.md",
-      "target": "templates/squad-heroes/skills/squad-heroes-flow-safety/SKILL.md",
-      "type": "template"
     }
   ]
 }

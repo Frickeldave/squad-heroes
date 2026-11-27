@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { applyPlan, buildInstallPlan } from '../src/installer.mjs';
@@ -37,6 +37,17 @@ test('installed launchers provide help without auth, config or Copilot mutation'
       assert.equal(result.status, 0, `${script}: ${result.stderr}`);
       assert.match(result.stdout, /Usage:/u);
     }
+  } finally {
+    cleanup(root);
+  }
+});
+
+test('Companion installation does not create the removed passive skill', () => {
+  const root = fixture();
+  try {
+    const removedSkill = ['squad-heroes', 'flow', 'safety'].join('-');
+    applyPlan(root, buildInstallPlan(root, options(), injected), {}, injected);
+    assert.equal(existsSync(path.join(root, '.github/skills', removedSkill, 'SKILL.md')), false);
   } finally {
     cleanup(root);
   }

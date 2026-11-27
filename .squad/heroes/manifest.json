@@ -106,7 +106,7 @@
       "source": ".squad/heroes/companion-targets.json",
       "target": ".squad/heroes/companion-targets.json",
       "owner": "companion",
-      "sha256": "a3d07a24f323c5534d426e9dd485e66233d9c3581b97cd8155185674311c6ca4"
+      "sha256": "e188cf1a383f489ecb2b3b19ccac2c8b65631e272e785e0a2e247cd648a428d0"
     },
     {
       "id": ".squad:heroes:companion:addon-layers:common.md",
@@ -288,7 +288,7 @@
       "source": ".squad/heroes/profiles/typescript-development.json",
       "target": ".squad/heroes/profiles/typescript-development.json",
       "owner": "plugin",
-      "sha256": "150d1864d2383af8ba21a06dd1e45d04f7e98c3f10fa7becb844b300d2d406f9"
+      "sha256": "92ad979a220b392c1b51ae9a9381f6a111d669a70741a40746c716d7c395b879"
     },
     {
       "id": ".squad:heroes:prompts:startreqeng.de.md",
@@ -331,13 +331,6 @@
       "target": ".squad/heroes/prompts/startwork.en.md",
       "owner": "plugin",
       "sha256": "d8a166696e1e960e4873f25cb674cce59df821ee8afb1738154705499fb94046"
-    },
-    {
-      "id": ".squad:heroes:skills:squad-heroes-flow-safety:SKILL.md",
-      "source": ".squad/heroes/skills/squad-heroes-flow-safety/SKILL.md",
-      "target": ".squad/heroes/skills/squad-heroes-flow-safety/SKILL.md",
-      "owner": "plugin",
-      "sha256": "7ec061abef56a210b9d50a7a9e343eb04cd8ce766fc8250fa9399e8824206b69"
     }
   ]
 }
