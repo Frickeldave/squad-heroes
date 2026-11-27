@@ -81,7 +81,9 @@ sein.
 Beim Board-Opt-in werden Owner und Nummer nicht eingegeben: Der Owner wird stets
 aus `--repository` abgeleitet, Projects werden lesend über `gh` erkannt. Ein
 Project wird automatisch gewählt, mehrere erscheinen in derselben Pfeiltasten-Auswahl, keines stoppt
-vor Planung mit konkreter Setup-/Zugriffsanleitung. Für CI bleiben
+vor Planung mit konkreter Setup-/Zugriffsanleitung. Das Null-Menü enthält
+„Mit Companion anlegen“, „Project manuell anlegen“ und Abbrechen; manuelle Wahl
+und Abbruch geben dieselbe konkrete Wiederherstellung aus. Für CI bleiben
 `--project-number` und ein dazu passender `--project-owner` als stets per API
 validierte Overrides möglich. Vor einer mutierenden Board-Konfiguration prüft
 eine frische GraphQL-Abfrage `viewerCanUpdate`; der spätere Workflow wiederholt
@@ -156,7 +158,31 @@ Companion erzeugten aktiven Dateien.
 
 ## Durch Companion erstellte Projects
 
-Bei aktiviertem Board-Sync und null sichtbaren Projects zeigt der Wizard ein Pfeiltastenmenü: neues Project anlegen oder Abbrechen/ein vorhandenes bereitstellen. Owner `frickeldave-test` wird abgeleitet, Titel `squad-heroes-snake` vorgeschlagen und Titel sowie Owner explizit bestätigt. In CI sind `--create-project` und `--project-title` gemeinsam Pflicht; `--create-project=false` ist ungültig.
+Bei aktiviertem Board-Sync und null sichtbaren Projects zeigt der Wizard ein Pfeiltastenmenü: Project mit Companion anlegen, manuell anlegen oder abbrechen/ein vorhandenes bereitstellen. Owner `frickeldave-test` wird abgeleitet, Titel `squad-heroes-snake` vorgeschlagen und Titel sowie Owner explizit bestätigt. In CI sind `--create-project` und `--project-title` gemeinsam Pflicht; `--create-project=false` ist ungültig.
+
+Schlägt die manuelle oder automatische Bereitstellung fehl, am aktiven
+GitHub-Konto anmelden und ein Benutzer-Project unter Owner
+`frickeldave-test` mit Titel `squad-heroes-snake` anlegen. GitHub UI: Avatar →
+**Your projects** → **New project**. Alternativ, nachdem
+`gh project create --help` die Syntax bestätigt hat, sicher:
+
+```bash
+gh project create --owner frickeldave-test --title squad-heroes-snake
+```
+
+Dem aktiven Account im Project Schreibzugriff geben und prüfen:
+
+```bash
+gh project list --owner frickeldave-test --limit 100 --format json
+```
+
+Danach den kopierten Companion mit `--project-number <number>` erneut starten
+oder im TTY-Menü auswählen. Dry-run kann das Project nicht anlegen. Bei einem
+Apply-Fehler kann das Project teilweise bestehen beziehungsweise Schema oder
+Repository-Link teilweise eingerichtet sein; zuerst die Liste und den
+Project-Zustand prüfen, keine Secret-Werte kopieren und nicht blind erneut
+erstellen. `HEROES_PROJECT_TOKEN` braucht nur `project`; Repositoryzugriffe
+bleiben bei `github.token`.
 
 Exakter Dry-run (keine GitHub-Mutation):
 

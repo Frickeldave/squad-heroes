@@ -393,7 +393,24 @@ Browserdaten und Cleanup-Protokoll.
 ## Lifecycle-Fixture zur Project-Erstellung
 
 - Owner `frickeldave-test`, Repository `squad-heroes-snake`, null Projects: Pfeiltastenmenü mit Anlegen und Abbrechen/Freigeben prüfen; Abbrechen ist mutationsfrei.
+- Das Menü muss zusätzlich „Project manuell anlegen“ enthalten. Sowohl manuelle Auswahl als auch Abbrechen geben Owner `frickeldave-test`, Titel `squad-heroes-snake`, `gh project create --owner frickeldave-test --title squad-heroes-snake`, Schreibzugriff, List-/Nummernprüfung, Rerun mit `--project-number <number>` und die klare Aussage aus, dass Dry-run nichts anlegt.
 - Dry-run mit `--create-project --project-title squad-heroes-snake` prüft Scope und lesenden Owner-Zugriff früh, wechselt nach Create-Bestätigung zu `PLANNED_CREATE`, fragt Statusfeld/-Map ohne Token-Prompt, zeigt Owner, Name, `{{PROJECT_NUMBER}}` und aufgeschobene Schema-/Link-Operationen, macht keinen Lookup mit dem Platzhalter und keine GitHub-Mutation.
-- Apply erzeugt genau einmal, löst zurückgegebene Nummer/Node-ID sofort mit einem frischen Project-Lookup auf, prüft `viewerCanUpdate`, konfiguriert/verknüpft und persistiert die Nummer. Rerun erzeugt kein zweites Project und keinen lokalen Write.
+- Apply erzeugt genau einmal, löst zurückgegebene Nummer/Node-ID sofort mit einem frischen Project-Lookup auf, prüft `viewerCanUpdate`, konfiguriert/verknüpft und persistiert die Nummer. Rerun erzeugt kein zweites Project und keinen lokalen Write. Simulierter Create- oder Folgefehler nennt möglichen Project-/Schema-/Link-Teilzustand, fordert zuerst `gh project list --owner frickeldave-test --limit 100 --format json`, enthält keine Secrets und bietet dieselbe manuelle Einrichtung.
 - 403, fehlende CI-Flags, mehrdeutige Booleans, ungültige Titel, Teilfehler/Recovery, bestehende Ein-/Mehrfach-/Explizitnummer-Flows und tokenfreie Logs prüfen.
 - Gerenderte Project-Workflows prüfen: `HEROES_PROJECT_TOKEN` fließt nur in Project-v2-Kommandos; Repository-Issue-/PR- und Label-Kommandos nutzen `${{ github.token }}` mit deklarierten Permissions. Das Project-Secret braucht nur den klassischen `project`-Scope (nicht `repo`) oder fein abgestuftes Projects-Lese-/Schreibrecht; `.squad/heroes.json` enthält kein Tokenfeld/-ausdruck.
+
+Vor dem Lifecycle für eine veraltete installierte Consumer-Kopie:
+
+```bash
+git -C {heroes-dir} pull --ff-only
+squad plugin install {heroes-dir}
+squad plugin verify
+sha256sum {heroes-dir}/dist/companion/scripts/install
+sha256sum .squad/templates/squad-heroes/companion/scripts/install
+cmp {heroes-dir}/dist/companion/scripts/install .squad/templates/squad-heroes/companion/scripts/install
+node .squad/templates/squad-heroes/companion/scripts/install --target "$PWD" --dry-run
+```
+
+`cmp` muss erfolgreich enden. Damit wird die aktuelle Quelle bytegleich mit
+dem neu installierten Companion verifiziert, nicht durch einen Versions-Hack
+angenommen.

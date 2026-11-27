@@ -70,6 +70,12 @@ erneut auf Marker und UTF-8 validiert.
   `gh auth status --hostname github.com` prüfen; im Companion mit `--create-project --project-title` anlegen oder für ein vorhandenes Project eine validierte `--project-number` übergeben. 403 bedeutet
   Project-/Organizationsrechte, 404 falschen, privaten oder unsichtbaren
   Owner/Project-Kontext.
+- Null-Project-Menü: „Project manuell anlegen“ oder Abbrechen ausgeben lassen;
+  die Meldung benennt Owner, vorgeschlagenen Titel, den aktiven Account sowie
+  die verifizierte CLI/GitHub-UI-Erstellung. `gh project list --owner
+  frickeldave-test --limit 100 --format json` prüft Nummer und Sichtbarkeit;
+  danach den Companion mit `--project-number <number>` ausführen oder im
+  Pfeiltastenmenü wählen. Dry-run erzeugt kein Project.
 - `conflicts`: Dry-run und Dateien unverändert; Entscheidung erforderlich.
 - `ambiguous_markers`: doppelte, fehlende oder vertauschte Marker.
 - `deployment_branch`: Ref ungültig oder nicht eindeutig.
@@ -123,4 +129,4 @@ gh repo view OWNER/REPO
 
 ## Recovery nach Project-Erstellung
 
-Die Project-Erstellung ist extern sichtbar und wird nicht automatisch zurückgerollt. Bei Fehlern an Schema/Link wird kein lokaler State geschrieben; der Teilzustand muss manuell geprüft/bereinigt werden. Beim Wiederholen wird das eine passende Project erkannt und wiederverwendet, nicht erneut angelegt. Danach werden Schema/Link erneut geprüft und nötige Änderungen nachgeholt. Titel und Project-Nummer vor dem Rerun verifizieren. Fertiger State enthält die reale Nummer und Recovery-Baselines in `.squad/heroes.json`.
+Die Project-Erstellung ist extern sichtbar und wird nicht automatisch zurückgerollt. Bei Fehlern an Erstellung, Schreibzugriff, Schema oder Link kann das Project bereits bestehen beziehungsweise teilweise konfiguriert sein; kein lokaler State wurde geschrieben. Zuerst `gh project list --owner frickeldave-test --limit 100 --format json` prüfen, vorhandene State-Teile bewerten und nicht blind erneut anlegen. Beim Wiederholen wird das eine passende Project erkannt und wiederverwendet, nicht erneut angelegt. Danach werden Schema/Link erneut geprüft und nötige Änderungen nachgeholt. Titel und Project-Nummer vor dem Rerun verifizieren. Fertiger State enthält die reale Nummer und Recovery-Baselines in `.squad/heroes.json`. Fehler- und Recovery-Ausgaben enthalten keine Secret-Werte. `HEROES_PROJECT_TOKEN` erhält nur `project`; Repository-Vorgänge nutzen `github.token`.

@@ -377,7 +377,23 @@ results, and the cleanup record.
 ## Project creation lifecycle fixture
 
 - Fixture owner `frickeldave-test`, repository `squad-heroes-snake`, zero Projects. Verify the arrow menu contains create and cancel/share choices; cancellation mutates nothing.
+- The menu must also contain “Create Project manually”. Both manual selection and cancellation print owner `frickeldave-test`, title `squad-heroes-snake`, `gh project create --owner frickeldave-test --title squad-heroes-snake`, active-account write access, list/number verification, rerun with `--project-number <number>`, and a clear statement that dry-run creates nothing.
 - Dry-run with `--create-project --project-title squad-heroes-snake` first proves scope and owner list access, enters `PLANNED_CREATE`, requests status field/map defaults without a token prompt, shows owner, name, `{{PROJECT_NUMBER}}`, deferred schema and repository-link operations, performs no Project lookup by placeholder, and records zero GitHub mutations.
-- Apply creates exactly once, immediately resolves the returned number/node ID through a fresh Project lookup, observes `viewerCanUpdate`, configures fields/options, links the repository, and persists the real number. A rerun with the saved state performs no second create and no local writes.
+- Apply creates exactly once, immediately resolves the returned number/node ID through a fresh Project lookup, observes `viewerCanUpdate`, configures fields/options, links the repository, and persists the real number. A rerun with the saved state performs no second create and no local writes. Simulated create or follow-up failure names possible Project/schema/link partial state, first requires `gh project list --owner frickeldave-test --limit 100 --format json`, contains no secrets, and offers the same manual setup.
 - Cover denied owner permission/403, missing noninteractive flags, ambiguous booleans, invalid titles, partial schema failure/recovery, existing one/multiple/explicit Project flows, and command logs containing no token material.
 - Inspect rendered Project workflows: `HEROES_PROJECT_TOKEN` is routed only into Project V2 commands, while repository issue/PR and label commands use `${{ github.token }}` plus declared permissions. The Project secret requires only classic `project` scope (not `repo`) or fine-grained Projects read/write; `.squad/heroes.json` contains no token field/expression.
+
+Before the lifecycle when an installed consumer copy is stale:
+
+```bash
+git -C {heroes-dir} pull --ff-only
+squad plugin install {heroes-dir}
+squad plugin verify
+sha256sum {heroes-dir}/dist/companion/scripts/install
+sha256sum .squad/templates/squad-heroes/companion/scripts/install
+cmp {heroes-dir}/dist/companion/scripts/install .squad/templates/squad-heroes/companion/scripts/install
+node .squad/templates/squad-heroes/companion/scripts/install --target "$PWD" --dry-run
+```
+
+`cmp` must succeed, proving byte equality between current source and the
+reinstalled Companion rather than relying on a version workaround.

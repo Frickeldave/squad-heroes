@@ -1,7 +1,13 @@
 #!/usr/bin/env node
 import { resolve } from 'node:path';
 import { existsSync, readFileSync } from 'node:fs';
-import { applyPlan, buildInstallPlan, parseInstallArguments, printPlan } from '../src/installer.mjs';
+import {
+  applyPlan,
+  buildInstallPlan,
+  parseInstallArguments,
+  printPlan,
+  projectManualInstructions,
+} from '../src/installer.mjs';
 import { HeroesError, INCOMPATIBLE_SQUAD_EXIT } from '../src/errors.mjs';
 import {
   assertGithubAuthentication,
@@ -43,8 +49,10 @@ interactive use offers explicit Companion creation or cancellation. CI must use
 both --create-project and --project-title; the former is the explicit apply
 approval and never accepts a boolean value. The rendered dry-run contains a
 Project-number placeholder and every follow-up schema/link operation, and makes
-no external mutation. The scope and API gates remain required for dry-run. No
-token is accepted.
+no external mutation. A separate "create manually" choice and cancellation both
+print concrete recovery steps; apply failures report possible partial external
+state and never disclose secrets. The scope and API gates remain required for
+dry-run. No token is accepted.
 `;
 
 function existingOptions(target) {
@@ -126,16 +134,28 @@ export async function completeInteractiveOptions(options, existing, ask, choose,
       const projects = repositoryAccess.projects;
       if (projects.length === 0) {
         const createLabel = wizardText(language, 'github_project_create');
+        const manualLabel = wizardText(language, 'github_project_manual');
         const cancelLabel = wizardText(language, 'github_project_cancel');
-        const selection = await choose(
-          wizardText(language, 'github_project_missing'),
-          [createLabel, cancelLabel],
-          createLabel
-        );
-        if (selection !== createLabel) {
-          throw new Error(wizardText(language, 'github_project_cancelled'));
-        }
         const defaultTitle = options.repository.split('/')[1];
+        const manual = `${wizardText(language, 'github_project_cancelled')}\n\n` +
+          projectManualInstructions(language, {
+            owner: repositoryAccess.owner,
+            title: options.projectTitle ?? defaultTitle,
+            active: repositoryAccess.account,
+          });
+        let selection;
+        try {
+          selection = await choose(
+            wizardText(language, 'github_project_missing'),
+            [createLabel, manualLabel, cancelLabel],
+            createLabel
+          );
+        } catch (error) {
+          throw new Error(`${manual}\n\n${error instanceof Error ? error.message : String(error)}`);
+        }
+        if (selection !== createLabel) {
+          throw new Error(manual);
+        }
         options.projectTitle = await ask(
           wizardText(language, 'github_project_title_prompt'),
           options.projectTitle ?? defaultTitle

@@ -63,6 +63,12 @@ markers and UTF-8 before write.
   `gh auth refresh -h github.com -s project`, then verify with
   `gh auth status --hostname github.com`; choose Companion creation with `--create-project --project-title`, or use a validated `--project-number` for an existing Project in CI. 403 means Project/organization rights;
   404 means wrong, private, or invisible owner/Project.
+- Zero-Project menu: choose manual creation or cancel to print recovery that
+  names the owner, suggested title, active account, and verified CLI/GitHub UI
+  creation path. Check number and visibility with `gh project list --owner
+  frickeldave-test --limit 100 --format json`; then rerun with
+  `--project-number <number>` or select it in the arrow-key menu. Dry-run
+  cannot create the Project.
 - `conflicts`: dry run and files unchanged; decision required.
 - `ambiguous_markers`: duplicate, absent or reversed markers.
 - `deployment_branch`: ref is invalid or ambiguous.
@@ -117,4 +123,4 @@ gh repo view OWNER/REPO
 
 ## Recovery after Project creation
 
-Project creation is externally visible and not automatically rolled back. If schema/link configuration fails, the installer writes no local state, reports the partial operation, and leaves manual inspection/cleanup to the operator. Rerunning is safe: the one matching Project is discovered and reused, so Companion must not create a duplicate. It then retries schema/link reads and needed mutations. Reuse the same confirmed title and verify the Project number before rerun. Completed state stores the real number in `.squad/heroes.json` and its recovery baselines.
+Project creation is externally visible and not automatically rolled back. If creation, write verification, schema, or linking fails, the Project may already exist or be partially configured; no local state was written. First run `gh project list --owner frickeldave-test --limit 100 --format json`, inspect existing partial state, and do not blindly create again. Rerunning is safe: the one matching Project is discovered and reused, so Companion must not create a duplicate. It then retries schema/link reads and needed mutations. Reuse the same confirmed title and verify the Project number before rerun. Completed state stores the real number in `.squad/heroes.json` and its recovery baselines. Failure/recovery output contains no secret values. `HEROES_PROJECT_TOKEN` receives only `project`; repository operations use `github.token`.

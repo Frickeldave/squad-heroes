@@ -15,13 +15,21 @@ import {
 import { buildHeroesConfig, validateHeroesConfig } from './config.mjs';
 import { classifyOperation, assertPlanSafe, summarizePlan, recoveryBaselines } from './plan.mjs';
 import { parseJsonFile, readUtf8, assertSafeTarget } from './io.mjs';
-import { fail } from './errors.mjs';
+import { HeroesError, fail } from './errors.mjs';
 import { resolveLanguage, translate, validateMessageCatalogs } from './messages.mjs';
 import { validateManifest } from './manifest.mjs';
 import { createHash } from 'node:crypto';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const VERSION = parseJsonFile(path.join(ROOT, 'package.json')).version;
+
+export function projectManualInstructions(language, { owner, title, active }) {
+  return translate(language, 'github_project_manual_instructions', {
+    owner,
+    title,
+    active,
+  }).text;
+}
 
 export function parseInstallArguments(argv) {
   const options = {
@@ -228,18 +236,44 @@ export function buildInstallPlan(repoRoot, options = {}, injected = {}) {
         fail('project_owner', `Project owner must be derived from repository ${accessRepository}: expected "${access.owner}".`);
       }
       if (!options.createProject || !options.projectTitle) {
+        const manual = projectManualInstructions(language, {
+          owner: access.owner,
+          title: options.projectTitle ?? accessRepository.split('/')[1],
+          active: access.account,
+        });
         fail(
           'project_create_flags',
-          'No GitHub Project exists. In CI pass both --create-project and --project-title; interactive users must select and confirm Companion creation.'
+          'No GitHub Project exists. In CI pass both --create-project and --project-title; interactive users must select Companion or manual creation.\n\n' + manual
         );
       }
       const title = options.projectTitle;
-      const identity = resolveProjectOwnerForCreate(accessRepository, title, {
-        ...injected,
-        language,
-        authentication: access,
-        account: access.account,
+      const manual = projectManualInstructions(language, {
+        owner: access.owner,
+        title,
+        active: access.account,
       });
+      let identity;
+      try {
+        identity = resolveProjectOwnerForCreate(accessRepository, title, {
+          ...injected,
+          language,
+          authentication: access,
+          account: access.account,
+        });
+      } catch (error) {
+        const original = error instanceof Error ? error.message : String(error);
+        throw new HeroesError(
+          error instanceof HeroesError ? error.code : 'gh_project_create',
+          original.includes(`gh project create --owner ${access.owner}`)
+            ? original
+            : `${original}\n\n${manual}`,
+          {
+            category: 'project_recovery',
+            owner: access.owner,
+            activeAccount: access.account,
+          }
+        );
+      }
       options.board.owner = access.owner;
       options.board.number = '{{PROJECT_NUMBER}}';
       projectCreation = {
@@ -460,52 +494,81 @@ export function applyPlan(
     : null;
   const externalBoard = { ...plan.config.extensions?.['board-sync'] };
   if (plan.projectCreate) {
-    const created = createBoardProject(plan.config.repository, plan.projectCreate, {
-      ...injected,
-      language: plan.config.language,
-      authentication: access,
-      account: access.account,
-    });
-    const verified = assertProjectWriteAccess(plan.config.repository, created, {
-      ...injected,
-      language: plan.config.language,
-      expectedAccount: expectedAccount ?? injected.expectedAccount,
-      authentication: access,
-    });
-    plan.projectState = 'APPLY_CREATE';
-    externalBoard.number = verified.number;
-    externalBoard.owner = verified.owner;
-    const resolvedState = structuredClone(plan.config);
-    resolvedState.extensions['board-sync'].number = verified.number;
-    validateHeroesConfig(resolvedState);
-    for (const operation of plan.operations) {
-      if (operation.mode === 'external') {
-        operation.actionDetails.number = verified.number;
-        operation.actionDetails.state = 'APPLY_CREATE';
-        operation.actionDetails.deferred = false;
-        continue;
+    let phase = plan.config.language === 'de' ? 'Erstellung' : 'creation';
+    try {
+      const created = createBoardProject(plan.config.repository, plan.projectCreate, {
+        ...injected,
+        language: plan.config.language,
+        authentication: access,
+        account: access.account,
+      });
+      phase = plan.config.language === 'de' ? 'Schreibzugriffprüfung' : 'write-access verification';
+      const verified = assertProjectWriteAccess(plan.config.repository, created, {
+        ...injected,
+        language: plan.config.language,
+        expectedAccount: expectedAccount ?? injected.expectedAccount,
+        authentication: access,
+      });
+      plan.projectState = 'APPLY_CREATE';
+      externalBoard.number = verified.number;
+      externalBoard.owner = verified.owner;
+      const resolvedState = structuredClone(plan.config);
+      resolvedState.extensions['board-sync'].number = verified.number;
+      validateHeroesConfig(resolvedState);
+      for (const operation of plan.operations) {
+        if (operation.mode === 'external') {
+          operation.actionDetails.number = verified.number;
+          operation.actionDetails.state = 'APPLY_CREATE';
+          operation.actionDetails.deferred = false;
+          continue;
+        }
+        operation.content = operation.target === '.squad/heroes.json'
+          ? ''
+          : operation.content.replaceAll('{{PROJECT_NUMBER}}', String(verified.number));
       }
-      operation.content = operation.target === '.squad/heroes.json'
-        ? ''
-        : operation.content.replaceAll('{{PROJECT_NUMBER}}', String(verified.number));
+      resolvedState.recovery.lastCompletedPlan = createHash('sha256')
+        .update(JSON.stringify(summarizePlan(plan.operations.filter((entry) => entry.mode !== 'external'))))
+        .digest('hex');
+      resolvedState.recovery.targets = recoveryBaselines(plan.operations);
+      validateHeroesConfig(resolvedState);
+      const stateOperation = plan.operations.find((entry) => entry.id === 'heroes-state');
+      stateOperation.content = `${JSON.stringify(resolvedState, null, 2)}\n`;
+      phase = plan.config.language === 'de' ? 'Schema-Konfiguration' : 'schema configuration';
+      configureBoardProject(plan.config.repository, externalBoard, {
+        ...injected,
+        language: plan.config.language,
+        account: access.account,
+      });
+      phase = plan.config.language === 'de' ? 'Repository-Verknüpfung' : 'repository linking';
+      linkBoardProject(plan.config.repository, verified, {
+        ...injected,
+        language: plan.config.language,
+        account: access.account,
+      });
+    } catch (error) {
+      const manual = projectManualInstructions(plan.config.language, {
+        owner: plan.projectCreate.owner,
+        title: plan.projectCreate.title,
+        active: access.account,
+      });
+      const recovery = translate(plan.config.language, 'github_project_apply_failed', {
+        phase,
+        owner: plan.projectCreate.owner,
+      }).text;
+      const original = error instanceof Error ? error.message : String(error);
+      throw new HeroesError(
+        error instanceof HeroesError ? error.code : 'gh_project_apply_failed',
+        original.includes(`gh project create --owner ${plan.projectCreate.owner}`)
+          ? `${original}\n\n${recovery}`
+          : `${original}\n\n${recovery}\n\n${manual}`,
+        {
+          category: 'project_recovery',
+          owner: plan.projectCreate.owner,
+          activeAccount: access.account,
+          phase,
+        }
+      );
     }
-    resolvedState.recovery.lastCompletedPlan = createHash('sha256')
-      .update(JSON.stringify(summarizePlan(plan.operations.filter((entry) => entry.mode !== 'external'))))
-      .digest('hex');
-    resolvedState.recovery.targets = recoveryBaselines(plan.operations);
-    validateHeroesConfig(resolvedState);
-    const stateOperation = plan.operations.find((entry) => entry.id === 'heroes-state');
-    stateOperation.content = `${JSON.stringify(resolvedState, null, 2)}\n`;
-    configureBoardProject(plan.config.repository, externalBoard, {
-      ...injected,
-      language: plan.config.language,
-      account: access.account,
-    });
-    linkBoardProject(plan.config.repository, verified, {
-      ...injected,
-      language: plan.config.language,
-      account: access.account,
-    });
   } else if (plan.config.extensions?.['board-sync']) {
     const verified = assertProjectWriteAccess(plan.config.repository, externalBoard, {
       ...injected,

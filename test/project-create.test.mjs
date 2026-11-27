@@ -28,6 +28,7 @@ const base = {
 function githubFixture({
   projects = [],
   denyCreate = false,
+  failCreate = false,
   failAfterCreate = false,
   missingAfterCreate = false,
 } = {}) {
@@ -50,6 +51,7 @@ function githubFixture({
         } } }));
       }
       if (text.includes('createProjectV2')) {
+        if (failCreate) return { status: 1, stdout: '', stderr: 'creation failed' };
         created = true;
         return commandResult(JSON.stringify({ data: { createProjectV2: { projectV2: {
           id: 'P42', number: 42, title: 'squad-heroes-snake', viewerCanUpdate: true,
@@ -160,6 +162,40 @@ test('zero Project interactive flow collects planned config without a token prom
   } finally { cleanup(root); }
 });
 
+test('zero Project menu offers concrete manual and cancel recovery without mutation', async () => {
+  const root = fixture();
+  const gh = githubFixture();
+  try {
+    for (const language of ['de', 'en']) {
+      for (const selectedIndex of [1, 2]) {
+        await assert.rejects(() => completeInteractiveOptions({
+          ...structuredClone(base),
+          language,
+          projectTitle: null,
+          createProject: false,
+          createProjectApproved: false,
+        }, null, async (_label, fallback) => fallback, async (_label, choices) => {
+          assert.equal(choices.length, 3);
+          assert.match(choices[1], /manuell|manually/iu);
+          return choices[selectedIndex];
+        }, gh), (error) => {
+          const message = String(error.message);
+          assert.match(message, /frickeldave-test/u);
+          assert.match(message, /squad-heroes-snake/u);
+          assert.match(message, /gh project create --owner frickeldave-test --title squad-heroes-snake/u);
+          assert.match(message, /gh project list --owner frickeldave-test --limit 100 --format json/u);
+          assert.match(message, /--project-number <number>/u);
+          assert.match(message, /HEROES_PROJECT_TOKEN/u);
+          assert.match(message, /--dry-run/u);
+          return true;
+        });
+      }
+    }
+    assert.equal(gh.calls.filter(({ args }) => args.join(' ').includes('createProjectV2')).length, 0);
+    assert.equal(existsSync(path.join(root, '.squad/heroes.json')), false);
+  } finally { cleanup(root); }
+});
+
 test('apply creates once, resolves number, configures and persists recovery state', () => {
   const root = fixture();
   const gh = githubFixture();
@@ -199,17 +235,41 @@ test('denied create and partial schema failure fail closed with recovery guidanc
   const denied = fixture();
   const deniedGh = githubFixture({ denyCreate: true });
   try {
-    assert.throws(() => buildInstallPlan(denied, structuredClone(base), deniedGh), /403|grant Project creation/u);
+    assert.throws(() => buildInstallPlan(denied, structuredClone(base), deniedGh), (error) => {
+      assert.match(error.message, /403|creation.*denied/iu);
+      assert.match(error.message, /gh project create --owner frickeldave-test --title squad-heroes-snake/u);
+      assert.doesNotMatch(error.message, /ghp_|token=/u);
+      return true;
+    });
     assert.equal(deniedGh.calls.filter(({ args }) => args.join(' ').includes('createProjectV2')).length, 0);
   } finally { cleanup(denied); }
   const partial = fixture();
   const partialGh = githubFixture({ failAfterCreate: true });
   try {
     const plan = buildInstallPlan(partial, structuredClone(base), partialGh);
-    assert.throws(() => applyPlan(partial, plan, {}, partialGh), /partially|schema|field|recover/iu);
+    assert.throws(() => applyPlan(partial, plan, {}, partialGh), (error) => {
+      assert.match(error.message, /partially|schema|field|recover/iu);
+      assert.match(error.message, /gh project list --owner frickeldave-test --limit 100 --format json/u);
+      assert.match(error.message, /No local Companion state was written/u);
+      assert.doesNotMatch(error.message, /ghp_|token=/u);
+      return true;
+    });
     assert.equal(partialGh.calls.filter(({ args }) => args.join(' ').includes('createProjectV2')).length, 1);
     assert.equal(existsSync(path.join(partial, '.squad/heroes.json')), false);
   } finally { cleanup(partial); }
+  const failedCreate = fixture();
+  const failedCreateGh = githubFixture({ failCreate: true });
+  try {
+    const plan = buildInstallPlan(failedCreate, structuredClone(base), failedCreateGh);
+    assert.throws(() => applyPlan(failedCreate, plan, {}, failedCreateGh), (error) => {
+      assert.match(error.message, /Project may nevertheless already exist/u);
+      assert.match(error.message, /gh project list --owner frickeldave-test --limit 100 --format json/u);
+      assert.match(error.message, /gh project create --owner frickeldave-test --title squad-heroes-snake/u);
+      assert.doesNotMatch(error.message, /creation failed|ghp_|token=/u);
+      return true;
+    });
+    assert.equal(existsSync(path.join(failedCreate, '.squad/heroes.json')), false);
+  } finally { cleanup(failedCreate); }
   const lookup = fixture();
   const lookupGh = githubFixture({ missingAfterCreate: true });
   try {

@@ -76,7 +76,7 @@ to a commit in the target repository.
 
 Project board opt-in never asks for owner or number. Owner is always derived
 from `--repository`; the available Projects are read through `gh`. One Project
-is selected automatically, multiple Projects use the same arrow-key picker, and zero opens the explicit create/cancel menu described below. Explicit `--project-number` (and a
+is selected automatically, multiple Projects use the same arrow-key picker, and zero opens the explicit Companion-create, manual-create, and cancel menu. Manual selection and cancellation both print the recovery steps below. Explicit `--project-number` (and a
 matching derived-owner `--project-owner`) may be used by CI but is always
 validated through the API. Before Board configuration can mutate, a fresh
 GraphQL check verifies `viewerCanUpdate`; the later workflow repeats that
@@ -149,7 +149,30 @@ the managed distribution, not active files already created by the Companion.
 
 ## Companion-created Projects
 
-With board sync enabled and zero visible Projects, the TTY wizard renders an arrow-key menu: create a new Project, or cancel/supply/share one. It derives owner `frickeldave-test`, proposes title `squad-heroes-snake`, and requires explicit title/owner confirmation. For CI, both `--create-project` and `--project-title` are mandatory; `--create-project=false` is invalid.
+With board sync enabled and zero visible Projects, the TTY wizard renders an arrow-key menu: create with Companion, create manually, or cancel/supply/share one. It derives owner `frickeldave-test`, proposes title `squad-heroes-snake`, and requires explicit title/owner confirmation. For CI, both `--create-project` and `--project-title` are mandatory; `--create-project=false` is invalid.
+
+If manual or automatic provisioning fails, sign in to the active GitHub
+account and create a user Project owned by `frickeldave-test` titled
+`squad-heroes-snake`. In the GitHub UI: avatar → **Your projects** → **New
+project**. Alternatively, after `gh project create --help` verifies this exact
+syntax, run:
+
+```bash
+gh project create --owner frickeldave-test --title squad-heroes-snake
+```
+
+Grant the active account Project write access and verify it:
+
+```bash
+gh project list --owner frickeldave-test --limit 100 --format json
+```
+
+Rerun the copied Companion with `--project-number <number>`, or select it in a
+TTY arrow menu. Dry-run cannot create the Project. After apply fails, the
+Project may exist and its schema or repository link may be partial; inspect the
+list/state before retrying, never copy secret values, and do not blindly create
+again. `HEROES_PROJECT_TOKEN` needs only `project`; repository operations stay on
+`github.token`.
 
 Exact dry-run (no GitHub mutation):
 

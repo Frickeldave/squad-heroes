@@ -446,12 +446,18 @@ export function resolveProjectOwnerForCreate(repository, title, options = {}) {
     ? identity.viewerCanAdminister === true
     : identity.isViewer === true;
   if (!ownerMutable) {
+    const manual = diagnostic(options, 'github_project_manual_instructions', {
+      active: authentication.account,
+      owner,
+      title: safeTitle,
+    });
     stop('project_create_denied', options, 'gh_project_create_access', {
       active: authentication.account,
       owner,
       host: GITHUB_HOST,
       kind: identity.__typename ?? (organization ? 'Organization' : 'User'),
       summary: 'owner update capability is false (403)',
+      manual,
     }, {
       summary: 'owner update capability is false (403)',
       repository,

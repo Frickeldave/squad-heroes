@@ -68,8 +68,8 @@ Board-Sync ist nur mit kompletter, versionierter Extension-Konfiguration
 aktivierbar. Der Repository-Owner wird abgeleitet und nie geraten. Fehlen
 `--project-number` und gespeicherte Nummer, wählt eine lesende
 `gh project list`-Prüfung einen einzelnen Kandidaten automatisch, zeigt bei
-mehreren denselben Pfeiltasten-Picker und stoppt bei null mit menschlicher
-Einrichtungsanleitung.
+mehreren denselben Pfeiltasten-Picker und bietet bei null Companion-Anlage,
+manuelle Anlage oder Abbruch mit konkreter Einrichtungsanleitung.
 Das gewählte Project wird vor dem Plan mit `gh project view` und
 `viewerCanUpdate` verifiziert; eine explizite Nummer passiert dieselben Checks.
 Ohne Opt-in wird kein Board-Workflow installiert.

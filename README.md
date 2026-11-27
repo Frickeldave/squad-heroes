@@ -80,8 +80,19 @@ bleiben Wizard-Eingaben. Die Baseline wird als lokaler Commit validiert.
 
 Bei Board-Sync wird der Project-Owner aus `owner/repository` abgeleitet.
 Project-Nummer und Zugriff werden vor Auswahl ausschließlich lesend geprüft: ein Project
-wird automatisch gewählt, mehrere erscheinen in derselben Pfeiltasten-Auswahl, keines öffnet im Wizard eine Pfeiltasten-Auswahl: „Neues Project mit Companion“ oder Abbrechen/Freigeben eines vorhandenen Projects. Bei Companion-Erstellung wird der Titel vorgeschlagen, muss aber bestätigt werden; Owner bleibt aus dem Repository abgeleitet. CI benutzt `--create-project` zusammen mit `--project-title`. `--project-owner`/`--project-number` bleiben
+wird automatisch gewählt, mehrere erscheinen in derselben Pfeiltasten-Auswahl, keines öffnet im Wizard eine Pfeiltasten-Auswahl: „Mit Companion anlegen“, „Project manuell anlegen“ oder Abbrechen/Freigeben eines vorhandenen Projects. Bei Companion-Erstellung wird der Titel vorgeschlagen, muss aber bestätigt werden; Owner bleibt aus dem Repository abgeleitet. CI benutzt `--create-project` zusammen mit `--project-title`. `--project-owner`/`--project-number` bleiben
 validierte CI-Overrides; Tokens werden nie abgefragt oder gespeichert.
+
+Das Null-Project-Menü bietet außerdem **„Project manuell anlegen“**.
+Manuelle Wahl, Abbruch und jeder fehlgeschlagene automatische Apply geben die
+konkreten Schritte für GitHub UI oder die verifizierte Syntax
+`gh project create --owner frickeldave-test --title squad-heroes-snake` aus:
+Owner/Benutzer-Project und Schreibzugriff des aktiven Accounts prüfen, danach
+`gh project list --owner frickeldave-test --limit 100 --format json` ausführen.
+Der kopierte Companion wird mit `--project-number <number>` erneut ausgeführt
+oder das Project wird im Pfeiltastenmenü gewählt. Ein Dry-run erzeugt niemals
+das Project. Nach Apply-Fehlern können Project, Schema oder Repository-Link
+teilweise bestehen; zuerst die Liste prüfen, statt blind neu zu erstellen.
 
 Für CI/Tests bleibt alles explizit und nicht-interaktiv:
 
@@ -141,6 +152,24 @@ squad plugin verify &&
 squad plugin install /pfad/zum/neueren/squad-heroes &&
 squad plugin verify
 ```
+
+Ist die Consumer-Kopie nachweislich älter, zuerst den Quellstand aktualisieren
+und das Plugin **erneut installieren**; Versions-Hacks oder das Kopieren
+einzelner Dateien umgehen den Plugin-Lifecycle nicht:
+
+```bash
+git -C /pfad/zum/squad-heroes pull --ff-only
+squad plugin install /pfad/zum/squad-heroes
+squad plugin verify
+sha256sum /pfad/zum/squad-heroes/dist/companion/scripts/install
+sha256sum .squad/templates/squad-heroes/companion/scripts/install
+cmp /pfad/zum/squad-heroes/dist/companion/scripts/install \
+  .squad/templates/squad-heroes/companion/scripts/install
+node .squad/templates/squad-heroes/companion/scripts/install --target "$PWD" --dry-run
+```
+
+Der `cmp`-Befehl muss ohne Meldung und mit Exitcode 0 enden; dann sind Quell-
+Installer und neu installierte Consumer-Kopie bytegleich.
 
 Das aktualisiert das verwaltete Bundle. Aktive Companion-Ziele bleiben
 unverändert. Erst ein expliziter erneuter Aufruf des lokal kopierten
