@@ -61,8 +61,11 @@ Erst ein ausdrücklicher Lauf dieses kopierten Installers ohne `--dry-run`
 materialisiert aktive Ziele.
 
 Im Terminal prüft der Wizard zuerst `gh`, Host-Authentifizierung,
-Repository-Lese-/Push-Rechte und immer den lesenden Project-Zugriff des aus dem
-Repository abgeleiteten Owners. Diese GitHub-Prüfungen laufen vor allen
+Repository-Lese-/Push-Rechte und den schreibfähigen `project`-Scope des aktiven
+Accounts aus dem sicher gefilterten Scope-Status von
+`gh auth status --hostname github.com`. Danach folgt immer ein nicht-mutierender
+Project-API-Zugriffstest für den aus dem Repository abgeleiteten Owner. Diese
+GitHub-Prüfungen laufen vor allen
 interaktiven Auswahlmenüs; ohne angegebenes Repository ist nur dessen
 unvermeidliche Abfrage nach der Host-Authentifizierung erlaubt. Die drei
 **Standardmodelle** und mehrere
@@ -76,7 +79,7 @@ verifiziertes Ersatzmenü. Launcher dürfen `--model` weiterhin pro Lauf
 bleiben Wizard-Eingaben. Die Baseline wird als lokaler Commit validiert.
 
 Bei Board-Sync wird der Project-Owner aus `owner/repository` abgeleitet.
-Project-Nummer und Zugriff werden ausschließlich lesend geprüft: ein Project
+Project-Nummer und Zugriff werden vor Auswahl ausschließlich lesend geprüft: ein Project
 wird automatisch gewählt, mehrere erscheinen in derselben Pfeiltasten-Auswahl, keines stoppt mit
 konkreten Einrichtungshinweisen. `--project-owner`/`--project-number` bleiben
 validierte CI-Overrides; Tokens werden nie abgefragt oder gespeichert.
@@ -135,12 +138,18 @@ Plugin-State; aktive, vom Companion erzeugte Dateien bleiben bestehen.
 - Node.js 20+, npm für die Produktentwicklung
 - Squad `2.0.0` oder höher, stabil (kein Prerelease)
 - lokal installierter `gh`, authentifiziert, mit Repository-Lese-/Push-Recht
-  und `read:project` für jeden vollständigen Companion-Installationsfluss
+  und dem schreibfähigen Scope `project` für jeden vollständigen
+  Companion-Installations- oder Dry-run-Fluss. `read:project` reicht nur für
+  isolierte Project-Metadaten-Lesevorgänge; Board-Einrichtung aktualisiert
+  Felder, Status und Schema und benötigt daher `project`.
 - genau ein stabiler `<!-- version: X.Y.Z -->`-Marker in
   `.github/agents/squad.agent.md`
 
 Der Companion prüft Squad, GitHub-Authentifizierung sowie Repository- und
-Project-Zugriff, fordert niemals Token an und speichert keine Credentials.
+Project-Zugriff, fordert niemals Token an und speichert keine Credentials. Bei
+fehlendem `project`-Scope stoppt er vor Menüs und weist ausschließlich auf
+`gh auth refresh -h github.com -s project` und danach
+`gh auth status --hostname github.com` hin.
 Konflikte werden vor dem ersten Schreibzugriff angezeigt.
 
 ## Dokumentation

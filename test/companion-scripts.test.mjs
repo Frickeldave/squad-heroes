@@ -10,6 +10,7 @@ const product = path.resolve(import.meta.dirname, '..');
 const injected = {
   cwd: '.',
   spawn: (command, args) => {
+    if (args[0] === 'auth') return commandResult("- Token scopes: 'repo', 'project'\n");
     if (args[0] === 'api' && args[1] === 'user') return commandResult('octocat\n');
     if (args[0] === 'api' && args[1].startsWith('repos/')) {
       return commandResult('{"pull":true,"push":true,"admin":false,"triage":false}\n');
@@ -156,6 +157,8 @@ test('release gate enforces exactly one label and validates a greater positive v
         const log = path.join(root, 'gh.log');
         write(root, 'bin/gh', `#!/bin/sh
     case "$*" in
+          *"auth status"*) printf '%s\n' "- Token scopes: 'repo', 'project'" ;;
+          *"api graphql"*) printf '%s\n' '{"data":{"organization":{"projectV2":{"id":"P1","viewerCanUpdate":true}}}}' ;;
       *"label list"*) printf '[]\\n' ;;
       *"project field-list"*) printf '{"fields":[]}\\n' ;;
       *"project view"*) printf '{"id":"P1"}\\n' ;;

@@ -20,13 +20,17 @@ planning and again before writing. Missing, duplicate, invalid, prerelease and
 older markers stop with exit code 2.
 
 The Companion checks `gh`, host authentication, the authenticated account, and
-non-mutating repository read/push permissions at startup. It then performs a
-read-only `read:project` probe for the Project owner derived from the repository
-and caches that result. All GitHub checks happen before profile, repository,
+non-mutating repository read/push permissions at startup. It proves the
+write-capable `project` scope from the active account's sanitized `gh auth
+status --hostname github.com` scope line, then performs a non-mutating Project
+API probe for the owner derived from the repository and caches that result.
+All GitHub checks happen before profile, repository,
 model, language, branch, review-baseline, or Project-choice menus. When the
 repository is absent, only its unavoidable prompt follows authentication. This
-Project read capability is required for every full wizard/install flow, even if
-board sync is later left disabled. The Companion never requests, accepts or
+The `project` scope and API probe are required for every full wizard/install and
+dry-run flow, even if board sync is later left disabled. Metadata-only reads
+can technically use `read:project`, but squad-heroes Board setup updates
+Project fields/status/schema and therefore requires `project`. The Companion never requests, accepts or
 persists a token. An unsupported
 Squad version must be repaired with the normal-user upgrade flow described
 below; never run Squad itself with `sudo`.
@@ -75,7 +79,10 @@ from `--repository`; the available Projects are read through `gh`. One Project
 is selected automatically, multiple Projects use the same arrow-key picker, and zero stops before
 planning with setup/access instructions. Explicit `--project-number` (and a
 matching derived-owner `--project-owner`) may be used by CI but is always
-validated through the API. Dry-run performs only these read checks. Empty
+validated through the API. Before Board configuration can mutate, a fresh
+GraphQL check verifies `viewerCanUpdate`; the later workflow repeats that
+check immediately before its first Project write. Dry-run performs only these
+read checks. Empty
 optional values use the displayed existing value. Non-interactive CI supplies:
 
 ```bash

@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import {
   assertSquadCompatibility,
-  assertGithubWriteAccess,
+  assertProjectWriteAccess,
   assertReviewBaseline,
   preflightGithubAccess,
   resolveBoardProject,
@@ -303,17 +303,17 @@ export function applyPlan(
   if (verify || dryRun) return { changed: 0, plan: summarizePlan(plan.operations) };
   assertSquadCompatibility(repoRoot);
   const access = plan.config.repository
-    ? assertGithubWriteAccess(plan.config.repository, {
+    ? preflightGithubAccess(plan.config.repository, {
         ...injected,
         language: plan.config.language,
         expectedAccount: expectedAccount ?? injected.expectedAccount,
       })
     : null;
   if (plan.config.extensions?.['board-sync']) {
-    resolveBoardProject(plan.config.repository, { ...plan.config.extensions['board-sync'] }, {
+    assertProjectWriteAccess(plan.config.repository, { ...plan.config.extensions['board-sync'] }, {
       ...injected,
       language: plan.config.language,
-      account: access.account,
+      expectedAccount: expectedAccount ?? injected.expectedAccount,
     });
   }
   let changed = 0;

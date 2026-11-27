@@ -21,12 +21,16 @@ verändert sein Plugin-verwaltetes Bundle selbst nicht.
 
 Vor Planung sind `gh auth status --hostname github.com`, authentifizierter
 Account-Zugriff und `gh api repos/OWNER/REPO --jq .permissions` Pflicht.
-Gespeichert werden nur die Booleans read/push/admin/triage. Board-Opt-in
-verlangt zusätzlich nicht-mutierenden Project-list/view-Zugriff; der Owner wird
-aus dem Repository abgeleitet. Host-Fehler verweisen auf
-`gh auth login --hostname github.com --web`. Nur-lesender Project-Zugriff nutzt
-`gh auth refresh -h github.com -s read:project`; dokumentiertes mutierendes
-Project-Setup bei Bedarf den Scope `project`. Berechtigung ersetzt
+Die Scope-Zeile des aktiven Accounts muss den schreibfähigen Scope `project`
+gewähren; gespeichert wird nur ein gefilterter Scope-Status. Gespeichert werden
+außerdem nur die Booleans read/push/admin/triage. Jede vollständige Installation
+einschließlich Dry-run verlangt nicht-mutierenden Project-API-Zugriff; der
+Owner wird aus dem Repository abgeleitet. Host-Fehler verweisen auf
+`gh auth login --hostname github.com --web`. Fehlender Scope wird exakt mit
+`gh auth refresh -h github.com -s project` und anschließend
+`gh auth status --hostname github.com` behoben. `read:project` reicht technisch
+nur für isolierte Metadaten-Lesevorgänge, nicht für dieses Board-Setup, das
+Project-Felder, Status und Schema ändert. Berechtigung ersetzt
 keine ausdrückliche Zustimmung. Dry-run und Erstaktivierung schreiben kein
 Project; der spätere Workflow bleibt separat opt-in.
 

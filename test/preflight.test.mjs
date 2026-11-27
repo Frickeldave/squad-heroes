@@ -4,10 +4,12 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import {
+  assertGithubAuthentication,
   assertGithubWriteAccess,
   assertSquadCompatibility,
   detectSquadVersion,
   listBoardProjects,
+  preflightGithubAccess,
 } from '../src/preflight.mjs';
 import { cleanup, fixture, write } from './helpers.mjs';
 
@@ -49,7 +51,11 @@ function ghFixture(repositoryResult, overrides = {}) {
   const calls = [];
   const spawn = (command, args) => {
     calls.push({ command, args });
-    if (args[0] === 'auth') return overrides.auth ?? { status: 0, stdout: '', stderr: '' };
+    if (args[0] === 'auth') return overrides.auth ?? {
+      status: 0,
+      stdout: '',
+      stderr: "- Token scopes: 'repo', 'project'\n",
+    };
     if (args[0] === 'api' && args[1] === 'user') {
       return overrides.account ?? { status: 0, stdout: 'octocat\n', stderr: '' };
     }
@@ -170,15 +176,56 @@ test('GitHub preflight uses one permissions check and returns booleans only', ()
   }]);
 });
 
+test('GitHub Project preflight requires the exact project scope after repository access', () => {
+  const readOnly = ghFixture(
+    { status: 0, stdout: '{"pull":true,"push":true}' },
+    { auth: {
+      status: 0,
+      stdout: "- Token scopes: 'repo', 'read:project'\n",
+      stderr: "Token: ghp_SUPER_SECRET\n",
+    } }
+  );
+  assert.throws(() => preflightGithubAccess('owner/repository', {
+    spawn: readOnly.spawn,
+  }), (error) => {
+    assert.equal(error.details.category, 'project_scope');
+    assert.equal(error.details.activeAccount, 'octocat');
+    assert.match(error.message, /read:project granted/u);
+    assert.match(error.message, /gh auth refresh -h github.com -s project/u);
+    assert.match(error.message, /gh auth status --hostname github.com/u);
+    assert.doesNotMatch(error.message, /ghp_|Token:/u);
+    return true;
+  });
+  assert.equal(readOnly.calls.some(({ args }) =>
+    args[0] === 'project' && args[1] === 'list'
+  ), false);
+
+  const granted = ghFixture(
+    { status: 0, stdout: '{"pull":true,"push":true}' },
+    { auth: {
+      status: 0,
+      stdout: "Logged in to github.com account octocat\n- Token scopes: 'repo', 'project'\n",
+      stderr: "Token: ghp_NEVER_PRINT\n",
+    }, fallback: { status: 0, stdout: '{"projects":[]}\n', stderr: '' } }
+  );
+  const access = preflightGithubAccess('owner/repository', { spawn: granted.spawn });
+  assert.equal(access.account, 'octocat');
+  assert.equal(access.projectScope, true);
+  assert.equal(access.scopeStatus, 'project granted');
+  const authentication = assertGithubAuthentication({ spawn: granted.spawn });
+  assert.deepEqual(authentication.scopes, ['repo', 'project']);
+  assert.doesNotMatch(JSON.stringify(authentication), /ghp_|NEVER_PRINT|Token/u);
+});
+
 test('GitHub Project scope and access failures are actionable and localized', () => {
-  const scope = { status: 1, stdout: '', stderr: 'requires scope read:project; token=secret' };
+  const scope = { status: 1, stdout: '', stderr: 'requires scope project; token=secret' };
   assert.throws(() => listBoardProjects('owner/repository', {
     account: 'octocat',
     spawn: () => scope,
   }), (error) => {
     assert.equal(error.details.category, 'project_scope');
-    assert.match(error.message, /gh auth refresh -h github.com -s read:project/u);
     assert.match(error.message, /gh auth refresh -h github.com -s project/u);
+    assert.match(error.message, /gh auth status --hostname github.com/u);
     assert.match(error.message, /Active gh account: octocat/u);
     assert.doesNotMatch(error.message, /token=secret/u);
     return true;

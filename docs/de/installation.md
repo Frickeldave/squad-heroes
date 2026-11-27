@@ -21,14 +21,19 @@ Er prüft ihn vor der Planung und erneut vor dem Schreiben. Fehlende, doppelte,
 ungültige, Prerelease- oder ältere Marker stoppen mit Exitcode 2.
 
 Zusätzlich werden beim Start `gh`, Host-Authentifizierung, authentifizierter
-Account und nicht-mutierende Repository-Lese-/Push-Rechte geprüft. Danach wird
-für den aus dem Repository abgeleiteten Project-Owner eine ausschließlich
-lesende `read:project`-Prüfung ausgeführt und sicher zwischengespeichert. Alle
+Account und nicht-mutierende Repository-Lese-/Push-Rechte geprüft. Der
+schreibfähige `project`-Scope wird aus der sicher gefilterten Scope-Zeile des
+aktiven Accounts in `gh auth status --hostname github.com` bewiesen. Danach folgt
+für den aus dem Repository abgeleiteten Project-Owner eine nicht-mutierende
+Project-API-Prüfung, deren Ergebnis sicher zwischengespeichert wird. Alle
 GitHub-Prüfungen erfolgen vor Profil-, Repository-, Modell-, Sprach-, Branch-,
 Review-Baseline- oder Project-Auswahl. Fehlt das Repository, folgt auf die
-Authentifizierung ausschließlich die unvermeidliche Repository-Abfrage. Dieser
-Project-Lesezugriff ist für jeden vollständigen Wizard-/Installationsfluss
-verpflichtend, auch wenn Board-Sync anschließend deaktiviert bleibt. Der
+Authentifizierung ausschließlich die unvermeidliche Repository-Abfrage. Der
+`project`-Scope und API-Test sind für jeden vollständigen Wizard-,
+Installations- und Dry-run-Fluss verpflichtend, auch wenn Board-Sync
+anschließend deaktiviert bleibt. Isolierte Project-Metadaten-Lesevorgänge
+können technisch `read:project` nutzen; die Board-Einrichtung von squad-heroes
+ändert jedoch Felder, Status und Schema und benötigt deshalb `project`. Der
 Companion fragt weder Token ab noch akzeptiert oder persistiert er sie. Eine zu
 alte Squad-Version wird mit dem unten beschriebenen
 normalen Upgrade-Fluss repariert; Squad selbst nie mit `sudo` ausführen.
@@ -78,7 +83,10 @@ aus `--repository` abgeleitet, Projects werden lesend über `gh` erkannt. Ein
 Project wird automatisch gewählt, mehrere erscheinen in derselben Pfeiltasten-Auswahl, keines stoppt
 vor Planung mit konkreter Setup-/Zugriffsanleitung. Für CI bleiben
 `--project-number` und ein dazu passender `--project-owner` als stets per API
-validierte Overrides möglich. Dry-run führt nur Leseprüfungen aus. Leere
+validierte Overrides möglich. Vor einer mutierenden Board-Konfiguration prüft
+eine frische GraphQL-Abfrage `viewerCanUpdate`; der spätere Workflow wiederholt
+diese Prüfung unmittelbar vor dem ersten Project-Schreibzugriff. Dry-run führt
+nur Leseprüfungen aus. Leere
 optionale Werte nutzen sichtbare Bestandswerte. Nicht-interaktive CI übergibt:
 
 ```bash

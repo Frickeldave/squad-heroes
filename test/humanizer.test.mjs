@@ -10,6 +10,7 @@ const skillRoot = path.join(root, '.squad/heroes/skills/humanizer');
 const injected = {
   cwd: '.',
   spawn: (command, args) => {
+    if (args[0] === 'auth') return commandResult("- Token scopes: 'repo', 'project'\n");
     if (args[0] === 'api' && args[1] === 'user') return commandResult('octocat\n');
     if (args[0] === 'api' && args[1].startsWith('repos/')) {
       return commandResult('{"pull":true,"push":true,"admin":false,"triage":false}\n');

@@ -179,11 +179,20 @@ node .squad/templates/squad-heroes/companion/scripts/install \
 
 Require approved model IDs and complete noninteractive inputs. Verify startup
 checks `gh`, authentication/account, repository read/push permissions, and the
-derived owner's Project read access, in that order and before every prompt,
+derived owner's Project API access, in that order. It must also prove the active
+account's exact write-capable `project` scope from a sanitized
+`gh auth status --hostname github.com` line; `read:project` alone must fail.
+These gates run before every prompt,
 menu renderer, readline/raw-terminal selection, model discovery, or plan output.
-The Project read probe is required even when board sync remains off and is
-cached for later selection. Missing Project scope must produce zero prompt/menu
-calls. Expect the
+The scope and non-mutating Project probe are required even when board sync
+remains off or installation is `--dry-run`, and the result is cached for later
+selection. Missing scope must show `gh auth refresh -h github.com -s project`,
+then `gh auth status --hostname github.com`, expose neither token nor raw status,
+and produce zero prompt/menu calls. A granted `project` scope must pass. Confirm
+the preflight output names the active account and a sanitized granted status.
+Verify 403 owner-right and 404 owner/visibility guidance, `viewerCanUpdate`
+before Board mutation, and a second immediate recheck before the first Project
+write. Expect the
 separate **Companion activation plan** to show `scripts/start-work.mjs`, other
 `scripts/` targets, `.github/prompts/`, and
 `.github/workflows/heroes-ci.yml`. It performs no writes, passes both version

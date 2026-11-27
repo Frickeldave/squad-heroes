@@ -20,13 +20,17 @@ changes its own plugin-managed bundle.
 ## Permissions and approval
 
 Before planning, `gh auth status --hostname github.com`, authenticated account
-access and `gh api repos/OWNER/REPO --jq .permissions` are required. Only the
-read/push/admin/triage booleans are retained. Board opt-in additionally requires
-non-mutating Project list/view access; selected owner is derived from the
-repository. Host failures direct the operator to
-`gh auth login --hostname github.com --web`. Read-only Project access uses
-`gh auth refresh -h github.com -s read:project`; a documented mutating Project
-setup uses the `project` scope when needed.
+access and `gh api repos/OWNER/REPO --jq .permissions` are required. The active
+account's scope line must grant the write-capable `project` scope; only a
+sanitized scope status is retained. Only the
+read/push/admin/triage booleans are retained. Every full install, including
+dry-run, additionally requires non-mutating Project API access; selected owner
+is derived from the repository. Host failures direct the operator to
+`gh auth login --hostname github.com --web`. Missing `project` scope remediation
+is exactly `gh auth refresh -h github.com -s project`, followed by
+`gh auth status --hostname github.com`. `read:project` is technically enough
+only for isolated metadata reads, not this Board setup, which updates Project
+fields/status/schema.
 Permission does not replace explicit approval. The installer performs no
 Project write in dry-run or initial activation; the later workflow remains a
 separate opt-in.

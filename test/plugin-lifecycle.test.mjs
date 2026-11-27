@@ -96,6 +96,7 @@ for (const fixtureId of [1, 2]) test(`real Squad lifecycle uses an installed sel
   const installedEntry = path.join(root, '.squad/templates/squad-heroes/companion/scripts/install');
   const installedCharter = path.join(root, '.squad/templates/squad-heroes/companion/.squad/heroes/agents/tony.en.md');
   write(root, 'bin/gh', `#!/bin/sh
+if [ "$1" = "auth" ] && [ "$2" = "status" ]; then printf '%s\\n' "- Token scopes: 'repo', 'project'"; fi
 if [ "$1" = "api" ] && [ "$2" = "user" ]; then printf 'octocat\\n'; fi
 if [ "$1" = "api" ] && printf '%s' "$2" | grep -q '^repos/'; then printf '{"pull":true,"push":true,"admin":false,"triage":false}\\n'; fi
 if [ "$1" = "project" ] && [ "$2" = "list" ]; then printf '{"projects":[]}\\n'; fi

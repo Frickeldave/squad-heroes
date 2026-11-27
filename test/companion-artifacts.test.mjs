@@ -9,7 +9,13 @@ import { cleanup, commandResult, fixture } from './helpers.mjs';
 const injected = {
   cwd: '.',
   spawn: (command, args) => {
+    if (args[0] === 'auth') return commandResult("- Token scopes: 'repo', 'project'\n");
     if (args[0] === 'api' && args[1] === 'user') return commandResult('octocat\n');
+    if (args[0] === 'api' && args[1] === 'graphql') {
+      return commandResult(JSON.stringify({
+        data: { organization: { projectV2: { id: 'P1', viewerCanUpdate: true } } },
+      }));
+    }
     if (args[0] === 'api' && args[1].startsWith('repos/')) {
       return commandResult('{"pull":true,"push":true,"admin":false,"triage":false}\n');
     }

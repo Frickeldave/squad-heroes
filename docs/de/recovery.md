@@ -64,9 +64,13 @@ erneut auf Marker und UTF-8 validiert.
 - `gh_api_error`: erneut versuchen und Host, VPN, DNS sowie GitHub-Verfügbarkeit
   prüfen.
 - `gh_project_scope`/`gh_project_access`, `project_missing`,
-  `project_ambiguous`: Project-Scope/-Zugriff oder deterministische Auswahl
-  fehlt. Nur den nötigen Scope erneuern, ein Project anlegen/freigeben oder für
-  CI eine validierte `--project-number` übergeben.
+  `project_ambiguous`: schreibfähiger `project`-Scope, Project-API-Zugriff oder
+  deterministische Auswahl fehlt. Ausschließlich mit
+  `gh auth refresh -h github.com -s project` erneuern und mit
+  `gh auth status --hostname github.com` prüfen; ein Project anlegen/freigeben
+  oder für CI eine validierte `--project-number` übergeben. 403 bedeutet
+  Project-/Organizationsrechte, 404 falschen, privaten oder unsichtbaren
+  Owner/Project-Kontext.
 - `conflicts`: Dry-run und Dateien unverändert; Entscheidung erforderlich.
 - `ambiguous_markers`: doppelte, fehlende oder vertauschte Marker.
 - `deployment_branch`: Ref ungültig oder nicht eindeutig.
@@ -109,9 +113,11 @@ gh repo view OWNER/REPO
   verwenden und diese Identität wählen. CI-/Operator-Läufe können bei bekannter
   Identität `--expected-github-account ACCOUNT` übergeben; Owner-Gleichheit wird
   niemals automatisch angenommen.
-- Nur-lesende Project-Auswahl:
-  `gh auth refresh -h github.com -s read:project`.
-- Mutiert dokumentiertes Project-Setup das Project:
-  `gh auth refresh -h github.com -s project`.
+- Fehlender Project-Scope für Board-Setup (auch im Dry-run):
+  `gh auth refresh -h github.com -s project`, danach
+  `gh auth status --hostname github.com`.
+- `read:project` allein unterstützt nur isolierte Project-Metadaten-Lesevorgänge.
+  Es reicht absichtlich nicht aus, weil squad-heroes Felder, Status und Schema
+  konfiguriert.
 - Bei API-/Netzwerkfehlern nach Prüfung von `github.com`, VPN und DNS erneut
   versuchen. Keine Tokens, `Authorization`-Header oder Antwort-Bodies ausgeben.

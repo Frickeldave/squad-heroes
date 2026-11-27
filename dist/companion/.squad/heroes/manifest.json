@@ -183,7 +183,7 @@
       "source": ".squad/heroes/companion/scripts/heroes-configure",
       "target": ".squad/heroes/companion/scripts/heroes-configure",
       "owner": "companion",
-      "sha256": "2ac7869d6fc2e7e9217a9c26e30d33b1d8849daee58223c0622d9840305ac11b"
+      "sha256": "e7f87d18c7dc75aee6f94e1f4ea7fe180da882765ff1516666d3df0f4bda92ab"
     },
     {
       "id": ".squad:heroes:companion:scripts:reqeng-block",

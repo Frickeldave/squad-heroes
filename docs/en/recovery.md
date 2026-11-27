@@ -58,9 +58,12 @@ markers and UTF-8 before write.
   log in through the browser/device flow and select the expected identity.
 - `gh_api_error`: retry and check host, VPN, DNS, and GitHub availability.
 - `gh_project_scope`/`gh_project_access`, `project_missing`,
-  `project_ambiguous`: Project scope/access or deterministic selection is
-  missing. Refresh only the scope needed; create/share a Project or pass a
-  validated `--project-number` for CI.
+  `project_ambiguous`: the write-capable `project` scope, Project API access, or
+  deterministic selection is missing. Refresh only with
+  `gh auth refresh -h github.com -s project`, then verify with
+  `gh auth status --hostname github.com`; create/share a Project or pass a
+  validated `--project-number` for CI. 403 means Project/organization rights;
+  404 means wrong, private, or invisible owner/Project.
 - `conflicts`: dry run and files unchanged; decision required.
 - `ambiguous_markers`: duplicate, absent or reversed markers.
 - `deployment_branch`: ref is invalid or ambiguous.
@@ -104,9 +107,11 @@ gh repo view OWNER/REPO
   browser/device login and select that identity. CI/operator runs may pass
   `--expected-github-account ACCOUNT` when an identity is known; repository
   owner equality is never inferred automatically.
-- Read-only Project selection:
-  `gh auth refresh -h github.com -s read:project`.
-- If documented Project setup mutates the Project:
-  `gh auth refresh -h github.com -s project`.
+- Missing Board-setup Project scope (required even for dry-run):
+  `gh auth refresh -h github.com -s project`, then
+  `gh auth status --hostname github.com`.
+- `read:project` alone supports only isolated Project metadata reads. It is
+  intentionally insufficient because squad-heroes configures fields, status and
+  schema.
 - For API/network errors, retry after checking `github.com`, VPN, and DNS. Do
   not expose tokens, `Authorization` headers, or response bodies.

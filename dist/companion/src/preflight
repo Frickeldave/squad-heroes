@@ -91,6 +91,27 @@ function safeGhAccount(value) {
   return /^(?!-)[A-Za-z0-9-]{1,39}$/u.test(login) ? login : null;
 }
 
+function parseAuthScopes(output, account) {
+  const text = String(output ?? '').replace(/\x1B\[[0-?]*[ -/]*[@-~]/gu, '');
+  const sections = text.split(/\n(?=(?:\s*-\s*)?Logged in to\s+|(?:\s*)github\.com\b)/iu);
+  const escapedAccount = account.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+  const active = sections.find((section) =>
+    new RegExp(`\\baccount\\s+${escapedAccount}\\b`, 'iu').test(section)
+  ) ?? (sections.length === 1 ? text : '');
+  const line = active.match(/Token scopes:\s*([^\r\n]+)/iu)?.[1] ?? '';
+  return [...line.matchAll(/['"]([A-Za-z0-9:_-]+)['"]/gu)]
+    .map((match) => match[1].toLowerCase())
+    .filter((scope, index, scopes) => scopes.indexOf(scope) === index);
+}
+
+function scopeStatus(scopes) {
+  const status = [];
+  if (scopes.includes('project')) status.push('project granted');
+  if (scopes.includes('read:project')) status.push('read:project granted');
+  if (!status.length) status.push(scopes.length ? 'project scopes absent' : 'project scope unverified');
+  return status.join('; ');
+}
+
 function safeStatusSummary(result) {
   const stderr = String(result?.stderr ?? '');
   const http = stderr.match(/\bHTTP\s+([1-5]\d\d)\b/iu);
@@ -153,7 +174,37 @@ export function assertGithubAuthentication(options = {}) {
       host: GITHUB_HOST,
     }), { category: 'account_mismatch', host: GITHUB_HOST, activeAccount: login, expectedAccount });
   }
-  return { account: login, host: GITHUB_HOST };
+  const scopes = parseAuthScopes(`${auth.stdout ?? ''}\n${auth.stderr ?? ''}`, login);
+  return {
+    account: login,
+    host: GITHUB_HOST,
+    projectScope: scopes.includes('project'),
+    scopes,
+    scopeStatus: scopeStatus(scopes),
+  };
+}
+
+export function assertGithubProjectScope(authentication, options = {}) {
+  if (authentication?.projectScope === true) return authentication;
+  const active = safeGhAccount(authentication?.account) ?? 'unknown';
+  const status = typeof authentication?.scopeStatus === 'string'
+    ? authentication.scopeStatus
+    : scopeStatus([]);
+  stop('project_scope', options, 'gh_project_scope', {
+    active,
+    owner: options.owner ?? repositoryOwner(options.repository),
+    host: GITHUB_HOST,
+    summary: status,
+    scopeStatus: status,
+    project: options.projectNumber ? ` #${options.projectNumber}` : '',
+  }, {
+    summary: status,
+    scopeStatus: status,
+    repository: options.repository,
+    activeAccount: active,
+    owner: options.owner ?? repositoryOwner(options.repository),
+  });
+  return authentication;
 }
 
 export function assertGithubRepositoryAccess(repository, options = {}) {
@@ -272,6 +323,7 @@ function projectScopeFailure(owner, repository, options, result, number) {
       owner,
       host: GITHUB_HOST,
       summary,
+      scopeStatus: 'API reported missing or inadequate Project scope',
       project: number ? ` #${number}` : '',
     }, { summary, repository, activeAccount: active, owner, projectNumber: number });
   }
@@ -347,6 +399,74 @@ export function resolveBoardProject(repository, board = {}, options = {}) {
   return { ...board, owner, number };
 }
 
+export function assertProjectWriteAccess(repository, board, options = {}) {
+  const authentication = options.authentication ?? assertGithubAuthentication({
+    ...options,
+    repository,
+  });
+  const owner = repositoryOwner(repository);
+  assertGithubProjectScope(authentication, {
+    ...options,
+    repository,
+    owner,
+    projectNumber: board.number,
+  });
+  const resolved = resolveBoardProject(repository, { ...board }, {
+    ...options,
+    account: authentication.account,
+    authentication,
+  });
+  const query = 'query($login:String!,$number:Int!){organization(login:$login){projectV2(number:$number){id viewerCanUpdate}}user(login:$login){projectV2(number:$number){id viewerCanUpdate}}}';
+  const verification = run('gh', [
+    'api', 'graphql',
+    '-f', `query=${query}`,
+    '-F', `login=${resolved.owner}`,
+    '-F', `number=${resolved.number}`,
+  ], options);
+  assertGhInstalled(verification, options);
+  const summary = safeStatusSummary(verification);
+  if (verification.status !== 0) {
+    stop('project_access', options, 'gh_project_write_access', {
+      active: authentication.account,
+      owner: resolved.owner,
+      host: GITHUB_HOST,
+      summary,
+      project: ` #${resolved.number}`,
+      number: resolved.number,
+    }, {
+      summary,
+      repository,
+      activeAccount: authentication.account,
+      owner: resolved.owner,
+      projectNumber: resolved.number,
+    });
+  }
+  let payload;
+  try {
+    payload = JSON.parse(String(verification.stdout));
+  } catch {
+    payload = null;
+  }
+  const project = payload?.data?.organization?.projectV2 ?? payload?.data?.user?.projectV2;
+  if (!project || project.viewerCanUpdate !== true) {
+    stop('project_write_denied', options, 'gh_project_write_access', {
+      active: authentication.account,
+      owner: resolved.owner,
+      host: GITHUB_HOST,
+      summary: project ? 'write access is false' : 'Project not found or not visible (404)',
+      project: ` #${resolved.number}`,
+      number: resolved.number,
+    }, {
+      summary: project ? 'write access is false' : 'Project not found or not visible (404)',
+      repository,
+      activeAccount: authentication.account,
+      owner: resolved.owner,
+      projectNumber: resolved.number,
+    });
+  }
+  return resolved;
+}
+
 export function preflightGithubAccess(repository, options = {}) {
   const authentication = options.authentication ?? assertGithubAuthentication(options);
   const access = assertGithubRepositoryAccess(repository, {
@@ -354,12 +474,17 @@ export function preflightGithubAccess(repository, options = {}) {
     authentication,
     repository,
   });
+  assertGithubProjectScope(authentication, {
+    ...options,
+    repository,
+    owner: access.owner,
+  });
   const projects = listBoardProjects(repository, {
     ...options,
     repository,
     account: access.account,
   });
-  return { ...access, projects };
+  return { ...access, projects, projectScope: authentication.projectScope, scopeStatus: authentication.scopeStatus };
 }
 
 export function assertReviewBaseline(repoRoot, baseline, options = {}) {

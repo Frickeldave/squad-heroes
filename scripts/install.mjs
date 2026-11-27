@@ -34,11 +34,12 @@ Interactive model and Project selection use an in-place arrow-key picker
 --model-reqeng/--model-work/--model-review. The runtime --model override remains
 available.
 
-With --enable-board-sync, Project owner is derived from --repository. Project
-number is discovered and validated read-only; CI may use --project-number for a
-deterministic validated override. Use --disable-board-sync to make the board-off
-choice explicit without a prompt. The startup Project read probe remains
-required. No token is accepted.
+With --enable-board-sync, Project owner is derived from --repository. The
+write-capable project scope is proved from the active account's sanitized
+gh auth status output, followed by a non-mutating Project API probe. CI may use
+--project-number for a deterministic validated override. Use --disable-board-sync
+to make the board-off choice explicit without a prompt. The scope and API gates
+remain required for dry-run. No token is accepted.
 `;
 
 function existingOptions(target) {
@@ -301,6 +302,8 @@ export async function main() {
         authentication,
         expectedAccount: options.expectedAccount,
       });
+      process.stdout.write(`${wizardText(language, 'github_access_verified')
+        .replace('{account}', options.githubPreflight.account)}\n`);
       assertSquadCompatibility(resolve(options.target ?? process.cwd()));
       const missingModelFlags = !existing && ['reqeng', 'work', 'review']
         .some((flow) => !options.explicitModels[flow]);

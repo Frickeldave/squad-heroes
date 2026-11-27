@@ -27,6 +27,7 @@ const options = {
 const injected = {
   cwd: '.',
   spawn: (command, args) => {
+    if (args[0] === 'auth') return commandResult("- Token scopes: 'repo', 'project'\n");
     if (args[0] === 'api' && args[1] === 'user') return commandResult('octocat\n');
     if (args[0] === 'api' && args[1].startsWith('repos/')) {
       return commandResult('{"pull":true,"push":true,"admin":false,"triage":false}\n');
@@ -73,6 +74,7 @@ test('interactive Companion wizard collects required and opt-in configuration', 
     return current;
   }, {
     spawn(command, args) {
+        if (args[0] === 'auth') return commandResult("- Token scopes: 'repo', 'project'\n");
       ghCalls.push([command, ...args]);
       events.push(`run:${command} ${args.join(' ')}`);
       if (command === 'copilot') {
@@ -161,7 +163,7 @@ test('missing Project scope stops before any wizard prompt or menu', async () =>
   }, {
     spawn(command, args) {
       calls.push([command, ...args]);
-      if (args[0] === 'auth') return commandResult();
+      if (args[0] === 'auth') return commandResult("- Token scopes: 'repo', 'read:project'\n");
       if (args[0] === 'api' && args[1] === 'user') return commandResult('octocat\n');
       if (args[0] === 'api' && args[1].startsWith('repos/')) {
         return commandResult('{"pull":true,"push":true}\n');
@@ -178,7 +180,6 @@ test('missing Project scope stops before any wizard prompt or menu', async () =>
     'auth status',
     'api user',
     'api repos/owner/repository',
-    'project list',
   ]);
 });
 
@@ -203,6 +204,7 @@ test('explicit full flags with board off preflight before the remaining prompt',
     throw new Error('explicit model flags must not render a menu');
   }, {
     spawn(command, args) {
+        if (args[0] === 'auth') return commandResult("- Token scopes: 'repo', 'project'\n");
       events.push(`run:${command} ${args.join(' ')}`);
       if (command === 'copilot') return { status: 1, stdout: '', stderr: '' };
       if (args[0] === 'api' && args[1] === 'user') return commandResult('octocat\n');
@@ -244,6 +246,7 @@ test('interactive German model labels and discovery fallback are explicit', asyn
       return current;
     }, {
       spawn(command, args) {
+        if (args[0] === 'auth') return commandResult("- Token scopes: 'repo', 'project'\n");
         if (command === 'copilot') return { status: 1, stdout: '', stderr: '' };
         if (args[0] === 'api' && args[1] === 'user') return commandResult('octocat\n');
         if (args[0] === 'api' && args[1].startsWith('repos/')) {
@@ -443,6 +446,7 @@ test('multiple discovered Projects are selected only through the interactive pic
     return label === 'GitHub Project' ? choices[1] : current;
   }, {
     spawn(command, args) {
+        if (args[0] === 'auth') return commandResult("- Token scopes: 'repo', 'project'\n");
       if (command === 'copilot') return { status: 1, stdout: '', stderr: '' };
       if (args[0] === 'api' && args[1] === 'user') return commandResult('octocat\n');
       if (args[0] === 'api' && args[1].startsWith('repos/')) {
@@ -481,6 +485,7 @@ test('dry-run board opt-in uses only read checks and writes no active targets', 
     };
     const injected = {
       spawn(command, args) {
+        if (args[0] === 'auth') return commandResult("- Token scopes: 'repo', 'project'\n");
         calls.push([command, ...args]);
         if (args[0] === 'api' && args[1] === 'user') return commandResult('octocat\n');
         if (args[0] === 'project' && args[1] === 'view') {
@@ -518,6 +523,7 @@ test('Project access failure blocks board installation before its first write', 
       board: { number: 9, statusField: 'Status', statusMap: { 'go:yes': 'Ready' }, secret: 'secrets.HEROES_PROJECT_TOKEN' },
     }, {
       spawn(command, args) {
+        if (args[0] === 'auth') return commandResult("- Token scopes: 'repo', 'project'\n");
         if (args[0] === 'api' && args[1] === 'user') return commandResult('octocat\n');
         if (args[0] === 'project' && args[1] === 'list') return commandResult('{"projects":[]}\n');
         if (args[0] === 'project' && args[1] === 'view') {
@@ -541,6 +547,7 @@ test('mutating board installation rechecks Project access immediately before wri
   let denyProject = false;
   const gate = {
     spawn(command, args) {
+        if (args[0] === 'auth') return commandResult("- Token scopes: 'repo', 'project'\n");
       if (args[0] === 'api' && args[1] === 'user') return commandResult('octocat\n');
       if (args[0] === 'api' && args[1].startsWith('repos/')) {
         return commandResult('{"pull":true,"push":true}\n');
@@ -569,6 +576,52 @@ test('mutating board installation rechecks Project access immediately before wri
     denyProject = true;
     assert.throws(() => applyPlan(root, plan, {}, gate), /Project access failed/u);
     assert.equal(views, 2);
+    assert.equal(existsSync(path.join(root, '.squad/heroes.json')), false);
+  } finally {
+    cleanup(root);
+  }
+});
+
+test('Project board activation verifies write rights before any file mutation', () => {
+  const root = fixture();
+  let writes = 0;
+  const gate = {
+    spawn(command, args) {
+      if (args[0] === 'auth') return commandResult("- Token scopes: 'project'\n");
+      if (args[0] === 'api' && args[1] === 'user') return commandResult('octocat\n');
+      if (args[0] === 'api' && args[1].startsWith('repos/')) {
+        return commandResult('{"pull":true,"push":true}\n');
+      }
+      if (args[0] === 'project' && args[1] === 'list') return commandResult('{"projects":[]}\n');
+      if (args[0] === 'project' && args[1] === 'view') {
+        return commandResult('{"number":9}\n');
+      }
+      if (args[0] === 'api' && args[1] === 'graphql') {
+        writes += 1;
+        return commandResult(JSON.stringify({
+          data: { organization: { projectV2: { id: 'P1', viewerCanUpdate: false } } },
+        }));
+      }
+      return commandResult();
+    },
+  };
+  try {
+    const plan = buildInstallPlan(root, {
+      ...options,
+      boardSync: true,
+      board: {
+        number: 9,
+        statusField: 'Status',
+        statusMap: { 'go:yes': 'Ready' },
+        secret: 'secrets.HEROES_PROJECT_TOKEN',
+      },
+    }, gate);
+    assert.throws(() => applyPlan(root, plan, {}, gate), (error) => {
+      assert.match(error.message, /403/iu);
+      assert.match(error.message, /Project owner\/admin/u);
+      return true;
+    });
+    assert.equal(writes, 1);
     assert.equal(existsSync(path.join(root, '.squad/heroes.json')), false);
   } finally {
     cleanup(root);

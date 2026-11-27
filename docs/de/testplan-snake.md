@@ -188,12 +188,21 @@ node .squad/templates/squad-heroes/companion/scripts/install \
 
 Vorbedingungen: freigegebene Modell-IDs und vollständige nicht-interaktive
 Eingaben liegen vor. Prüfen, dass der Start `gh`, Authentifizierung/Account,
-Repository-Lese-/Push-Rechte und den lesenden Project-Zugriff des abgeleiteten
-Owners in dieser Reihenfolge vor jedem Prompt, Menü-Renderer,
-Readline-/Raw-Terminal-Auswahl, Modell-Discovery oder Planausgabe prüft. Die
-Project-Leseprüfung ist auch bei deaktiviertem Board-Sync verpflichtend und wird
-für die spätere Auswahl zwischengespeichert. Fehlender Project-Scope muss null
-Prompt-/Menü-Aufrufe erzeugen. Erwartet: der separate **Companion-Aktivierungsplan**
+Repository-Lese-/Push-Rechte und den Project-API-Zugriff des abgeleiteten
+Owners in dieser Reihenfolge prüft. Zusätzlich muss der exakte schreibfähige
+Scope `project` des aktiven Accounts aus einer gefilterten
+`gh auth status --hostname github.com`-Zeile bewiesen werden; `read:project`
+allein muss scheitern. Diese Gates laufen vor jedem Prompt, Menü-Renderer,
+Readline-/Raw-Terminal-Auswahl, Modell-Discovery oder Planausgabe. Scope- und
+nicht-mutierende Project-Prüfung sind auch bei deaktiviertem Board-Sync und
+`--dry-run` verpflichtend. Fehlender Scope muss
+`gh auth refresh -h github.com -s project` und danach
+`gh auth status --hostname github.com` zeigen, keinen Token/rohen Status leaken
+und null Prompt-/Menü-Aufrufe erzeugen. Ein gewährter `project`-Scope muss
+bestehen; die Ausgabe nennt aktiven Account und gefilterten Granted-Status.
+403-Owner-Rechte- und 404-Owner/Sichtbarkeits-Hinweise, `viewerCanUpdate` vor
+Board-Mutation sowie die zweite Prüfung direkt vor dem ersten Project-Write
+testen. Erwartet: der separate **Companion-Aktivierungsplan**
 zeigt `scripts/start-work.mjs`, weitere `scripts/`-Ziele, `.github/prompts/` und
 `.github/workflows/heroes-ci.yml`. Er verursacht keine Writes, passiert beide
 Version-Gates, fordert keinen Token an und hält Plugin-/Companion-Ownership
