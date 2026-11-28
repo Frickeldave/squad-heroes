@@ -140,7 +140,7 @@ node scripts/versionbump.mjs --help
 node scripts/check-release-label.mjs --help
 ```
 
-Gate: alle Einstiegspunkte existieren und liefern sichere Hilfe/Diagnose. Derselbe Apply erneut meldet `changed: 0`. Ändere einen verwalteten Markerblock: Dry-run zeigt lokale, eingehende und Ergebnisfassung; ungeklärte Konflikte schreiben nichts. Nur eine dokumentierte Entscheidung wird angewendet. `history.md` wächst nur append-only; Profilwechsel stoppt fail-closed.
+Gate: alle Einstiegspunkte existieren und liefern sichere Hilfe/Diagnose. Derselbe Apply erneut meldet `changed: 0`. Ändere einen verwalteten Markerblock: Der normale Dry-run nennt Konflikt und Empfehlung ohne rohes JSON oder Dateibodies; begrenzte Details sind optional. Ungeklärte Konflikte schreiben nichts. Nur eine dokumentierte Entscheidung wird angewendet. `history.md` wächst nur append-only; Profilwechsel stoppt fail-closed.
 
 Nach Plugin-Update Companion erneut ausführen. Aktive Bytes dürfen sich nur bei diesem Apply ändern. Plugin deaktivieren/deinstallieren: aktive Dateien bleiben bestehen und `.squad/plugins/*` blieb beim Companion-Rerun unverändert. Danach neu installieren.
 
@@ -226,7 +226,7 @@ node .squad/templates/squad-heroes/companion/scripts/install \
   --dry-run
 ```
 
-Gate: Menü enthält Companion-Anlage, manuelle Anlage und Abbruch; Dry-run zeigt `PLANNED_CREATE` und `{{PROJECT_NUMBER}}`, führt aber keine Mutation oder Platzhalter-Abfrage aus. Apply erzeugt genau einmal, löst echte Nummer/Node-ID auf, prüft `viewerCanUpdate`, richtet Schema und Repository-Link ein und speichert die Nummer. Rerun erzeugt weder ein zweites Project noch lokale Writes. Fehler bei 403, fehlenden CI-Flags, ungültigem Titel oder Teilschema liefern sichere Recovery ohne Secret. `HEROES_PROJECT_TOKEN` wird nur für Project v2 verwendet; Repository-Zugriffe nutzen `${{ github.token }}`.
+Gate: Menü enthält Companion-Anlage, manuelle Anlage und Abbruch. Der normale Dry-run sagt, dass Companion das Project anlegt, Schema konfiguriert und Repository verknüpft; interne Platzhalter werden nicht angezeigt. Es erfolgt keine Mutation oder Platzhalter-Abfrage. Apply erzeugt genau einmal, löst echte Nummer/Node-ID auf, prüft `viewerCanUpdate`, richtet Schema und Repository-Link ein und speichert die Nummer. Rerun erzeugt weder ein zweites Project noch lokale Writes. Fehler bei 403, fehlenden CI-Flags, ungültigem Titel oder Teilschema liefern sichere Recovery ohne Secret. `HEROES_PROJECT_TOKEN` wird nur für Project v2 verwendet; Repository-Zugriffe nutzen `${{ github.token }}`.
 
 ## Veraltete Consumer-Kopie
 

@@ -26,7 +26,9 @@ Conflicts in profile sources under `.squad/001/` use the same Companion recovery
 
 ## Companion conflicts
 
-Unresolved conflicts stop before writes. Each target accepts only `use`, `keep`, `merge`, or `abort`. TTY selection uses arrows or `j`/`k`, Enter, and Escape/`q`. CI file:
+Unresolved conflicts stop before writes. The normal TTY view explains the target, the proposed change, and the recommendation in plain language. Merge is selected first for managed sections. `Show details / diff` is optional and bounded. The UI never requires users to interpret `owner`, `actionDetails`, escaped file bodies, or raw plan JSON.
+
+TTY selection uses arrows or `j`/`k`, Enter, and Escape/`q`. CI uses the internal decision values in a file:
 
 ```json
 {

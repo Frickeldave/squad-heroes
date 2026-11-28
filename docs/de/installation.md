@@ -33,7 +33,23 @@ node .squad/templates/squad-heroes/companion/scripts/install \
   --dry-run
 ```
 
-Der separate **Companion-Aktivierungsplan** zeigt aktive Ziele wie `scripts/start-work.mjs`, `.github/prompts/`, `.github/workflows/heroes-ci.yml` und Agenten. Prüfe ihn und führe denselben Befehl ohne `--dry-run` aus. Erst dieser Schritt schreibt. Unveränderte Wiederholung ist ein No-op.
+Der separate **Companion-Aktivierungsplan** ist eine kompakte Zusammenfassung statt eines rohen JSON-Dumps. Er gruppiert neue Dateien, vorhandene Dateien zum Zusammenführen, Project-Aktionen, unveränderte Dateien und Gesamtsummen:
+
+```text
+Dateien zum Hinzufügen (82)
+  - scripts/start-work.mjs
+  - .github/workflows/heroes-ci.yml
+  - .squad/agents/tony/charter.md
+  ... und 79 weitere
+
+Vorhandene Dateien zum Zusammenführen (2)
+  - .squad/team.md: lokale Inhalte erhalten und Teamsektion ergänzen
+  - .squad/routing.md: vorhandene Regeln erhalten und Routing-Zeilen ergänzen
+
+Dry-run: Es wurden keine Dateien oder Remote-Ressourcen geändert.
+```
+
+Prüfe ihn und führe denselben Befehl ohne `--dry-run` aus. Erst dieser Schritt schreibt. Unveränderte Wiederholung ist ein No-op. Mit `--plan-json plan.json` wird der maschinenlesbare Plan in eine Datei geschrieben; `--json-plan` gibt ausdrücklich JSON auf stdout aus.
 
 TTY-Menüs verwenden Pfeile oder `j`/`k`, Enter, Escape und `q`. Ohne TTY sind Modell- und Project-Flags Pflicht:
 
@@ -52,7 +68,9 @@ node .squad/templates/squad-heroes/companion/scripts/install \
   --dry-run
 ```
 
-Konflikte stoppen vor Writes. Im TTY wird je Ziel `use`, `keep`, `merge` oder `abort` gewählt. CI übergibt eine JSON-Datei mit `--decisions`:
+Konflikte stoppen vor Writes. Bei `.squad/team.md` erklärt der Installer, dass noch keine verwaltete Squad-Heroes-Teamsektion vorhanden ist, nennt die Agenten und empfiehlt das Zusammenführen. Im Picker ist `Zusammenführen – empfohlen: vorhandene Datei ergänzen` vorausgewählt. Die weiteren Optionen beschreiben eingehende Fassung, lokalen Stand und Abbrechen. `Details / Diff anzeigen` ist optional und anfangs nicht gewählt; angezeigt werden begrenzte Zeilenzahlen und der eingehende markierte Block, nicht vollständige Dateiinhalte.
+
+CI übergibt die internen Entscheidungswerte mit `--decisions`:
 
 ```json
 {

@@ -41,6 +41,8 @@ export function parseInstallArguments(argv) {
   const options = {
     dryRun: false,
     verify: false,
+    jsonPlan: false,
+    planJsonPath: null,
     boardSync: false,
     boardSyncExplicit: false,
     board: {},
@@ -58,6 +60,11 @@ export function parseInstallArguments(argv) {
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === '--dry-run') options.dryRun = true;
+    else if (arg === '--json-plan') options.jsonPlan = true;
+    else if (arg === '--plan-json') {
+      options.planJsonPath = argv[++index];
+      if (!options.planJsonPath) fail('argument', '--plan-json requires a file path');
+    }
     else if (arg === '--verify') options.verify = true;
     else if (arg === '--enable-board-sync') {
       options.boardSync = true;
@@ -523,11 +530,13 @@ export function applyPlan(
 ) {
   const conflicts = plan.conflicts;
   if (conflicts.length) {
-    const list = summarizePlan(plan.operations);
+    const targets = conflicts.map(({ target }) => `  - ${target}`).join('\n');
     fail(
       'conflicts',
-      `Installation stopped: ${conflicts.length} unresolved conflicts. ` +
-      `Use an interactive TTY to select each decision, or pass --decisions <json-file>. ${JSON.stringify(list)}`
+      translate(plan.config.language, 'conflicts_apply', {
+        count: conflicts.length,
+        targets,
+      }).text
     );
   }
   if (verify || dryRun) return { changed: 0, plan: summarizePlan(plan.operations) };
@@ -657,8 +666,113 @@ export function applyPlan(
   return { changed, plan: summarizePlan(plan.operations) };
 }
 
-export function printPlan(plan, language = 'en') {
+function operationReason(operation, language) {
+  if (operation.mode === 'managed-section' && operation.action === 'conflict') {
+    return translate(language, operation.recommendation === 'merge'
+      ? 'plan_merge_managed'
+      : 'plan_review_file').text;
+  }
+  if (operation.mode === 'package-json') return translate(language, 'plan_merge_package').text;
+  if (operation.action === 'append') return translate(language, 'plan_append_history').text;
+  if (operation.action === 'update') return translate(language, 'plan_update_review').text;
+  return translate(language, operation.action === 'merge'
+    ? 'plan_preserve_local'
+    : 'plan_review_file').text;
+}
+
+function projectActionText(operation, language) {
+  const details = operation.actionDetails ?? {};
+  if (operation.externalAction === 'create-project') {
+    return translate(language, 'plan_project_create', { title: details.title }).text;
+  }
+  if (operation.externalAction === 'configure-project-schema') {
+    const project = details.state === 'EXISTING_PROJECT'
+      ? `${translate(language, 'github_project').text} #${details.number}`
+      : translate(language, 'plan_project_after_create').text;
+    return translate(language, 'plan_project_schema', { field: details.field, project }).text;
+  }
+  if (operation.externalAction === 'link-repository') {
+    const project = details.state === 'EXISTING_PROJECT'
+      ? `${translate(language, 'github_project').text} #${details.number}`
+      : translate(language, 'plan_project_after_create').text;
+    return translate(language, 'plan_project_link', {
+      repository: details.repository,
+      project,
+    }).text;
+  }
+  return translate(language, 'plan_project_existing').text;
+}
+
+function boundedPaths(operations, language, withReasons = false) {
+  const limit = 8;
+  const representatives = [
+    /^scripts\/start-work\.mjs$/u,
+    /^\.github\/workflows\/heroes-ci\.yml$/u,
+    /^\.github\/prompts\/startwork\.prompt\.md$/u,
+    /^\.squad\/agents\/tony\/charter\.md$/u,
+    /^\.squad\/team\.md$/u,
+    /^\.squad\/routing\.md$/u,
+    /^\.squad\/001\/profile\.json$/u,
+  ];
+  const selected = [];
+  if (!withReasons) {
+    for (const pattern of representatives) {
+      const operation = operations.find((item) => pattern.test(item.target));
+      if (operation && !selected.includes(operation)) selected.push(operation);
+    }
+  }
+  for (const operation of operations) {
+    if (selected.length >= limit) break;
+    if (!selected.includes(operation)) selected.push(operation);
+  }
+  const visible = selected.map((operation) => withReasons
+    ? `  - ${operation.target}: ${operationReason(operation, language)}`
+    : `  - ${operation.target}`);
+  if (operations.length > limit) {
+    visible.push(`  ${translate(language, 'plan_more', { count: operations.length - limit }).text}`);
+  }
+  return visible;
+}
+
+export function machinePlan(plan) {
+  return summarizePlan(plan.operations);
+}
+
+export function printPlan(plan, language = 'en', { dryRun = false } = {}) {
   const heading = translate(language, 'plan_heading').text;
   const scope = translate(language, 'companion_plan_scope').text;
-  process.stdout.write(`${scope}\n${heading}: ${JSON.stringify(summarizePlan(plan.operations), null, 2)}\n`);
+  const additions = plan.operations.filter(({ action, mode }) =>
+    action === 'create' && mode !== 'external');
+  const existing = plan.operations.filter(({ action, mode }) =>
+    mode !== 'external' && ['merge', 'update', 'append', 'conflict'].includes(action));
+  const unchanged = plan.operations.filter(({ action, mode }) =>
+    mode !== 'external' && action === 'noop');
+  const project = plan.operations.filter(({ mode }) => mode === 'external');
+  const lines = [scope, '', heading];
+
+  lines.push(translate(language, 'plan_files_add', { count: additions.length }).text);
+  lines.push(...boundedPaths(additions, language));
+  if (existing.length > 0) {
+    lines.push('', translate(language, 'plan_files_merge', { count: existing.length }).text);
+    lines.push(...boundedPaths(existing, language, true));
+  }
+  if (project.length > 0) {
+    lines.push('', translate(language, 'plan_project_actions').text);
+    lines.push(...project.map((operation) => `  - ${projectActionText(operation, language)}`));
+  }
+  if (unchanged.length > 0) {
+    lines.push('', translate(language, 'plan_files_unchanged', { count: unchanged.length }).text);
+  }
+  lines.push(
+    '',
+    translate(language, 'plan_totals', {
+      add: additions.length,
+      merge: existing.length,
+      unchanged: unchanged.length,
+      project: project.length,
+      conflicts: plan.conflicts.length,
+    }).text
+  );
+  if (dryRun) lines.push(translate(language, 'plan_dry_run').text);
+  process.stdout.write(`${lines.join('\n')}\n`);
 }

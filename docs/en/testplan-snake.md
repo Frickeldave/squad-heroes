@@ -140,7 +140,7 @@ node scripts/versionbump.mjs --help
 node scripts/check-release-label.mjs --help
 ```
 
-Gate: all entry points exist and provide safe help or diagnostics. Repeating the same apply reports `changed: 0`. Modify one managed marker block: dry-run shows local, incoming, and result; unresolved conflicts write nothing. Apply exactly one documented decision. `history.md` stays append-only, and profile changes fail closed.
+Gate: all entry points exist and provide safe help or diagnostics. Repeating the same apply reports `changed: 0`. Modify one managed marker block: the normal dry-run names the conflict and its recommendation without raw JSON or file bodies; bounded detail is opt-in. Unresolved conflicts write nothing. Apply exactly one documented decision. `history.md` stays append-only, and profile changes fail closed.
 
 After a plugin update, explicitly rerun the Companion. Active bytes may change only in this apply. Disable/uninstall the plugin: active files remain, and `.squad/plugins/*` stayed unchanged during the Companion rerun. Reinstall afterward.
 
@@ -226,7 +226,7 @@ node .squad/templates/squad-heroes/companion/scripts/install \
   --dry-run
 ```
 
-Gate: the menu contains Companion creation, manual creation, and cancel; dry-run shows `PLANNED_CREATE` and `{{PROJECT_NUMBER}}`, with no mutation or placeholder lookup. Apply creates once, resolves the real number/node ID, checks `viewerCanUpdate`, configures schema and repository link, and stores the number. Rerun creates no second Project and no local writes. 403, missing CI flags, invalid title, and partial-schema failures produce safe recovery without secrets. `HEROES_PROJECT_TOKEN` reaches only Project v2 commands; repository access uses `${{ github.token }}`.
+Gate: the menu contains Companion creation, manual creation, and cancel; the normal dry-run says that Companion will create the Project, configure its schema, and link the repository, without exposing internal placeholders. It performs no mutation or placeholder lookup. Apply creates once, resolves the real number/node ID, checks `viewerCanUpdate`, configures schema and repository link, and stores the number. Rerun creates no second Project and no local writes. 403, missing CI flags, invalid title, and partial-schema failures produce safe recovery without secrets. `HEROES_PROJECT_TOKEN` reaches only Project v2 commands; repository access uses `${{ github.token }}`.
 
 ## Handle a stale consumer copy
 

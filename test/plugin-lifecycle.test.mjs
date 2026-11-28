@@ -132,15 +132,25 @@ exit 0
     assert.match(companionDryRun.stdout, /\.github\/prompts\/startwork\.prompt\.md/u);
     assert.match(companionDryRun.stdout, /\.github\/workflows\/heroes-ci\.yml/u);
     assert.match(companionDryRun.stdout, /\.squad\/agents\/tony\/charter\.md/u);
+    assert.doesNotMatch(companionDryRun.stdout, /actionDetails|owner|"preview"/u);
     assert.equal(existsSync(activeScript), false);
 
+    const explicitJson = mustRunCompanion(root, ['--dry-run', '--json-plan']);
+    const machine = JSON.parse(explicitJson.stdout);
+    assert.ok(machine.some(({ target }) => target === 'scripts/start-work.mjs'));
+
+    const planFile = path.join(root, 'heroes-plan.json');
+    const fileJsonDryRun = mustRunCompanion(root, ['--dry-run', '--plan-json', planFile]);
+    assert.match(fileJsonDryRun.stdout, /Files to add/u);
+    assert.ok(JSON.parse(readFileSync(planFile, 'utf8')).length > 0);
+
     const applied = mustRunCompanion(root);
-    assert.match(applied.stdout, /"changed":[1-9]\d*/u);
+    assert.match(applied.stdout, /Installation complete: [1-9]\d* files written/u);
     assert.equal(existsSync(activeScript), true);
     assert.equal(existsSync(activeWorkflow), true);
     mustRun(root, ['verify']);
     const noOp = mustRunCompanion(root);
-    assert.match(noOp.stdout, /"changed":0/u);
+    assert.match(noOp.stdout, /Installation complete: 0 files written/u);
 
     const activeBeforeUpdate = readFileSync(path.join(root, '.squad/agents/tony/charter.en.md'), 'utf8');
     const firstLock = state(root, 'lock.json').plugins['squad-heroes'];

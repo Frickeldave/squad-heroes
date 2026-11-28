@@ -26,7 +26,9 @@ Konflikte in Profilquellen `.squad/001/` werden wie aktive Companion-Ziele behan
 
 ## Companion-Konflikte
 
-Ungeklärte Konflikte stoppen vor Writes. Je Zielpfad sind nur `use`, `keep`, `merge` und `abort` zulässig. TTY-Auswahl: Pfeile oder `j`/`k`, Enter, Escape/`q`. CI:
+Ungeklärte Konflikte stoppen vor Writes. Die normale TTY-Ansicht erklärt Ziel, vorgeschlagene Änderung und Empfehlung in natürlicher Sprache. Bei verwalteten Abschnitten ist Zusammenführen vorausgewählt. `Details / Diff anzeigen` ist optional und begrenzt. Nutzer müssen weder `owner`, `actionDetails`, maskierte Dateiinhalte noch rohes Plan-JSON interpretieren.
+
+TTY-Auswahl: Pfeile oder `j`/`k`, Enter, Escape/`q`. CI verwendet interne Entscheidungswerte in einer Datei:
 
 ```json
 {

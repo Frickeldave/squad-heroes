@@ -60,7 +60,8 @@ node .squad/templates/squad-heroes/companion/scripts/install \
 - Vor Menüs prüft er `gh`, Host-Authentifizierung, Account, Repository-Rechte und den lesenden Project-API-Zugriff. Der schreibfähige Scope `project` ist auch im Dry-run Pflicht, selbst ohne Board-Sync.
 - Profile, Sprache, Branches und optionale Review-Baseline bleiben explizit. Die Baseline muss zu einem lokalen Commit auflösen.
 - TTY-Auswahl funktioniert mit Pfeilen oder `j`/`k`, Enter, Escape und `q`; Zifferneingabe ist kein Auswahlmechanismus.
-- Lokale Konflikte stoppen vor Writes. Je Ziel ist `use`, `keep`, `merge` oder `abort` erforderlich; CI übergibt sie mit `--decisions`.
+- Pläne sind kompakt: Ergänzungen, Zusammenführungen, Project-Aktionen, No-ops und Summen. Rohes JSON ist mit `--plan-json` oder `--json-plan` ausdrücklich wählbar.
+- Lokale Konflikte stoppen vor Writes. Das TTY erklärt jedes Ziel natürlich und wählt das empfohlene Zusammenführen vor. Details sind optional und begrenzt; CI übergibt interne Entscheidungen mit `--decisions`.
 - `--model ID` überschreibt ein Flow-Modell nur für den jeweiligen Launcher-Aufruf.
 - Tokens werden nie erfragt, gespeichert oder in Logs ausgegeben.
 

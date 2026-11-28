@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 import { resolve } from 'node:path';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import {
   applyPlan,
   buildInstallPlan,
+  machinePlan,
   parseInstallArguments,
   printPlan,
   projectManualInstructions,
@@ -24,7 +25,7 @@ import { emitKeypressEvents } from 'node:readline';
 
 const HELP = `Usage:
   node .squad/templates/squad-heroes/companion/scripts/install --target /path/to/repository --repository owner/name --project-type 001 --deployment-branches N \\
-    --deployment-branch-1 main [--deployment-branch-2 int ...] [--language de|en] [--expected-github-account ACCOUNT] [--dry-run]
+    --deployment-branch-1 main [--deployment-branch-2 int ...] [--language de|en] [--expected-github-account ACCOUNT] [--dry-run] [--plan-json FILE | --json-plan]
 
 Squad 2.0.0 or higher must be installed in the target repository. The installer
 is human-triggered, performs two version checks, never calls plugin installation
@@ -43,8 +44,11 @@ available.
 
 After the first plan render, unresolved local conflicts also use that picker.
 For a fresh markerless Squad file, merge is the visibly recommended default;
-it preserves the local bytes and inserts the incoming managed section. CI must
-resolve every conflict with a JSON object passed through --decisions.
+it preserves the local bytes and inserts the incoming managed section. Labels
+describe the outcome instead of exposing internal identifiers. A "Show details /
+diff" option provides a bounded summary; details are hidden by default. CI must
+resolve every conflict with a JSON object passed through --decisions. Machine
+plans are opt-in with --plan-json <file> or --json-plan.
 
 With --enable-board-sync, Project owner is derived from --repository. The
 write-capable project scope is proved from the active account's sanitized
@@ -55,9 +59,10 @@ the Project API probe. CI may use
 to make the board-off choice explicit without a prompt. When no Project exists,
 interactive use offers explicit Companion creation or cancellation. CI must use
 both --create-project and --project-title; the former is the explicit apply
-approval and never accepts a boolean value. The rendered dry-run contains a
-Project-number placeholder and every follow-up schema/link operation, and makes
-no external mutation. A separate "create manually" choice and cancellation both
+approval and never accepts a boolean value. The normal rendered dry-run describes
+creation and every follow-up schema/link operation in natural language, and
+makes no external mutation. Explicit machine output may retain internal
+placeholders. A separate "create manually" choice and cancellation both
 print concrete recovery steps; apply failures report possible partial external
 state and never disclose secrets. The scope and API gates remain required for
 dry-run. No token is accepted.
@@ -258,7 +263,7 @@ export function selectWithArrowKeys(label, choices, current = '', options = {}) 
         help,
         ...values.map((value, index) => {
           const selected = index === selectedIndex;
-          const marker = selected ? '❯' : ' ';
+          const marker = selected ? '>' : ' ';
           const currentText = value === current ? ` ${currentSuffix}` : '';
           const line = `${marker} ${value}${currentText}`;
           return selected ? `\x1B[7m${line}\x1B[0m` : line;
@@ -322,34 +327,171 @@ export function selectWithArrowKeys(label, choices, current = '', options = {}) 
   });
 }
 
-function concisePreview(value) {
-  const normalized = String(value ?? '').replaceAll('\r', '\\r').replaceAll('\n', '\\n');
-  return normalized.length > 180 ? `${normalized.slice(0, 177)}...` : normalized;
+function linesAndBytes(value) {
+  const text = String(value ?? '');
+  return {
+    lines: text === '' ? 0 : text.split(/\r?\n/u).length - (text.endsWith('\n') ? 1 : 0),
+    bytes: Buffer.byteLength(text, 'utf8'),
+  };
+}
+
+function naturalList(values, language) {
+  if (values.length < 2) return values[0] ?? '';
+  const conjunction = language === 'de' ? ' und ' : ' and ';
+  return `${values.slice(0, -1).join(', ')}${conjunction}${values.at(-1)}`;
+}
+
+function managedBlock(source, section) {
+  if (!section || !source) return '';
+  const start = source.search(new RegExp(`<!--\\s*squad-heroes:${section}:begin(?:\\s+[^>]*)?\\s*-->`, 'u'));
+  const endMarker = `<!-- squad-heroes:${section}:end -->`;
+  const end = source.indexOf(endMarker, start);
+  return start >= 0 && end >= start ? source.slice(start, end + endMarker.length) : '';
+}
+
+function incomingTableNames(source) {
+  return String(source ?? '').split(/\r?\n/u)
+    .map((line) => line.match(/^\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|$/u))
+    .filter((match) => match && !['Name', 'Domain', '---'].includes(match[1]))
+    .map((match) => match[1]);
+}
+
+function conflictExplanation(conflict, language) {
+  const missing = !managedBlock(conflict.before, conflict.section);
+  const values = { target: conflict.target };
+  if (conflict.target === '.squad/team.md' && missing) {
+    const agents = incomingTableNames(managedBlock(conflict.incoming, conflict.section));
+    return [
+      translate(language, 'conflict_team_missing', values).text,
+      translate(language, 'conflict_team_plan', {
+        agents: naturalList(agents, language),
+      }).text,
+    ];
+  }
+  if (conflict.target === '.squad/routing.md' && missing) {
+    const rows = incomingTableNames(managedBlock(conflict.incoming, conflict.section));
+    return [
+      translate(language, 'conflict_routing_missing', values).text,
+      translate(language, 'conflict_routing_plan', { count: rows.length }).text,
+    ];
+  }
+  if (conflict.mode === 'package-json') {
+    return [
+      translate(language, 'conflict_package', values).text,
+      translate(language, 'conflict_package_plan').text,
+    ];
+  }
+  if (conflict.mode === 'whole-file') {
+    return [
+      translate(language, 'conflict_whole_file', values).text,
+      translate(language, 'conflict_whole_file_plan').text,
+    ];
+  }
+  return missing
+    ? [
+        translate(language, 'conflict_managed_missing', values).text,
+        translate(language, 'conflict_managed_plan').text,
+      ]
+    : [
+        translate(language, 'conflict_managed_changed', values).text,
+        translate(language, 'conflict_managed_changed_plan').text,
+      ];
+}
+
+function choiceLabels(conflict, language) {
+  const labels = new Map([
+    ['merge', translate(language, 'conflict_choice_merge').text],
+    ['use', translate(language, conflict.mode === 'whole-file'
+      ? 'conflict_choice_use_file'
+      : 'conflict_choice_use').text],
+    ['keep', translate(language, 'conflict_choice_keep').text],
+    ['abort', translate(language, 'conflict_choice_abort').text],
+  ]);
+  const order = ['merge', 'use', 'keep', 'abort'].filter((value) =>
+    conflict.options.includes(value));
+  return {
+    order,
+    labels,
+    choices: order.map((value) => labels.get(value)),
+  };
+}
+
+function printConflictDetails(conflict, language, output) {
+  const base = linesAndBytes(conflict.base);
+  const local = linesAndBytes(conflict.before);
+  const incoming = linesAndBytes(conflict.incoming);
+  output.write(`${translate(language, 'conflict_details_heading').text}\n`);
+  output.write(`${translate(language, 'conflict_details_three_way', {
+    baseLines: base.lines,
+    baseBytes: base.bytes,
+    localLines: local.lines,
+    localBytes: local.bytes,
+    incomingLines: incoming.lines,
+    incomingBytes: incoming.bytes,
+  }).text}\n`);
+  const block = managedBlock(conflict.incoming, conflict.section);
+  if (!block) return;
+  const size = linesAndBytes(block);
+  output.write(`${translate(language, 'conflict_details_section', {
+    lines: size.lines,
+    bytes: size.bytes,
+  }).text}\n`);
+  const preview = block.split(/\r?\n/u).slice(0, 12).map((line) =>
+    line.length > 240 ? `${line.slice(0, 237)}...` : line
+  );
+  output.write(`${translate(language, 'conflict_details_preview', { lines: preview.length }).text}\n`);
+  output.write(preview.map((line) => `  ${line}`).join('\n') + '\n');
 }
 
 export async function resolveConflictDecisions(plan, choose, { language = 'en', output = process.stdout } = {}) {
   const decisions = { ...(plan.config.recovery?.decisions ?? {}) };
   for (const conflict of plan.conflicts) {
-    const section = conflict.section ? `; section: ${conflict.section}` : '';
-    output.write(
-      `Conflict: ${conflict.target}${section}\n` +
-      `  Local: ${concisePreview(conflict.before)}\n` +
-      `  Incoming: ${concisePreview(conflict.incoming)}\n`
-    );
-    if (conflict.recommendation === 'merge') {
-      output.write(`${wizardText(language, 'conflict_recommended')}\n`);
+    output.write(`${conflictExplanation(conflict, language).join('\n')}\n`);
+    const recommended = conflict.recommendation ?? 'merge';
+    if (recommended === 'merge' && !managedBlock(conflict.before, conflict.section)) {
+      output.write(`${translate(language, 'conflict_recommended').text}\n`);
     }
-    const selection = await choose(
-      wizardText(language, 'conflict_picker_label').replace('{target}', conflict.target),
-      conflict.options,
-      conflict.recommendation ?? ''
-    );
-    if (!conflict.options.includes(selection)) {
-      throw new Error(`Invalid conflict decision "${selection}" for ${conflict.target}`);
+    const { order, labels, choices } = choiceLabels(conflict, language);
+    output.write(`${translate(language, 'conflict_recommendation', {
+      recommendation: labels.get(recommended),
+    }).text}\n`);
+    const details = translate(language, 'conflict_choice_details').text;
+    let selected;
+    while (true) {
+      const available = [...choices, details];
+      const current = labels.get(recommended) ?? choices[0];
+      const selection = await choose(
+        wizardText(language, 'conflict_picker_label').replace('{target}', conflict.target),
+        available,
+        current
+      );
+      if (selection === details) {
+        printConflictDetails(conflict, language, output);
+        continue;
+      }
+      selected = order.find((value) => labels.get(value) === selection || value === selection);
+      if (selected) break;
+      throw new Error(translate(language, 'conflict_invalid_selection', {
+        selection,
+        target: conflict.target,
+      }).text);
     }
-    decisions[conflict.target] = selection;
-    output.write(`Selected ${conflict.target}: ${selection}\n`);
+    decisions[conflict.target] = selected;
+    output.write(`${translate(language, 'conflict_selected', {
+      target: conflict.target,
+      decision: labels.get(selected),
+    }).text}\n`);
+    output.write(`${translate(language, 'conflict_resolution', {
+      target: conflict.target,
+      decision: labels.get(selected),
+      effect: translate(language, selected === 'merge' && !managedBlock(conflict.before, conflict.section)
+        ? 'conflict_resolution_merge_missing'
+        : `conflict_resolution_${selected}`).text,
+    }).text}\n`);
   }
+  output.write(`${translate(language, 'conflicts_resolved', {
+    count: plan.conflicts.length,
+  }).text}\n`);
   return decisions;
 }
 
@@ -402,9 +544,11 @@ export async function main() {
         authentication,
         expectedAccount: options.expectedAccount,
       });
-      process.stdout.write(`${wizardText(language, 'github_access_verified')
-        .replace('{account}', options.githubPreflight.account)
-        .replace('{owner}', options.githubPreflight.owner)}\n`);
+      if (!options.jsonPlan) {
+        process.stdout.write(`${wizardText(language, 'github_access_verified')
+          .replace('{account}', options.githubPreflight.account)
+          .replace('{owner}', options.githubPreflight.owner)}\n`);
+      }
       assertSquadCompatibility(resolve(options.target ?? process.cwd()));
       const missingModelFlags = !existing && ['reqeng', 'work', 'review']
         .some((flow) => !options.explicitModels[flow]);
@@ -419,7 +563,18 @@ export async function main() {
     let plan = buildInstallPlan(repoRoot, options, {
       githubPreflight: options.githubPreflight,
     });
-    printPlan(plan, plan.config.language);
+    if (options.jsonPlan) {
+      process.stdout.write(`${JSON.stringify(machinePlan(plan), null, 2)}\n`);
+    } else {
+      printPlan(plan, plan.config.language, { dryRun: options.dryRun });
+    }
+    if (options.planJsonPath) {
+      writeFileSync(resolve(options.planJsonPath), `${JSON.stringify(machinePlan(plan), null, 2)}\n`, {
+        encoding: 'utf8',
+        mode: 0o600,
+      });
+    }
+    if (options.jsonPlan) return;
     let resolvedConflicts = false;
     if (plan.conflicts.length > 0 && supportsArrowKeyPicker()) {
       const decisions = await resolveConflictDecisions(plan, (label, choices, current) =>
@@ -430,17 +585,22 @@ export async function main() {
         githubPreflight: options.githubPreflight,
       });
       resolvedConflicts = true;
-      process.stdout.write('\nResolved plan:\n');
-      printPlan(plan, plan.config.language);
     }
     if (resolvedConflicts && plan.conflicts.length > 0) {
-      throw new Error(`Resolved plan still has ${plan.conflicts.length} unresolved conflicts.`);
+      throw new Error(translate(plan.config.language, 'resolved_plan_conflicts', {
+        count: plan.conflicts.length,
+      }).text);
     }
     if (resolvedConflicts && !options.dryRun) {
       const prompt = createInterface({ input: process.stdin, output: process.stdout });
       try {
-        const approval = (await prompt.question('Approve the resolved rendered plan for apply (y/N): ')).trim().toLowerCase();
-        if (!['y', 'yes'].includes(approval)) throw new Error('Resolved plan was not approved; no mutation started.');
+        const approval = (await prompt.question(`${wizardText(
+          plan.config.language,
+          'resolved_apply_approval'
+        )}: `)).trim().toLowerCase();
+        if (!['y', 'yes'].includes(approval)) {
+          throw new Error(wizardText(plan.config.language, 'resolved_plan_not_approved'));
+        }
       } finally {
         prompt.close();
       }
@@ -462,7 +622,12 @@ export async function main() {
       }
     }
     const result = applyPlan(repoRoot, plan, options);
-    process.stdout.write(`${JSON.stringify(result)}\n`);
+    if (!options.jsonPlan) {
+      const message = options.dryRun
+        ? wizardText(plan.config.language, 'dry_run_complete')
+        : translate(plan.config.language, 'apply_complete_result', { count: result.changed }).text;
+      process.stdout.write(`${message}\n`);
+    }
   } catch (error) {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
     process.exitCode = error instanceof HeroesError && error.code === 'squad_version'

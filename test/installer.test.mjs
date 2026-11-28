@@ -3,7 +3,13 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
-import { applyPlan, buildInstallPlan, parseInstallArguments, printPlan } from '../src/installer.mjs';
+import {
+  applyPlan,
+  buildInstallPlan,
+  machinePlan,
+  parseInstallArguments,
+  printPlan,
+} from '../src/installer.mjs';
 import {
   assertGithubWriteAccess,
   resolveBoardProject,
@@ -45,6 +51,8 @@ test('project type parser preserves only explicit non-TTY input', () => {
   assert.equal(parseInstallArguments(['--project-type', '001']).profile, '001');
   assert.equal(parseInstallArguments([]).profile, null);
   assert.equal(parseInstallArguments(['--project-type', 'unknown']).profile, 'unknown');
+  assert.equal(parseInstallArguments(['--json-plan']).jsonPlan, true);
+  assert.equal(parseInstallArguments(['--plan-json', 'plan.json']).planJsonPath, 'plan.json');
 });
 
 test('interactive Companion wizard collects required and opt-in configuration', async () => {
@@ -702,7 +710,7 @@ test('fresh dry-run plans plugin and companion separately without mutation', () 
       return true;
     };
     try {
-      printPlan(plan, 'en');
+      printPlan(plan, 'en', { dryRun: true });
     } finally {
       process.stdout.write = originalWrite;
     }
@@ -711,6 +719,13 @@ test('fresh dry-run plans plugin and companion separately without mutation', () 
     assert.match(output, /complete versioned distribution/u);
     assert.match(output, /scripts\/start-work\.mjs/u);
     assert.match(output, /\.github\/workflows\/heroes-ci\.yml/u);
+    assert.match(output, /Dry-run: no files or remote resources changed/u);
+    assert.match(output, /Files to add \(\d+\)/u);
+    assert.match(output, /Existing files to merge/u);
+    assert.doesNotMatch(output, /\[\s*\n\s*\{/u);
+    assert.doesNotMatch(output, /\\n/u);
+    assert.doesNotMatch(output, /actionDetails|owner/u);
+    assert.ok(machinePlan(plan).length > 0);
   } finally {
     cleanup(root);
   }
@@ -868,6 +883,10 @@ test('interactive picker resolves fresh markerless team and routing, then safely
     });
     assert.equal(selected.filter((entry) => entry.startsWith('Selected ')).length, 2);
     assert.ok(selected.some((entry) => entry.includes('Recommended: merge')));
+    assert.ok(selected.some((entry) => entry.includes('Merge — recommended: add to the existing file')));
+    assert.ok(selected.some((entry) => entry.includes('Show details / diff')));
+    assert.ok(selected.some((entry) => entry.endsWith(':Merge — recommended: add to the existing file')));
+    assert.ok(selected.join('\n').includes('local roster') === false);
 
     const resolved = buildInstallPlan(
       root,
@@ -894,6 +913,50 @@ test('interactive picker resolves fresh markerless team and routing, then safely
   } finally {
     cleanup(root);
   }
+});
+
+test('German conflict help is natural, recommends merge, and bounds opt-in details', async () => {
+  const incoming = `<!-- squad-heroes:team:begin -->
+## Members
+
+| Name | Role |
+| --- | --- |
+| Tony | Lead Architekt |
+<!-- squad-heroes:team:end -->
+`;
+  const plan = {
+    config: { recovery: {} },
+    conflicts: [{
+      target: '.squad/team.md',
+      mode: 'managed-section',
+      section: 'team',
+      action: 'conflict',
+      before: 'lokaler Inhalt\r\n',
+      base: '',
+      incoming,
+      options: ['use', 'keep', 'merge', 'abort'],
+      recommendation: 'merge',
+    }],
+  };
+  const output = [];
+  let call = 0;
+  const decisions = await resolveConflictDecisions(plan, async (_label, choices, current) => {
+    call += 1;
+    assert.equal(current, 'Zusammenführen – empfohlen: vorhandene Datei ergänzen');
+    assert.ok(choices.includes('Details / Diff anzeigen'));
+    return call === 1 ? 'Details / Diff anzeigen' : current;
+  }, {
+    language: 'de',
+    output: { write: (chunk) => output.push(String(chunk)) },
+  });
+  const rendered = output.join('');
+  assert.deepEqual(decisions, { '.squad/team.md': 'merge' });
+  assert.match(rendered, /In \.squad\/team\.md ist noch keine verwaltete Squad-Heroes-Teamsektion vorhanden/u);
+  assert.match(rendered, /Agenten Tony/u);
+  assert.match(rendered, /Empfehlung: Zusammenführen – empfohlen/u);
+  assert.match(rendered, /Basis: 0 Zeilen/u);
+  assert.doesNotMatch(rendered, /actionDetails|owner|\\n/u);
+  assert.ok(rendered.length < 2500);
 });
 
 test('unsupported version changed between plan and write aborts before mutation', () => {

@@ -96,6 +96,8 @@ export function classifyOperation(repoRoot, item, decisions = {}) {
         base: item.baseline ?? '',
         incoming,
         options: [...DECISIONS],
+        recommendation: 'merge',
+        recommendationReason: 'merge updates managed script commands and preserves unrelated package.json content',
       };
     }
     const decision = decisions[item.target];
@@ -141,10 +143,10 @@ export function classifyOperation(repoRoot, item, decisions = {}) {
         base: item.baseline ?? '',
         incoming,
         options: [...DECISIONS],
-        ...(local || ambiguousLocal ? {} : {
-          recommendation: 'merge',
-          recommendationReason: 'managed-section marker is absent; merge inserts the incoming section and preserves every local byte',
-        }),
+        recommendation: 'merge',
+        recommendationReason: local || ambiguousLocal
+          ? 'merge replaces only the managed section and preserves content outside it'
+          : 'managed-section marker is absent; merge inserts the incoming section and preserves every local byte',
       };
     }
     if (!DECISIONS.has(decision)) fail('decision', `Invalid decision ${decision} for ${item.target}`);
@@ -163,7 +165,16 @@ export function classifyOperation(repoRoot, item, decisions = {}) {
   }
   const decision = decisions[item.target];
   if (!decision) {
-    return { ...item, action: 'conflict', before, base: item.baseline ?? '', incoming, options: [...DECISIONS] };
+    return {
+      ...item,
+      action: 'conflict',
+      before,
+      base: item.baseline ?? '',
+      incoming,
+      options: ['use', 'keep', 'abort'],
+      recommendation: 'use',
+      recommendationReason: 'the incoming complete file is selected after review; local replacement is explicit',
+    };
   }
   if (!DECISIONS.has(decision)) fail('decision', `Invalid decision ${decision} for ${item.target}`);
   if (decision === 'keep') return { ...item, action: 'noop', content: before, before, decision };

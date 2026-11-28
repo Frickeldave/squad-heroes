@@ -33,7 +33,23 @@ node .squad/templates/squad-heroes/companion/scripts/install \
   --dry-run
 ```
 
-The separate **Companion activation plan** shows active targets such as `scripts/start-work.mjs`, `.github/prompts/`, `.github/workflows/heroes-ci.yml`, and agents. Review it, then run the same command without `--dry-run`. Only that step writes. Repeating unchanged input is a no-op.
+The separate **Companion activation plan** is a concise summary, not a raw JSON dump. It groups files to add, existing files to merge, Project actions, unchanged files, and totals:
+
+```text
+Files to add (82)
+  - scripts/start-work.mjs
+  - .github/workflows/heroes-ci.yml
+  - .squad/agents/tony/charter.md
+  ... and 79 more
+
+Existing files to merge (2)
+  - .squad/team.md: preserve local content and add the marked team section
+  - .squad/routing.md: preserve existing rules and add routing rows
+
+Dry-run: no files or remote resources changed.
+```
+
+Review it, then run the same command without `--dry-run`. Only that step writes. Repeating unchanged input is a no-op. Use `--plan-json plan.json` to write the machine-readable plan to a file, or `--json-plan` for explicit JSON on stdout.
 
 TTY menus use arrows or `j`/`k`, Enter, Escape, and `q`. Without a TTY, model and Project flags are required:
 
@@ -52,7 +68,9 @@ node .squad/templates/squad-heroes/companion/scripts/install \
   --dry-run
 ```
 
-Conflicts stop before writes. On a TTY, select `use`, `keep`, `merge`, or `abort` for each target. CI passes a JSON file with `--decisions`:
+Conflicts stop before writes. For `.squad/team.md`, the installer explains that no managed Squad Heroes team section exists yet, names the agents to add, and recommends merge. The picker starts on `Merge — recommended: add to the existing file`. The other choices use direct descriptions for incoming, local, and cancel. `Show details / diff` is available but not selected by default; it shows bounded line counts and an incoming marked block, not complete file bodies.
+
+CI passes the internal decision values through `--decisions`:
 
 ```json
 {
