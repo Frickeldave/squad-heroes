@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "id": "typescript-development",
-  "name": "TypeScript Development",
+  "id": "001",
+  "name": "001 Typescript developer project",
   "immutable": true,
   "agents": [
     { "id": "tony", "role": "Lead Architekt" },

@@ -1,40 +1,32 @@
 # Recovery and troubleshooting
 
-## No global rollback
+## Stop and resume safely
 
-The installer atomically replaces individual files but does not claim a global
-multi-file transaction. A plan is idempotent and an interrupted run can resume
-with the same input. Existing local files remain unless a confirmed managed
-section changes.
+Files are replaced individually and atomically; there is no global rollback. Resume an interrupted run with identical input. Existing local content remains without a confirmed decision.
 
-## Resolving conflicts
+On failure, stop active commands/jobs, save the message and exit code, and stop mutating resources if ownership is unclear.
 
-For plugin artifacts, run `squad plugin verify` first. A checksum error stops the
-documented update chain before `squad plugin install <newer-local-dir>`; Squad
-does not provide automatic three-way merging for plugin files. Deliberately
-keep the local state, restore the installed state, or explicitly reinstall after
-review. `verify` and `list --json` expose the authoritative state. This guard
-applies only to Squad-owned plugin targets.
+## Plugin recovery
 
-If installed files under `.squad/templates/squad-heroes/companion/` are
-corrupt, restore the complete plugin distribution through `squad plugin install`
-after `verify`; that operation never installs root `scripts/`,
-`.github/prompts/`, or `.github/workflows/`. Re-run the copied Companion
-separately to review its activation plan and update those active targets.
-Plugin uninstall intentionally leaves active targets and `.squad/heroes.json`
-in place.
+```bash
+squad plugin verify
+squad plugin list --json
+```
 
-The copied Companion's first `--dry-run` shows every active operation and
-conflict. On a TTY, each conflict then appears with the target, managed section
-and concise local/incoming previews. Use the Up/Down or `j`/`k` arrows and
-Enter to choose `use`, `keep`, `merge`, or `abort`; Escape/`q` cancels. For a
-fresh markerless Squad file only, Companion labels `merge` as recommended and
-shows it as the default selection: merge appends the incoming managed section
-without replacing any preexisting local bytes. All choices are explicit; the
-plan is rebuilt and rerendered, then dry-run can finish with `changed: 0`.
+On `checksum mismatch`, do not install. Keep the conflict and either restore the installed state deliberately or reinstall the complete plugin state after review:
 
-Without a TTY, record one decision per active target in a JSON object and pass
-it with `--decisions`. Missing decisions still fail before mutation:
+```bash
+squad plugin install /path/to/squad-heroes
+squad plugin verify
+```
+
+That restores only `.squad/templates/squad-heroes/companion/`. It does not repair root `scripts/`, `.github/prompts/`, or `.github/workflows/`; run the local Companion separately in dry-run and apply mode for those targets.
+
+Conflicts in profile sources under `.squad/001/` use the same Companion recovery rules. Re-materialize restored agents and skills from those sources.
+
+## Companion conflicts
+
+Unresolved conflicts stop before writes. Each target accepts only `use`, `keep`, `merge`, or `abort`. TTY selection uses arrows or `j`/`k`, Enter, and Escape/`q`. CI file:
 
 ```json
 {
@@ -43,94 +35,70 @@ it with `--decisions`. Missing decisions still fail before mutation:
 }
 ```
 
-Only `use`, `keep`, `merge`, `abort` are accepted. `merge` is revalidated for
-markers and UTF-8 before write. Apply persists the exact map in
-`.squad/heroes.json` recovery state and must use the same resolved plan.
+```bash
+node .squad/templates/squad-heroes/companion/scripts/install \
+  --target "$PWD" \
+  --decisions .squad/heroes-decisions.json \
+  --dry-run
+```
 
-## Common errors
+Apply stores the confirmed map in `.squad/heroes.json`. `merge` is revalidated for markers and UTF-8; `history.md` remains append-only.
 
-- `detected "missing"`: marker file or marker is absent.
-- `detected "0.13.1"` or another lower version: exit code 2. Stop without
-  mutation and run `squad upgrade --self` as the normal user. If a root-owned
-  global npm install reports `EACCES`/`EPERM`, use the safe global repair
-  command from [Installation](installation.md#repairing-a-root-owned-global-squad-installation);
-  do not run Squad itself under `sudo`.
-- Exit code 2 also covers missing, duplicate, invalid or prerelease Squad
-  versions; `2.0.0-rc.1` is not accepted.
-- `gh_cli_missing`: install `gh`, then run the host browser/device login.
-- `gh_auth_failed`: use the host browser/device login; never paste a token.
-- `gh_repository_not_found`: the slug is wrong, the repo is absent, or the active
-  account cannot see a private repo.
-- `gh_repository_read_denied`: ask an owner to grant read/collaborator access.
-- `gh_repository_push_denied`: readable repo, but an owner/maintainer must grant
-  write/collaborator access.
-- `gh_account_mismatch`: switch only to an already configured account, otherwise
-  log in through the browser/device flow and select the expected identity.
-- `gh_api_error`: retry and check host, VPN, DNS, and GitHub availability.
-- `gh_project_scope`/`gh_project_access`, `project_missing`,
-  `project_ambiguous`: the write-capable `project` scope, Project API access, or
-  deterministic selection is missing. Refresh only with
-  `gh auth refresh -h github.com -s project`, then verify with
-  `gh auth status --hostname github.com`; choose Companion creation with `--create-project --project-title`, or use a validated `--project-number` for an existing Project in CI. 403 means Project/organization rights;
-  404 means wrong, private, or invisible owner/Project.
-- Zero-Project menu: choose manual creation or cancel to print recovery that
-  names the owner, suggested title, active account, and verified CLI/GitHub UI
-  creation path. Check number and visibility with `gh project list --owner
-  frickeldave-test --limit 100 --format json`; then rerun with
-  `--project-number <number>` or select it in the arrow-key menu. Dry-run
-  cannot create the Project.
-- `conflicts`: dry run and files unchanged; decision required.
-- `ambiguous_markers`: duplicate, absent or reversed markers.
-- `deployment_branch`: ref is invalid or ambiguous.
-- `model_default`: explicit flow model ID is missing.
-- `Plugin verification failed: checksum mismatch ...`: a Squad-owned installed
-  plugin target changed locally; do not run `install`.
-- `Permission denied` while resolving or running `squad`: restart the terminal
-  after the global repair and verify `command -v squad`,
-  `ls -l "$(command -v squad)"`, and `squad --version`. Do not recursively
-  chmod npm's global tree. Only after these checks pass, run `squad upgrade` in
-  the target repository and verify the marker.
+## Error codes
 
-For authentication failures, use only official host-side `gh auth login` or
-`gh auth refresh` flows. Do not copy tokens, use `--with-token`, or type token
-values into a terminal.
+| Error | Recovery |
+| --- | --- |
+| `detected "missing"`, duplicate/invalid marker, prerelease, or version below 2.0.0 | Stop without mutation, upgrade Squad normally, and recheck the marker. |
+| `gh_cli_missing` | Install `gh` and use the official login. |
+| `gh_auth_failed` | Run `gh auth login --hostname github.com --web`; never paste a token. |
+| `gh_repository_not_found` | Check owner/repository, visibility, and private access. |
+| `gh_repository_read_denied` / `push_denied` | Ask an owner for read/collaborator or write access. |
+| `gh_account_mismatch` | Select an existing account with `gh auth switch` or use the official login. |
+| `gh_api_error` | Check GitHub, VPN, DNS, and network, then retry. |
+| `gh_project_scope`, `project_access`, `project_missing`, `project_ambiguous` | Refresh scope, verify selection, or provide a validated Project number. |
+| `conflicts` / `ambiguous_markers` | Inspect dry-run and markers; a decision is required. |
+| `deployment_branch` | Correct the ref or branch argument. |
+| `model_default` | Provide an explicit flow model ID. |
 
-## Copy/paste GitHub preflight remediation
+## GitHub preflight
 
-Every failed gate reports the host, the safe active login, repository slug,
-sanitized verification result, and **No mutation started**. It never prints a
-token, header, or full API response.
-
-```sh
+```bash
 gh auth status --hostname github.com
 gh api user --jq .login
 gh api repos/OWNER/REPO --jq .permissions
 gh repo view OWNER/REPO
 ```
 
-- A `404` means the owner/name is wrong or the account cannot see the private
-  repository. Ask an authenticated owner to verify it exists and grant
-  collaborator access.
-- A `200` response with `read: true` and `push: false` is not an owner-identity
-  failure. Ask an owner or maintainer for write/collaborator access. Confirm the
-  login with `gh api user --jq .login`; repository owner equality is not
-  required.
-- Missing/failed host login:
-  `gh auth login --hostname github.com --web`.
-- If the correct account is already configured:
-  `gh auth switch --hostname github.com --user ACCOUNT`. Otherwise use the
-  browser/device login and select that identity. CI/operator runs may pass
-  `--expected-github-account ACCOUNT` when an identity is known; repository
-  owner equality is never inferred automatically.
-- Missing Board-setup Project scope (required even for dry-run):
-  `gh auth refresh -h github.com -s project`, then
-  `gh auth status --hostname github.com`.
-- `read:project` alone supports only isolated Project metadata reads. It is
-  intentionally insufficient because squad-heroes configures fields, status and
-  schema.
-- For API/network errors, retry after checking `github.com`, VPN, and DNS. Do
-  not expose tokens, `Authorization` headers, or response bodies.
+- 404: wrong slug or invisible private repository; ask an owner to grant access.
+- `read: true`, `push: false`: the repository is visible but write access is missing. An owner must grant collaborator access; owner equality is not required.
+- Correct existing account: `gh auth switch --hostname github.com --user ACCOUNT`.
+- Missing `project` scope:
 
-## Recovery after Project creation
+```bash
+gh auth refresh -h github.com -s project
+gh auth status --hostname github.com
+```
 
-Project creation is externally visible and not automatically rolled back. If creation, write verification, schema, or linking fails, the Project may already exist or be partially configured; no local state was written. First run `gh project list --owner frickeldave-test --limit 100 --format json`, inspect existing partial state, and do not blindly create again. Rerunning is safe: the one matching Project is discovered and reused, so Companion must not create a duplicate. It then retries schema/link reads and needed mutations. Reuse the same confirmed title and verify the Project number before rerun. Completed state stores the real number in `.squad/heroes.json` and its recovery baselines. Failure/recovery output contains no secret values. `HEROES_PROJECT_TOKEN` receives only `project`; repository operations use `github.token`.
+Errors include only a safe login, host, slug, and sanitized result: **No mutation started**. Do not copy tokens or authorization headers.
+
+## Partial Project state
+
+Project creation is externally visible and is not globally rolled back. After a failure in creation, schema, or linking:
+
+```bash
+gh project list --owner OWNER --limit 100 --format json
+```
+
+Inspect the existing number, title, schema, and repository link. Rerun with a confirmed `--project-number`; do not blindly recreate. Successful state stores the real number and recovery baselines in `.squad/heroes.json`.
+
+## Squad launcher
+
+For `Permission denied`, record the symlink and target. Run `squad upgrade --self` as the normal user; only a root-owned npm package may require the bounded repair from [Installation](installation.md#repair-the-squad-launcher). Restart the terminal and verify:
+
+```bash
+command -v squad
+ls -l "$(command -v squad)"
+squad --version
+```
+
+Only then run `squad upgrade` in the consumer. Do not use recursive `chmod` or `sudo squad`.

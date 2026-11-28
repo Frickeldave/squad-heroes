@@ -1,4 +1,4 @@
-<!-- squad-heroes:team:begin schema=1 profile=typescript-development -->
+<!-- squad-heroes:team:begin schema=1 profile=001 -->
 ## Members
 
 | Name | Role |

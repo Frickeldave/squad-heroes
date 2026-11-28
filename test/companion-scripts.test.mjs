@@ -21,7 +21,7 @@ const injected = {
 };
 const options = {
   repository: 'owner/repository',
-  profile: 'typescript-development',
+  profile: '001',
   language: 'en',
   branches: ['main'],
   models: { reqeng: 'mai-code-2', work: 'claude-sonnet-5.5', review: 'gpt-6.1-terra' },

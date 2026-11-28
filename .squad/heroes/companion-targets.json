@@ -1,9 +1,6 @@
 {
   "schemaVersion": 1,
   "targets": [
-    { "id": "skill-humanizer-index", "source": ".squad/heroes/skills/humanizer/SKILL.md", "target": ".github/skills/humanizer/SKILL.md", "mode": "whole-file" },
-    { "id": "skill-humanizer-de", "source": ".squad/heroes/skills/humanizer/de-DE.md", "target": ".github/skills/humanizer/de-DE.md", "mode": "whole-file" },
-    { "id": "skill-humanizer-en", "source": ".squad/heroes/skills/humanizer/en-US.md", "target": ".github/skills/humanizer/en-US.md", "mode": "whole-file" },
     { "id": "team", "source": ".squad/heroes/companion/team.md", "target": ".squad/team.md", "mode": "managed-section", "section": "team" },
     { "id": "routing", "source": ".squad/heroes/companion/routing.md", "target": ".squad/routing.md", "mode": "managed-section", "section": "routing" },
     { "id": "readme-badges", "source": ".squad/heroes/companion/readme-badges.md", "target": "README.md", "mode": "managed-section", "section": "readme-badges" },

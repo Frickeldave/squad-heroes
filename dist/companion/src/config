@@ -1,8 +1,9 @@
 import { fail } from './errors';
 import { safeRelativePath } from './io';
 
-export const PROFILE_ID = 'typescript-development';
-export const PROFILE_NAME = 'TypeScript Development';
+export const PROFILE_ID = '001';
+export const PROFILE_NAME = '001 Typescript developer project';
+export const LEGACY_PROFILE_ID = 'typescript-development';
 export const AGENTS = Object.freeze([
   ['tony', 'Lead Architekt', 'Lead Architect'],
   ['pepper', 'Requirement Engineer', 'Requirement Engineer'],
@@ -17,6 +18,11 @@ const ALLOWED_TOP_LEVEL = new Set([
   'schemaVersion', 'product', 'profile', 'deploymentBranches', 'language', 'modelDefaults',
   'repository', 'managed', 'recovery', 'extensions', 'reviewBaseline',
 ]);
+
+export function migrateHeroesConfig(config) {
+  if (config?.profile !== LEGACY_PROFILE_ID) return config;
+  return { ...config, profile: PROFILE_ID };
+}
 
 export function validateHeroesConfig(config, { allowProjectPlaceholder = false } = {}) {
   if (!config || typeof config !== 'object' || Array.isArray(config)) fail('config_type', 'heroes.json must be an object');

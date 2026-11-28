@@ -14,73 +14,93 @@
   },
   "files": [
     {
-      "source": "dist/companion/.squad/heroes/agents/bruce.de.md",
-      "target": "templates/squad-heroes/companion/.squad/heroes/agents/bruce.de.md",
+      "source": "dist/companion/.squad/heroes/001/agents/bruce.de.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/001/agents/bruce.de.md",
       "type": "template"
     },
     {
-      "source": "dist/companion/.squad/heroes/agents/bruce.en.md",
-      "target": "templates/squad-heroes/companion/.squad/heroes/agents/bruce.en.md",
+      "source": "dist/companion/.squad/heroes/001/agents/bruce.en.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/001/agents/bruce.en.md",
       "type": "template"
     },
     {
-      "source": "dist/companion/.squad/heroes/agents/clint.de.md",
-      "target": "templates/squad-heroes/companion/.squad/heroes/agents/clint.de.md",
+      "source": "dist/companion/.squad/heroes/001/agents/clint.de.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/001/agents/clint.de.md",
       "type": "template"
     },
     {
-      "source": "dist/companion/.squad/heroes/agents/clint.en.md",
-      "target": "templates/squad-heroes/companion/.squad/heroes/agents/clint.en.md",
+      "source": "dist/companion/.squad/heroes/001/agents/clint.en.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/001/agents/clint.en.md",
       "type": "template"
     },
     {
-      "source": "dist/companion/.squad/heroes/agents/maria.de.md",
-      "target": "templates/squad-heroes/companion/.squad/heroes/agents/maria.de.md",
+      "source": "dist/companion/.squad/heroes/001/agents/maria.de.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/001/agents/maria.de.md",
       "type": "template"
     },
     {
-      "source": "dist/companion/.squad/heroes/agents/maria.en.md",
-      "target": "templates/squad-heroes/companion/.squad/heroes/agents/maria.en.md",
+      "source": "dist/companion/.squad/heroes/001/agents/maria.en.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/001/agents/maria.en.md",
       "type": "template"
     },
     {
-      "source": "dist/companion/.squad/heroes/agents/natasha.de.md",
-      "target": "templates/squad-heroes/companion/.squad/heroes/agents/natasha.de.md",
+      "source": "dist/companion/.squad/heroes/001/agents/natasha.de.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/001/agents/natasha.de.md",
       "type": "template"
     },
     {
-      "source": "dist/companion/.squad/heroes/agents/natasha.en.md",
-      "target": "templates/squad-heroes/companion/.squad/heroes/agents/natasha.en.md",
+      "source": "dist/companion/.squad/heroes/001/agents/natasha.en.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/001/agents/natasha.en.md",
       "type": "template"
     },
     {
-      "source": "dist/companion/.squad/heroes/agents/nick.de.md",
-      "target": "templates/squad-heroes/companion/.squad/heroes/agents/nick.de.md",
+      "source": "dist/companion/.squad/heroes/001/agents/nick.de.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/001/agents/nick.de.md",
       "type": "template"
     },
     {
-      "source": "dist/companion/.squad/heroes/agents/nick.en.md",
-      "target": "templates/squad-heroes/companion/.squad/heroes/agents/nick.en.md",
+      "source": "dist/companion/.squad/heroes/001/agents/nick.en.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/001/agents/nick.en.md",
       "type": "template"
     },
     {
-      "source": "dist/companion/.squad/heroes/agents/pepper.de.md",
-      "target": "templates/squad-heroes/companion/.squad/heroes/agents/pepper.de.md",
+      "source": "dist/companion/.squad/heroes/001/agents/pepper.de.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/001/agents/pepper.de.md",
       "type": "template"
     },
     {
-      "source": "dist/companion/.squad/heroes/agents/pepper.en.md",
-      "target": "templates/squad-heroes/companion/.squad/heroes/agents/pepper.en.md",
+      "source": "dist/companion/.squad/heroes/001/agents/pepper.en.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/001/agents/pepper.en.md",
       "type": "template"
     },
     {
-      "source": "dist/companion/.squad/heroes/agents/tony.de.md",
-      "target": "templates/squad-heroes/companion/.squad/heroes/agents/tony.de.md",
+      "source": "dist/companion/.squad/heroes/001/agents/tony.de.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/001/agents/tony.de.md",
       "type": "template"
     },
     {
-      "source": "dist/companion/.squad/heroes/agents/tony.en.md",
-      "target": "templates/squad-heroes/companion/.squad/heroes/agents/tony.en.md",
+      "source": "dist/companion/.squad/heroes/001/agents/tony.en.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/001/agents/tony.en.md",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/.squad/heroes/001/profile.json",
+      "target": "templates/squad-heroes/companion/.squad/heroes/001/profile.json",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/.squad/heroes/001/skills/humanizer/SKILL.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/001/skills/humanizer/SKILL.md",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/.squad/heroes/001/skills/humanizer/de-DE.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/001/skills/humanizer/de-DE.md",
+      "type": "template"
+    },
+    {
+      "source": "dist/companion/.squad/heroes/001/skills/humanizer/en-US.md",
+      "target": "templates/squad-heroes/companion/.squad/heroes/001/skills/humanizer/en-US.md",
       "type": "template"
     },
     {
@@ -219,11 +239,6 @@
       "type": "template"
     },
     {
-      "source": "dist/companion/.squad/heroes/profiles/typescript-development.json",
-      "target": "templates/squad-heroes/companion/.squad/heroes/profiles/typescript-development.json",
-      "type": "template"
-    },
-    {
       "source": "dist/companion/.squad/heroes/prompts/startreqeng.de.md",
       "target": "templates/squad-heroes/companion/.squad/heroes/prompts/startreqeng.de.md",
       "type": "template"
@@ -251,21 +266,6 @@
     {
       "source": "dist/companion/.squad/heroes/prompts/startwork.en.md",
       "target": "templates/squad-heroes/companion/.squad/heroes/prompts/startwork.en.md",
-      "type": "template"
-    },
-    {
-      "source": "dist/companion/.squad/heroes/skills/humanizer/SKILL.md",
-      "target": "templates/squad-heroes/companion/.squad/heroes/skills/humanizer/SKILL.md",
-      "type": "template"
-    },
-    {
-      "source": "dist/companion/.squad/heroes/skills/humanizer/de-DE.md",
-      "target": "templates/squad-heroes/companion/.squad/heroes/skills/humanizer/de-DE.md",
-      "type": "template"
-    },
-    {
-      "source": "dist/companion/.squad/heroes/skills/humanizer/en-US.md",
-      "target": "templates/squad-heroes/companion/.squad/heroes/skills/humanizer/en-US.md",
       "type": "template"
     },
     {

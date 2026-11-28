@@ -6,7 +6,7 @@ import { applyPlan, buildInstallPlan } from '../src/installer.mjs';
 import { cleanup, commandResult, fixture } from './helpers.mjs';
 
 const root = path.resolve(import.meta.dirname, '..');
-const skillRoot = path.join(root, '.squad/heroes/skills/humanizer');
+const skillRoot = path.join(root, '.squad/heroes/001/skills/humanizer');
 const injected = {
   cwd: '.',
   spawn: (command, args) => {
@@ -29,10 +29,9 @@ function json(file) {
 test('Humanizer has a shared router and both localized rule sets in every distribution', () => {
   for (const file of files) assert.equal(existsSync(path.join(skillRoot, file)), true, file);
 
-  const sourcePaths = files.map((file) => `.squad/heroes/skills/humanizer/${file}`);
+  const sourcePaths = files.map((file) => `.squad/heroes/001/skills/humanizer/${file}`);
   const manifest = json('.squad/heroes/manifest.json');
   const marketplace = json('plugin.manifest.json');
-  const targets = json('.squad/heroes/companion-targets.json').targets;
   for (const source of sourcePaths) {
     assert.ok(manifest.files.some((file) => file.source === source), source);
     const distributed = `dist/companion/${source}`;
@@ -41,17 +40,10 @@ test('Humanizer has a shared router and both localized rule sets in every distri
       file.target === `templates/squad-heroes/companion/${source}`
     ), source);
   }
-  for (const file of files) {
-    assert.ok(targets.some((entry) =>
-      entry.source === `.squad/heroes/skills/humanizer/${file}` &&
-      entry.target === `.github/skills/humanizer/${file}` &&
-      entry.mode === 'whole-file'
-    ), file);
-  }
 });
 
 test('the TypeScript profile registers Humanizer', () => {
-  const profile = json('.squad/heroes/profiles/typescript-development.json');
+  const profile = json('.squad/heroes/001/profile.json');
   assert.deepEqual(profile.skills, ['humanizer']);
 });
 
@@ -60,7 +52,7 @@ test('clean installation places all Humanizer files under .github/skills', () =>
   try {
     const plan = buildInstallPlan(repo, {
       repository: 'owner/repository',
-      profile: 'typescript-development',
+      profile: '001',
       language: 'en',
       locale: 'en_US',
       branches: ['main'],
@@ -86,7 +78,7 @@ test('clean installation places all Humanizer files under .github/skills', () =>
 });
 
 test('localized agent charters select exactly the matching prose rules', () => {
-  const agents = path.join(root, '.squad/heroes/agents');
+  const agents = path.join(root, '.squad/heroes/001/agents');
   for (const file of readdirSync(agents).filter((name) => name.endsWith('.md'))) {
     const source = readFileSync(path.join(agents, file), 'utf8');
     if (file.endsWith('.de.md')) {
@@ -103,8 +95,8 @@ test('localized agent charters select exactly the matching prose rules', () => {
 });
 
 test('Maria makes Humanizer mandatory for every localized documentation deliverable and prose review', () => {
-  const de = readFileSync(path.join(root, '.squad/heroes/agents/maria.de.md'), 'utf8');
-  const en = readFileSync(path.join(root, '.squad/heroes/agents/maria.en.md'), 'utf8');
+  const de = readFileSync(path.join(root, '.squad/heroes/001/agents/maria.de.md'), 'utf8');
+  const en = readFileSync(path.join(root, '.squad/heroes/001/agents/maria.en.md'), 'utf8');
   assert.match(de, /\*\*Pflicht:\*\*[\s\S]*jedem[\s\S]*Dokumentationsdeliverable[\s\S]*Prosa-Prüfung[\s\S]*de-DE\.md[\s\S]*durchgängig/u);
   assert.match(en, /\*\*Mandatory:\*\*[\s\S]*every[\s\S]*documentation[\s\S]*prose review[\s\S]*en-US\.md[\s\S]*throughout/u);
 });

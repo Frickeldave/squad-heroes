@@ -18,11 +18,12 @@ import {
   resolveBoardProject,
 } from '../src/preflight';
 import { resolveLanguage, supportedLanguage, translate } from '../src/messages';
+import { PROFILE_ID, PROFILE_NAME } from '../src/config';
 import { createInterface } from 'node:readline/promises';
 import { emitKeypressEvents } from 'node:readline';
 
 const HELP = `Usage:
-  node .squad/templates/squad-heroes/companion/scripts/install --target /path/to/repository --repository owner/name --profile typescript-development --deployment-branches N \\
+  node .squad/templates/squad-heroes/companion/scripts/install --target /path/to/repository --repository owner/name --project-type 001 --deployment-branches N \\
     --deployment-branch-1 main [--deployment-branch-2 int ...] [--language de|en] [--expected-github-account ACCOUNT] [--dry-run]
 
 Squad 2.0.0 or higher must be installed in the target repository. The installer
@@ -74,6 +75,16 @@ function wizardText(language, id) {
 
 export async function completeInteractiveOptions(options, existing, ask, choose, injected = {}) {
   if (!choose) throw new Error('Interactive selection requires a menu implementation');
+  const selectedProfile = await choose(
+    'Project type',
+    [PROFILE_NAME],
+    PROFILE_NAME
+  );
+  options.profile = selectedProfile;
+  if (![PROFILE_ID, PROFILE_NAME].includes(options.profile)) {
+    throw new Error(`Only ${PROFILE_NAME} is available`);
+  }
+  if (options.profile === PROFILE_NAME) options.profile = PROFILE_ID;
   const preliminaryLanguage = supportedLanguage(
     options.language ?? existing?.language ?? process.env.LANG
   ) ?? 'en';
@@ -95,11 +106,6 @@ export async function completeInteractiveOptions(options, existing, ask, choose,
     .replace('{account}', repositoryAccess.account)
     .replace('{owner}', repositoryAccess.owner)}\n`);
 
-  options.profile ??= await ask('Project profile', existing?.profile ?? 'typescript-development');
-  if (!['typescript-development', 'TypeScript Development'].includes(options.profile)) {
-    throw new Error('Only TypeScript Development is available in this MVP');
-  }
-  if (options.profile === 'TypeScript Development') options.profile = 'typescript-development';
   options.language ??= await ask('Language (de|en)', existing?.language ?? 'en');
   const language = resolveLanguage(options.language, existing?.language, process.env.LANG).language;
 
@@ -404,6 +410,9 @@ export async function main() {
         .some((flow) => !options.explicitModels[flow]);
       if (missingModelFlags) {
         throw new Error(wizardText(language, 'picker_tty_required'));
+      }
+      if (!existing && options.profile !== PROFILE_ID) {
+        throw new Error(`--project-type ${PROFILE_ID} is required for noninteractive installation.`);
       }
     }
     const repoRoot = resolve(options.target ?? process.cwd());

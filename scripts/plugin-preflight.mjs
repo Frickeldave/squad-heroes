@@ -19,7 +19,7 @@ try {
   console.log(
     `node ${JSON.stringify(path.join(targetRoot, '.squad/templates/squad-heroes/companion/scripts/install'))} ` +
     `--target ${JSON.stringify(targetRoot)} ` +
-    '--repository owner/name --profile typescript-development --deployment-branches 1 ' +
+    '--repository owner/name --project-type 001 --deployment-branches 1 ' +
     '--deployment-branch-1 main --language en --dry-run'
   );
 } catch (error) {

@@ -35,7 +35,7 @@ export function requireSquad2() {
 export function loadConfig() {
   const state = JSON.parse(readFileSync('.squad/heroes.json', 'utf8'));
   if (state.schemaVersion !== 1 || state.product !== 'squad-heroes' ||
-      state.profile !== 'typescript-development') throw new Error('invalid heroes.json');
+      state.profile !== '001') throw new Error('invalid heroes.json');
   return state;
 }
 

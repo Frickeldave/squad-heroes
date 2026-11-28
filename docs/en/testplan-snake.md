@@ -1,102 +1,57 @@
-# End-to-end test plan: `squad-heroes-snake` consumer repository
+# End-to-end test plan: `squad-heroes-snake`
 
-This runbook validates the released product outside the source repository. It
-is repeatable but not fully automatic: GitHub and browser checks require an
-approved test organization and explicit human confirmation. Never store tokens,
-PATs, or credentials in commands, files, or evidence.
+Validate `{heroes-dir}`, an approved GitHub owner `{owner}`, and an empty consumer checkout `{snake-dir}`. Store evidence outside both repositories. Never expose tokens or PATs in commands, files, or logs.
 
-## 1. Prerequisites
+Start gate: in a TTY, Companion installation must first show the "Project type" menu with exactly `001 Typescript developer project`. Non-TTY runs must pass `--project-type 001` explicitly; omission fails.
 
-1. Linux, Node.js 20+, npm, `git`, `gh`, and `squad` are installed.
-   Verify the launcher as the normal user before upgrading anything:
+## Prerequisites
 
-   ```bash
-   command -v squad
-   ls -l "$(command -v squad)"
-   squad --version
-   ```
+- Linux, Node.js 20+, npm, `git`, `gh`, Squad, and a TTY for interactive cases.
+- An approved, empty owner namespace `{owner}` and an available `squad-heroes-snake` repository name.
+- Authenticated `gh` with repository push permission and the writable Project scope.
 
-   If this fails with `Permission denied`, stop; do not run the CLI under
-   `sudo` or apply a recursive chmod.
-2. An empty approved GitHub owner/namespace is available. `{owner}` means only
-   this namespace.
-3. Verify the active `gh` identity and permissions without exposing credentials:
+```bash
+command -v squad
+ls -l "$(command -v squad)"
+squad --version
+gh auth status --hostname github.com
+gh api repos/{owner}/squad-heroes-snake --jq .permissions.push
+```
 
-   ```bash
-   gh auth status
-   gh api repos/{owner}/squad-heroes-snake --jq .permissions.push
-   ```
+Gate: `gh auth status` succeeds. A `404` from the repository query is valid before creation; after creation, `push` must be `true`. If the Squad launcher reports `Permission denied`, do not continue under `sudo` or with recursive `chmod`; use the bounded repair in [Installation](installation.md).
 
-   Expect `gh auth status` to succeed. The first API lookup may legitimately be
-   `404` before creation; otherwise `push` must be provably `true`. If auth is
-   missing, use only the host-side `gh auth login` browser/device flow.
-4. Keep a local `squad-heroes` checkout at `{heroes-dir}` and identify the exact
-   tested state:
+## Validate the product state
 
-   ```bash
-   cd {heroes-dir}
-   git rev-parse HEAD
-   sha256sum plugin.manifest.json package-lock.json
-   npm ci
-   npm run check
-   npm run smoke
-   squad plugin validate .
-   git diff --check
-   ```
+```bash
+cd {heroes-dir}
+git rev-parse HEAD
+sha256sum plugin.manifest.json package-lock.json
+git status --short
+npm ci
+npm run check
+npm run smoke
+squad plugin validate .
+git diff --check
+```
 
-   Save command output, commit ID, and checksums in an `evidence/` directory
-   outside the product repository. Any failure, unexpected dirty state, or
-   missing Squad version stops the run.
+Gate: every command succeeds and the tested state is identified. Save the commit ID and checksums.
 
-## 2. Create the empty consumer repository
+## Create the consumer and validate Squad
 
 ```bash
 gh repo create {owner}/squad-heroes-snake --private --confirm
 git clone git@github.com:{owner}/squad-heroes-snake.git {snake-dir}
 cd {snake-dir}
 git status --short
-```
-
-Expect an empty repository with only the Git directory. Verify SSH access before
-cloning or use the HTTPS transport already configured by `gh`. Stop if the name
-exists and is not explicitly confirmed as this run's empty test repository.
-
-## 3. Verify a supported Squad version
-
-Initialize Squad only in the consumer repository. The authoritative product
-source is the marker in the installed file:
-
-```bash
-cd {snake-dir}
 squad init
 grep -c '<!-- version:' .github/agents/squad.agent.md
 grep '<!-- version:' .github/agents/squad.agent.md
 squad --version
 ```
 
-Expect `1` from `grep -c` and exactly one `<!-- version: X.Y.Z -->` marker whose
-valid stable SemVer is at least `2.0.0` (for example `2.0.0`, `2.0.1` or
-`3.0.0`). `squad --version` records the CLI too, but does not replace the marker
-check. Prereleases, including `2.0.0-rc.1`, are rejected fail-closed.
+Gate: exactly one `<!-- version: X.Y.Z -->` marker exists with stable SemVer at least `2.0.0`. Prereleases and older versions stop before installation. After `squad upgrade --self` and any bounded launcher repair, repeat the marker checks and `node {heroes-dir}/scripts/plugin-preflight.mjs --target "$PWD"`.
 
-If the detected version is `0.13.1`, this is a stop condition: do not continue
-the installation. Update the installed CLI with `squad upgrade --self` as the
-normal user. If a root-owned global npm package fails with `EACCES`/`EPERM`,
-repair that one global install with:
-
-```bash
-sudo sh -c 'umask 022 && exec npm install -g --allow-scripts=@bradygaster/squad-cli,node-pty,koffi,protobufjs @bradygaster/squad-cli@latest'
-```
-
-Do not run Squad itself under `sudo`, persist a global allowlist, or use
-`--dangerously-allow-all-scripts`. Restart the terminal and repeat `command -v
-squad`, `ls -l "$(command -v squad)"`, and `squad --version`. After all three
-checks pass, run `squad upgrade` inside `{snake-dir}`, repeat the marker commands,
-and rerun `node {heroes-dir}/scripts/plugin-preflight.mjs --target "$PWD"`.
-
-## 4. Install and update the Squad plugin
-
-Fresh lifecycle:
+## Validate the plugin lifecycle
 
 ```bash
 cd {snake-dir}
@@ -112,54 +67,27 @@ git status --short
 find .squad/plugins -maxdepth 2 -type f -print -exec sha256sum {} \;
 ```
 
-The **plugin distribution plan** from `squad plugin dry-run` must include the
-complete versioned companion: its installer and static copies of runtime,
-script, `.squad/heroes/`, workflow, resource, and Humanizer files. Require
-representative entries such as
-`templates/squad-heroes/companion/.squad/heroes/agents/tony.en.md`,
-`templates/squad-heroes/companion/src/installer`, and
-`templates/squad-heroes/companion/.squad/heroes/companion/workflows/heroes-ci.yml`.
-Every entry remains below `templates/squad-heroes/companion/`; it must not
-target active root `scripts/`, `.github/prompts/`, or `.github/workflows/`.
+The **plugin distribution plan** (`plugin distribution plan`) gates:
 
-Expect declared plugin targets under `.squad/`; `.squad/plugins/*` must be the
-authoritative installed state. `list --json` must report `squad-heroes@0.1.0`
-or the exact released version under test. `verify` succeeds. Active Companion
-targets remain untouched.
+- the complete distribution appears only below `templates/squad-heroes/companion/`;
+- representative targets include `templates/squad-heroes/companion/src/installer`, `templates/squad-heroes/companion/.squad/heroes/001/agents/tony.en.md`, and `templates/squad-heroes/companion/.squad/heroes/companion/workflows/heroes-ci.yml`;
+- the static source reference `.squad/heroes/companion/workflows/heroes-ci.yml` remains included;
+- it does not directly target root `scripts/`, `.github/prompts/`, or `.github/workflows/`;
+- `list --json` reports the tested version, `verify` succeeds, and active targets remain unchanged.
 
-Idempotency and actual update behavior:
+Idempotency:
 
-1. Save plugin target and Companion control checksums.
-2. Repeat the identical installation:
+```bash
+squad plugin verify
+squad plugin install {heroes-dir}
+squad plugin verify
+```
 
-   ```bash
-   squad plugin verify &&
-   squad plugin install {heroes-dir} &&
-   squad plugin verify
-   ```
+Gate: target bytes remain unchanged and exactly one `squad-heroes` entry exists. Deliberately modify a plugin target; `verify` must fail with `checksum mismatch` without changing files. Restore it explicitly.
 
-   Expect unchanged target bytes and one installed `squad-heroes` entry. Squad
-   may record a new timestamp or audit event.
-3. Check out a newer approved release at `{heroes-new-dir}` and prove that
-   version or source content differs:
+Check out a newer approved release at `{heroes-new-dir}` with a different version or content. Repeat validate, verify, install, and verify. Gate: the new version and checksums appear in `.squad/plugins/*`.
 
-   ```bash
-   node {heroes-new-dir}/scripts/plugin-preflight.mjs --target "$PWD"
-   squad plugin validate {heroes-new-dir}
-   squad plugin verify &&
-   node {heroes-new-dir}/scripts/plugin-preflight.mjs --target "$PWD" &&
-   squad plugin install {heroes-new-dir} &&
-   squad plugin verify
-   squad plugin list --json
-   ```
-
-   Expect the new version, manifest checksum, file checksums, and static content
-   to appear in `.squad/plugins/*`.
-4. Locally modify one plugin target and run `squad plugin verify`. Expect a
-   `checksum mismatch`, nonzero status, and no state/file change from `verify`.
-   Deliberately restore it rather than silently covering the conflict.
-
-## 5. Companion and supplied flows
+## Validate Companion activation
 
 ```bash
 cd {snake-dir}
@@ -167,7 +95,7 @@ node .squad/templates/squad-heroes/companion/scripts/install --help
 node .squad/templates/squad-heroes/companion/scripts/install \
   --target {snake-dir} \
   --repository {owner}/squad-heroes-snake \
-  --profile typescript-development \
+  --project-type 001 \
   --deployment-branches 1 \
   --deployment-branch-1 main \
   --language en \
@@ -177,48 +105,33 @@ node .squad/templates/squad-heroes/companion/scripts/install \
   --dry-run
 ```
 
-Require approved model IDs and complete noninteractive inputs. Verify startup
-checks `gh`, authentication/account, repository read/push permissions, and the
-derived owner's Project API access, in that order. It must also prove the active
-account's exact write-capable `project` scope from a sanitized
-`gh auth status --hostname github.com` line; `read:project` alone must fail.
-These gates run before every prompt,
-menu renderer, readline/raw-terminal selection, model discovery, or plan output.
-The scope and non-mutating Project probe are required even when board sync
-remains off or installation is `--dry-run`, and the result is cached for later
-selection. Missing scope must show `gh auth refresh -h github.com -s project`,
-then `gh auth status --hostname github.com`, expose neither token nor raw status,
-and produce zero prompt/menu calls. A granted `project` scope must pass. Confirm
-the preflight output names the active account and a sanitized granted status.
-Verify 403 owner-right and 404 owner/visibility guidance, `viewerCanUpdate`
-before Board mutation, and a second immediate recheck before the first Project
-write. Expect the
-separate **Companion activation plan** to show `scripts/start-work.mjs`, other
-`scripts/` targets, `.github/prompts/`, and
-`.github/workflows/heroes-ci.yml`. It performs no writes, passes both version
-gates, avoids credential prompts, and keeps plugin/Companion ownership separate.
+The **Companion activation plan** gates:
 
-Also run the installer on a TTY once without model flags. If repository is
-missing, only that one prompt may occur after auth and before repository/Project
-checks. Confirm the labels
-`Default model for reqeng/work/review` use an in-place picker: Up/Down or `j`/`k`
-moves, Enter confirms, Escape/`q` aborts, and typed numbers or arbitrary text
-cannot select an item. The displayed current value is highlighted and is the
-default. Without a TTY, expect a clear noninteractive-flags error rather than a
-number-entry fallback. If board sync is enabled, confirm owner `\{owner\}` is
-derived and Project `\#` is auto-selected or chosen with the same arrow-key
-picker—never typed. Verify the one/multiple/zero Project cases.
-Run a separate launcher invocation with `--model` and confirm the override is
-used unchanged for that run.
+- checks run in this order: `gh`, auth/account, repository read/push permissions, Project API access; the `project` scope is safely proven from status output;
+- gates run before prompts, model discovery, menus, and output, including with `--dry-run` and board sync disabled; `read:project` alone fails;
+- missing scope shows only `gh auth refresh -h github.com -s project` and `gh auth status --hostname github.com`;
+- `scripts/start-work.mjs`, other scripts, `.github/prompts/`, and `.github/workflows/heroes-ci.yml` appear, with no writes;
+- 403/404 guidance, `viewerCanUpdate` before Board mutation, and the second check before the first Project write are exercised.
+- `.squad/001/profile.json`, agents, and skills are installed; active charters derive from them and land in `.squad/agents/`;
+- ReqEng, Work, and Review each appear once and are not duplicated under `.squad/001/`.
 
-Run the same command without `--dry-run`, then:
+On a TTY, run the installer again without model flags. Arrows or `j`/`k` move, Enter confirms, and Escape/`q` cancels; numbers do not select. Without a TTY, require noninteractive flags. Exercise one-, multiple-, and zero-Project cases; owner derives from `{owner}`. A launcher run with `--model` must propagate that exact override.
+
+Then:
 
 ```bash
-cd {snake-dir}
+node .squad/templates/squad-heroes/companion/scripts/install \
+  --target {snake-dir} \
+  --repository {owner}/squad-heroes-snake \
+  --project-type 001 \
+  --deployment-branches 1 \
+  --deployment-branch-1 main \
+  --language en \
+  --model-reqeng mai-code-2 \
+  --model-work claude-sonnet-5.5 \
+  --model-review gpt-6.1-terra
 git status --short
-git diff -- . ':!package-lock.json'
 find scripts .github/prompts .github/workflows .squad/agents -type f -print
-node .squad/templates/squad-heroes/companion/scripts/install --help
 node scripts/start-reqeng.mjs --help
 node scripts/start-work.mjs --help
 node scripts/start-review.mjs --help
@@ -227,80 +140,51 @@ node scripts/versionbump.mjs --help
 node scripts/check-release-label.mjs --help
 ```
 
-Each entry point must exist and provide safe help or diagnostics. Unapproved
-external board writes remain absent. Repeat the Companion command with identical
-inputs and expect `changed: 0` or byte-identical no-op.
+Gate: all entry points exist and provide safe help or diagnostics. Repeating the same apply reports `changed: 0`. Modify one managed marker block: dry-run shows local, incoming, and result; unresolved conflicts write nothing. Apply exactly one documented decision. `history.md` stays append-only, and profile changes fail closed.
 
-Conflict test: change one managed marker block deliberately, rerun dry-run, and
-record all three versions/options. An unresolved conflict stops before writes;
-then apply exactly one documented decision. `history.md` must append only.
-A profile change must fail closed.
+After a plugin update, explicitly rerun the Companion. Active bytes may change only in this apply. Disable/uninstall the plugin: active files remain, and `.squad/plugins/*` stayed unchanged during the Companion rerun. Reinstall afterward.
 
-After plugin update, explicitly rerun the copied Companion and repeat the
-idempotency check. Confirm active target bytes changed only on that explicit
-rerun. Disable and uninstall the plugin, then verify that the active
-`scripts/`, workflows and charters still exist before reinstalling the plugin.
-`.squad/plugins/*` is unchanged by the Companion rerun.
+## Create the Snake issue
 
-## 6. Create the Snake ticket
-
-The ticket describes only the test product. Minimum body:
-
-- goal: browser-based Snake;
-- acceptance: start, keyboard direction, food/growth, wall/self collision,
-  score, game over, restart, deterministic core;
-- gates: unit tests, build/check, reviewer approval.
+Use the supplied [issue template](testplan-snake-issue.md) directly. Do not create a separate local issue file:
 
 ```bash
 cd {snake-dir}
-gh issue create --repo github.com:{owner}/squad-heroes-snake \
+gh issue create --repo github.com/{owner}/squad-heroes-snake \
   --title "Build browser-based Snake game" \
-  --body-file evidence/snake-issue.md
-gh issue list --repo github.com:{owner}/squad-heroes-snake --state open
+  --body-file {heroes-dir}/docs/en/testplan-snake-issue.md
+gh issue list --repo github.com/{owner}/squad-heroes-snake --state open
 ```
 
-Record `{snake-issue}`. Expect exactly one newly created test item and no change
-to any unrelated ticket.
+Record the returned URL/number immediately as `{snake-issue}`. Gate: exactly one new open ticket; unrelated tickets remain unchanged.
 
-## 7. Full Squad workflow
+## Validate the Squad flows
 
-1. Start ReqEng/issue processing with
-   `node scripts/start-reqeng.mjs --issue {snake-issue}` and flags from `--help`.
-2. Submit bundled, unambiguous answers. Blocking questions must close before
-   Work. Re-evaluate the same stable block; duplicate blocks fail the test.
-3. Start `node scripts/start-work.mjs --issue {snake-issue}`.
-4. Capture branch, worktree/tmux, resolved model ID, downstream model, and
-   decisions:
+```bash
+cd {snake-dir}
+node scripts/start-reqeng.mjs --issue {snake-issue}
+node scripts/start-work.mjs --issue {snake-issue}
+git branch --show-current
+git worktree list
+git log --oneline -5
+gh issue view {snake-issue} --repo github.com:{owner}/squad-heroes-snake
+```
 
-   ```bash
-   git branch --show-current
-   git worktree list
-   git log --oneline -5
-   gh issue view {snake-issue} --repo github.com:{owner}/squad-heroes-snake
-   ```
+Gate: blocking questions close before Work, the same question block is evaluated without duplicates, and one validated model ID propagates unchanged. Branch, issue reference, tmux, and worktree are unambiguous.
 
-   Expect an unambiguous branch/issue reference and one exact model ID propagated
-   unchanged to every downstream operation.
-5. Execute implementation, tests, and documentation through the generated Squad
-   chain. Commits contain no credentials.
-6. Create a PR with `gh pr create` referencing `{snake-issue}`, then:
+Implement, test, and open a PR with `gh pr create`. The body must contain `Closes #{snake-issue}`.
 
-   ```bash
-   gh pr view --repo github.com:{owner}/squad-heroes-snake
-   gh pr checks --repo github.com:{owner}/squad-heroes-snake --watch --fail-fast
-   gh pr view --json reviewDecision,mergeable,state
-   ```
+```bash
+gh pr view --repo github.com:{owner}/squad-heroes-snake
+gh pr checks --repo github.com:{owner}/squad-heroes-snake --watch --fail-fast
+gh pr view --repo github.com:{owner}/squad-heroes-snake \
+  --json reviewDecision,mergeable,state
+node scripts/start-review.mjs --pr {snake-pr}
+```
 
-   Do not mark ready or merge on failure, missing review, or an open gate.
-7. Run `node scripts/start-review.mjs --pr {snake-pr}`. Baseline precedence must
-   be run override, configured baseline, or PR base—never PR head.
-8. Merge only after approval, then add a completion comment with checks and
-   commit evidence. Scribe/decision updates must contain the agreed data without
-   duplicated blocks.
+Gate: review baseline is run override, configured baseline, or PR base, never head. Do not mark ready or merge on a failure, missing approval, or open gate. After approval, merge and post completion evidence with checks and commits.
 
-## 8. Verify Snake behavior
-
-Automatic checks where supported by the consumer framework:
+## Validate Snake behavior
 
 ```bash
 cd {snake-dir}
@@ -310,41 +194,58 @@ npm run build
 npm run check
 ```
 
-Tests must prove:
+Automated gates:
 
-- deterministic initial state with a fixed seed;
-- one-axis movement in every direction;
-- food increases length and score;
-- wall or self collision causes game over;
-- restart returns to the initial state;
-- immediate reverse direction is rejected;
-- identical action sequences produce identical state.
+- a fixed seed produces the same initial and final state;
+- movement is axis-aligned and immediate reversal is blocked;
+- food uses free cells and increases length/score;
+- wall and self collision cause game over;
+- restart restores the initial state and creates no second loop;
+- identical actions produce identical state.
 
-A missing test, build failure, nondeterministic result, or flaky output stops the
-run.
+Manually test desktop and a narrow viewport: use the generated README to start the app, then check keyboard/optional touch input, focus, growth, score, game over, restart, overflow, console, and network errors. Record browser, version, time, and screenshots.
 
-Manual browser checks:
+## Validate Project creation
 
-1. Start the local server according to the generated README.
-2. Verify start, keyboard input, growth, game over, and restart on a desktop
-   browser; verify touch/mobile controls if supplied.
-3. Confirm no diagonal motion, blocked UI, double-restart behavior, console
-   errors, or failed network requests.
-4. Save browser, version, timestamp, and screenshots as approval evidence.
+Fixture: owner `frickeldave-test`, repository `squad-heroes-snake`, zero Projects.
 
-## 9. Failure handling and cleanup
+```bash
+node .squad/templates/squad-heroes/companion/scripts/install \
+  --target "$PWD" \
+  --repository frickeldave-test/squad-heroes-snake \
+  --enable-board-sync \
+  --project-type 001 \
+  --language en \
+  --deployment-branches 1 \
+  --deployment-branch-1 main \
+  --model-reqeng mai-code-2 \
+  --model-work claude-sonnet-5.5 \
+  --model-review gpt-6.1-terra \
+  --create-project \
+  --project-title squad-heroes-snake \
+  --dry-run
+```
 
-On failure: stop active commands, jobs, or local servers; record the step,
-command, exit code, and unchanged checks; mutate nothing once ownership of a
-resource is unclear.
+Gate: the menu contains Companion creation, manual creation, and cancel; dry-run shows `PLANNED_CREATE` and `{{PROJECT_NUMBER}}`, with no mutation or placeholder lookup. Apply creates once, resolves the real number/node ID, checks `viewerCanUpdate`, configures schema and repository link, and stores the number. Rerun creates no second Project and no local writes. 403, missing CI flags, invalid title, and partial-schema failures produce safe recovery without secrets. `HEROES_PROJECT_TOKEN` reaches only Project v2 commands; repository access uses `${{ github.token }}`.
 
-For `bash: /usr/bin/squad: Permission denied`, record the launcher symlink and
-its resolved path, do not patch individual dependency permissions, and repeat
-the documented global reinstall with `umask 022`. Restart the terminal and
-repeat the three launcher checks before resuming a product or test-repository
-upgrade.
+## Handle a stale consumer copy
 
-After a successful or intentionally aborted run:
+```bash
+git -C {heroes-dir} pull --ff-only
+squad plugin install {heroes-dir}
+squad plugin verify
+sha256sum {heroes-dir}/dist/companion/scripts/install
+sha256sum .squad/templates/squad-heroes/companion/scripts/install
+cmp {heroes-dir}/dist/companion/scripts/install \
+  .squad/templates/squad-heroes/companion/scripts/install
+node .squad/templates/squad-heroes/companion/scripts/install --target "$PWD" --dry-run
+```
+
+Gate: `cmp` exits 0.
+
+## Failure and cleanup
+
+On failure, stop active processes and record the step, command, exit code, and last passing check. Do not mutate a resource with unclear ownership. For partial Project failure, first inspect `gh project list --owner {owner} --limit 100 --format json` and existing state; do not blindly recreate.
 
 ```bash
 cd {snake-dir}
@@ -353,85 +254,16 @@ gh pr list --repo github.com:{owner}/squad-heroes-snake --state open
 gh issue list --repo github.com:{owner}/squad-heroes-snake --state open
 ```
 
-1. Remove only this run's worktrees with `git worktree remove {path}`.
-2. End identified tmux sessions by exact name with
-   `tmux kill-session -t {name}`; never use pattern deletion.
-3. Delete test branches only from this repository after final commit, using safe
-   `gh` operations and explicit confirmation.
-4. Move local evidence according to retention policy. Delete temporary checkouts
-   only after comparing owner and absolute path.
-5. If the isolated repository is no longer needed:
-
-   ```bash
-   gh repo delete github.com:{owner}/squad-heroes-snake --yes
-   ```
-
-   Require explicit human confirmation for this irreversible action.
-6. Check `gh auth status` again, but do not alter the credential store. Do not
-   revoke globally useful permissions used by other approved work.
-
-Final evidence includes commit IDs, `list --json`, plugin checksums, Companion
-plan, ticket/PR numbers, check/review results, model/Scribe evidence, browser
-results, and the cleanup record.
-
-## Project creation lifecycle fixture
-
-- Fixture owner `frickeldave-test`, repository `squad-heroes-snake`, zero Projects. Verify the arrow menu contains create and cancel/share choices; cancellation mutates nothing.
-- The menu must also contain “Create Project manually”. Both manual selection and cancellation print owner `frickeldave-test`, title `squad-heroes-snake`, `gh project create --owner frickeldave-test --title squad-heroes-snake`, active-account write access, list/number verification, rerun with `--project-number <number>`, and a clear statement that dry-run creates nothing.
-- Dry-run with `--create-project --project-title squad-heroes-snake` first proves scope and owner list access, enters `PLANNED_CREATE`, requests status field/map defaults without a token prompt, shows owner, name, `{{PROJECT_NUMBER}}`, deferred schema and repository-link operations, performs no Project lookup by placeholder, and records zero GitHub mutations.
-- Apply creates exactly once, immediately resolves the returned number/node ID through a fresh Project lookup, observes `viewerCanUpdate`, configures fields/options, links the repository, and persists the real number. A rerun with the saved state performs no second create and no local writes. Simulated create or follow-up failure names possible Project/schema/link partial state, first requires `gh project list --owner frickeldave-test --limit 100 --format json`, contains no secrets, and offers the same manual setup.
-- Cover denied owner permission/403, missing noninteractive flags, ambiguous booleans, invalid titles, partial schema failure/recovery, existing one/multiple/explicit Project flows, and command logs containing no token material.
-- Inspect rendered Project workflows: `HEROES_PROJECT_TOKEN` is routed only into Project V2 commands, while repository issue/PR and label commands use `${{ github.token }}` plus declared permissions. The Project secret requires only classic `project` scope (not `repo`) or fine-grained Projects read/write; `.squad/heroes.json` contains no token field/expression.
-
-Before the lifecycle when an installed consumer copy is stale:
+- Remove only this run's worktrees with `git worktree remove {path}`.
+- End only named test tmux sessions with `tmux kill-session -t {name}`.
+- Delete test branches only after the final commit and with explicit confirmation.
+- Store evidence under its retention policy.
+- Delete the test repository only after explicit human approval:
 
 ```bash
-git -C {heroes-dir} pull --ff-only
-squad plugin install {heroes-dir}
-squad plugin verify
-sha256sum {heroes-dir}/dist/companion/scripts/install
-sha256sum .squad/templates/squad-heroes/companion/scripts/install
-cmp {heroes-dir}/dist/companion/scripts/install .squad/templates/squad-heroes/companion/scripts/install
-node .squad/templates/squad-heroes/companion/scripts/install --target "$PWD" --dry-run
+gh repo delete github.com/{owner}/squad-heroes-snake --yes
 ```
 
-`cmp` must succeed, proving byte equality between current source and the
-reinstalled Companion rather than relying on a version workaround.
+- Check `gh auth status` again; do not modify the credential store.
 
-## After the runbook: Snake issue and installed flows
-
-The fully written, copy-ready issue template is in
-[testplan-snake-issue.md](testplan-snake-issue.md). Use that file unchanged as
-the issue body; do not link development history or internal evidence. In the
-consumer repository:
-
-```bash
-cd {snake-dir}
-gh issue create --repo github.com:{owner}/squad-heroes-snake \
-  --title "Implement a browser-based Snake game" \
-  --body-file {heroes-dir}/docs/en/testplan-snake-issue.md
-gh issue list --repo github.com:{owner}/squad-heroes-snake --state open
-```
-
-Record the created number as `{snake-issue}`, then start the installed flows
-in exactly this order:
-
-```bash
-node scripts/start-reqeng.mjs --issue {snake-issue}
-node scripts/start-work.mjs --issue {snake-issue}
-```
-
-ReqEng must produce clarified requirements and a handoff to Work with no
-blocking questions. Work must create the branch/worktree, implementation,
-checks, and a PR containing `Closes #{snake-issue}`. Record its number as
-`{snake-pr}`. Only after that PR actually exists, start the Review flow:
-
-```bash
-gh pr view {snake-pr} --repo github.com:{owner}/squad-heroes-snake
-node scripts/start-review.mjs --pr {snake-pr}
-```
-
-Review receives a real PR and valid baseline precedence (run override,
-configured baseline, then PR base; never PR head). Expected gates: ReqEng
-questions closed, Work tests/build/check green, PR open, and no review blocker.
-Do not mark ready or merge early.
+Final evidence: commit ID, checksums, `list --json`, plans, issue/PR, checks, review, model/Scribe evidence, browser data, and cleanup.

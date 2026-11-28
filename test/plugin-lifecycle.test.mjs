@@ -11,7 +11,7 @@ const squad = spawnSync('squad', ['--version'], { encoding: 'utf8' });
 const companionArgs = [
   '--target', '.',
   '--repository', 'owner/repository',
-  '--profile', 'typescript-development',
+  '--profile', '001',
   '--deployment-branches', '1',
   '--deployment-branch-1', 'main',
   '--language', 'en',
@@ -70,9 +70,9 @@ function newerProduct(version) {
   ));
   internalManifest.version = version;
   const charter = internalManifest.files.find(({ target }) =>
-    target === '.squad/heroes/agents/tony.en.md');
+    target === '.squad/heroes/001/agents/tony.en.md');
   charter.sha256 = sha(readFileSync(
-    path.join(destination, 'dist/companion/.squad/heroes/agents/tony.en.md')
+    path.join(destination, 'dist/companion/.squad/heroes/001/agents/tony.en.md')
   ));
   write(
     destination,
@@ -94,7 +94,7 @@ for (const fixtureId of [1, 2]) test(`real Squad lifecycle uses an installed sel
   const activeScript = path.join(root, 'scripts/start-work.mjs');
   const activeWorkflow = path.join(root, '.github/workflows/heroes-ci.yml');
   const installedEntry = path.join(root, '.squad/templates/squad-heroes/companion/scripts/install');
-  const installedCharter = path.join(root, '.squad/templates/squad-heroes/companion/.squad/heroes/agents/tony.en.md');
+  const installedCharter = path.join(root, '.squad/templates/squad-heroes/companion/.squad/heroes/001/agents/tony.en.md');
   write(root, 'bin/gh', `#!/bin/sh
 if [ "$1" = "auth" ] && [ "$2" = "status" ]; then printf '%s\\n' "- Token scopes: 'repo', 'project'"; fi
 if [ "$1" = "api" ] && [ "$2" = "user" ]; then printf 'octocat\\n'; fi
@@ -110,7 +110,7 @@ exit 0
     assert.match(pluginDryRun.stdout, /templates\/squad-heroes\/companion\/src\/installer/u);
     assert.match(pluginDryRun.stdout, /templates\/squad-heroes\/companion\/\.squad\/heroes\/companion\/scripts\/start-work/u);
     assert.match(pluginDryRun.stdout, /templates\/squad-heroes\/companion\/\.squad\/heroes\/companion\/workflows\/heroes-ci\.yml/u);
-    assert.match(pluginDryRun.stdout, /templates\/squad-heroes\/companion\/\.squad\/heroes\/skills\/humanizer\/en-US\.md/u);
+    assert.match(pluginDryRun.stdout, /templates\/squad-heroes\/companion\/\.squad\/heroes\/001\/skills\/humanizer\/en-US\.md/u);
     assert.doesNotMatch(pluginDryRun.stdout, /(?:^|\n)\s*(?:scripts\/|\.github\/prompts\/|\.github\/workflows\/)/u);
 
     mustRun(root, ['install', product]);
@@ -150,8 +150,8 @@ exit 0
     assert.notEqual(state(root, 'lock.json').plugins['squad-heroes'].manifest_sha256, firstLock.manifest_sha256);
     assert.equal(
       state(root, 'lock.json').plugins['squad-heroes'].files.find(({ target }) =>
-        target.endsWith('/companion/.squad/heroes/agents/tony.en.md')).sha256,
-      sha(readFileSync(path.join(productV2, 'dist/companion/.squad/heroes/agents/tony.en.md')))
+        target.endsWith('/companion/.squad/heroes/001/agents/tony.en.md')).sha256,
+      sha(readFileSync(path.join(productV2, 'dist/companion/.squad/heroes/001/agents/tony.en.md')))
     );
     assert.equal(
       readFileSync(path.join(root, '.squad/agents/tony/charter.en.md'), 'utf8'),
@@ -179,8 +179,10 @@ exit 0
   }
 });
 
-test('the README documents installed-copy Companion semantics', () => {
-  const readme = readFileSync(path.join(product, 'README.md'), 'utf8');
-  assert.match(readme, /squad plugin install <local-dir>/);
-  assert.match(readme, /\.squad\/templates\/squad-heroes\/companion\/scripts\/install/u);
+test('localized READMEs document installed-copy Companion semantics', () => {
+  for (const file of ['README-de.md', 'README-en.md']) {
+    const readme = readFileSync(path.join(product, file), 'utf8');
+    assert.match(readme, /squad plugin install/u);
+    assert.match(readme, /\.squad\/templates\/squad-heroes\/companion\/scripts\/install/u);
+  }
 });

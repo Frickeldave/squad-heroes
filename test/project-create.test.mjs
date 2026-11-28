@@ -9,7 +9,7 @@ import { cleanup, commandResult, fixture } from './helpers.mjs';
 
 const base = {
   repository: 'frickeldave-test/squad-heroes-snake',
-  profile: 'typescript-development',
+  profile: '001',
   language: 'en',
   branches: ['main'],
   models: { reqeng: 'mai-code-2', work: 'claude-sonnet-5.5', review: 'gpt-6.1-terra' },
@@ -244,7 +244,8 @@ test('zero Project menu offers concrete manual and cancel recovery without mutat
           projectTitle: null,
           createProject: false,
           createProjectApproved: false,
-        }, null, async (_label, fallback) => fallback, async (_label, choices) => {
+        }, null, async (_label, fallback) => fallback, async (label, choices) => {
+          if (label === 'Project type') return choices[0];
           assert.equal(choices.length, 3);
           assert.match(choices[1], /manuell|manually/iu);
           return choices[selectedIndex];

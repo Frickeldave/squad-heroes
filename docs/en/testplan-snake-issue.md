@@ -66,6 +66,7 @@ keep the core logic clearly separate from presentation.
 
 ## Technical constraints
 
+- The Squad consumer first selects `001 Typescript developer project` and persists profile `001`; shared ReqEng, Work, and Review flows remain unchanged.
 - Use the frontend and build structure already established in the consumer
   repository. Do not add a backend dependency.
 - Add concise, clear start and test commands to the README.

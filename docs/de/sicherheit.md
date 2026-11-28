@@ -2,77 +2,34 @@
 
 ## Schreibgrenzen
 
-- Plugin-Lifecycle: ausschließlich `.squad/plugins/*` durch Squad.
-- Plugin-Inhalte: die vollständige versionierte Distribution unter
-  `.squad/templates/squad-heroes/companion/`, einschließlich statischer Kopien
-  von Installer, Laufzeit, Skripten, `.squad/heroes/`, Workflows, Ressourcen und
-  Humanizer-Dateien.
-- Companion: explizit katalogisierte aktive Consumer-Ziele in seinem separaten
-  Aktivierungsplan.
-- Prompt-Layer: ausschließlich `.github/prompts/addon.config.json`.
+- Squad besitzt nur `.squad/plugins/*`.
+- Das Plugin besitzt die Distribution unter `.squad/templates/squad-heroes/companion/`.
+- Der Companion besitzt nur explizit katalogisierte aktive Ziele.
+- Profilquellen gehören zu `.squad/001/`; aktive Agenten werden nach `.squad/agents/` materialisiert.
+- Prompt-Layer stammen ausschließlich aus `.github/prompts/addon.config.json`.
 
-Dieselben Ziele werden nie parallel besessen. Der Plugin-Distributionsplan
-zielt nicht direkt auf Root-`scripts/`, `.github/prompts/` oder
-`.github/workflows/`. Plugin-Lifecycle-Befehle verändern keine aktiven
-Companion-Dateien; der Companion nutzt die installierte Distribution und
-verändert sein Plugin-verwaltetes Bundle selbst nicht.
+Plugin-Befehle ändern keine aktiven Companion-Dateien. Der Companion ändert sein Plugin-Bundle nicht. Dieselbe Datei gehört nie zwei Ownern gleichzeitig.
 
-## Rechte und Zustimmung
+## Freigaben
 
-Vor Planung sind `gh auth status --hostname github.com`, authentifizierter
-Account-Zugriff und `gh api repos/OWNER/REPO --jq .permissions` Pflicht.
-Die Scope-Zeile des aktiven Accounts muss den schreibfähigen Scope `project`
-gewähren; gespeichert wird nur ein gefilterter Scope-Status. Gespeichert werden
-außerdem nur die Booleans read/push/admin/triage. Jede vollständige Installation
-einschließlich Dry-run verlangt nicht-mutierenden Project-API-Zugriff; der
-Owner wird aus dem Repository abgeleitet. Host-Fehler verweisen auf
-`gh auth login --hostname github.com --web`. Fehlender Scope wird exakt mit
-`gh auth refresh -h github.com -s project` und anschließend
-`gh auth status --hostname github.com` behoben. `read:project` reicht technisch
-nur für isolierte Metadaten-Lesevorgänge, nicht für dieses Board-Setup, das
-Project-Felder, Status und Schema ändert. Berechtigung ersetzt
-keine ausdrückliche Zustimmung. Dry-run und Erstaktivierung schreiben kein
-Project; der spätere Workflow bleibt separat opt-in.
+Vor Planung sind Host-Authentifizierung, Account, Repository-Zugriff und nicht-mutierender Project-API-Zugriff Pflicht. Der schreibfähige `project`-Scope wird aus gefilterter Ausgabe geprüft; gespeichert werden nur sichere Scope-/Permission-Booleans.
+
+Dry-run und Erstaktivierung schreiben kein Project. Board-Mutation erfordert Opt-in und frische Prüfung von `viewerCanUpdate`; Project-Anlage benötigt Planfreigabe, in CI `--create-project` und im Terminal zusätzlich `y/N`.
 
 ## Konflikte
 
-Bestehende verwaltete Bereiche zeigen Basis, lokalen Stand, eingehende Fassung
-und Ergebnis. Zulässig sind ausschließlich `verwenden`, `behalten`,
-`zusammenführen`, `abbrechen`. Ein Merge wird erneut validiert. `history.md`
-bleibt append-only; `team.md` ändert nur Markerbereiche.
+Aktive Konflikte zeigen Basis, lokalen Stand, eingehende Fassung und Ergebnis. Erlaubt sind nur `use`, `keep`, `merge` und `abort`. Merge wird erneut validiert; `history.md` bleibt append-only. Ungeklärte Konflikte stoppen vor Writes.
 
 ## Credentials
 
-Tokens und PATs werden weder abgefragt noch als Argument, stdin, Datei, Log oder
-Test-Fixture akzeptiert. Zulässig sind nur der sichere Host-Credential-Store und
-der offizielle Browser-/Device-Flow. `--with-token`, Token-Umgebungsvariablen,
-Token-Argumente und ausgegebene Credentials werden nicht verwendet.
-Bei den installierten Project-Workflows ist eine bewusste Ausnahme zum
-repositorybezogenen Actions-`GITHUB_TOKEN` nötig: Projects v2 gehören einem
-Benutzer oder einer Organisation; GitHub bietet keine
-Workflow-Berechtigung, die `GITHUB_TOKEN` den dafür nötigen Project-v2-Zugriff
-gewährt. Die Workflows nutzen deshalb fest
-`secrets.HEROES_PROJECT_TOKEN`. Erwartet wird ein klassischer PAT mit
-ausschließlich Scope `project` oder ein fein abgestufter PAT mit **Projects:
-Lesen und Schreiben** für den Project-Owner; `repo` ist für diesen Token nicht
-nötig. Laufzeitskripte führen Project-v2-Aufrufe mit diesem Secret aus,
-Repository-Issue-/PR-Lesezugriffe und Label-Writes dagegen mit `${{ github.token }}`
-und den deklarierten Workflow-Rechten. Der Installer rendert nur den festen
-Ausdruck und liest weder Wert noch Token; beides wird nicht in
-`.squad/heroes.json` gespeichert oder protokolliert.
-Bei einer nicht unterstützten Squad-Version wird `squad upgrade --self` als
-normaler Benutzer und anschließend im Ziel-Repository `squad upgrade`
-ausgeführt. Ein root-eigenes globales npm-Paket kann den einmaligen,
-allowlist-beschränkten Reparaturbefehl aus der Installation erfordern; `sudo`
-gilt nur für diesen npm-Installationsbefehl, niemals für Squad selbst. Kein
-dieser Befehle erfordert, dass ein Token ins Terminal eingefügt wird.
+Tokens und PATs werden weder erfragt noch als Argument, stdin, Fixture, Datei oder Log akzeptiert. Unterstützt sind Host-Credential-Store und offizielle Browser-/Device-Flows. `--with-token`, Token-Umgebungswerte und ausgegebene Header sind unzulässig.
 
-## Supply-chain-Verifikation
+Project-Workflows benötigen den festen Secret-Ausdruck `secrets.HEROES_PROJECT_TOKEN`, weil `github.token` keine GitHub-Projects-v2-Owner-Rechte erhält. Der PAT braucht nur `project` beziehungsweise fein abgestuftes Projects-Lese-/Schreibrecht; `repo` ist nicht nötig. Repository-Issue-/PR-Zugriffe bleiben bei `${{ github.token }}`. Kein Tokenwert wird gelesen, in `.squad/heroes.json` gespeichert oder protokolliert.
 
-Vertrauensstufe `source trust: moderate`: Release/Tag, Version/Commit und
-vorhandene Upstream-Hashes werden geprüft. Das Projekt baut keine eigene PKI,
-Zertifikats- oder Signaturinfrastruktur und erfindet keine Upstream-Garantie.
+## Project-Anlage
 
-## Freigabegrenze der Project-Erstellung
+Apply erstellt das Project erst nach lokalen Konfliktprüfungen. Es löst die echte Nummer auf, prüft `viewerCanUpdate`, konfiguriert Schema/Link und speichert die Nummer. Teilfehler können externen Zustand hinterlassen; es gibt kein globales Rollback. Recovery nutzt sichtbare Project-Listen statt blinder Wiederholung.
 
-Erstellung nur im Apply nach lokalen Konfliktprüfungen und angezeigtem Create-/Schema-/Link-Plan. `--create-project` ist die explizite CI-Freigabe; interaktiv ist nach dem Plan zusätzlich y/N nötig. Dry-run geht in `PLANNED_CREATE`: Identität, Owner-Fähigkeit, Scope und lesende Listenprüfung, aufgeschobene Schema-/Link-Operationen und keine Abfrage von `{{PROJECT_NUMBER}}`. Apply wechselt zu `APPLY_CREATE`, erstellt einmal, löst die zurückgegebene Nummer sofort über sichtbaren Project-/GraphQL-Zugriff auf, prüft `viewerCanUpdate` und konfiguriert/verknüpft idempotent. Bestehende Auswahl und Prüfung nach Erstellung behalten verwertbare 403/404-Hinweise. Keine Token-Argumente werden akzeptiert oder protokolliert. Keine blinde Wiederholung. Bereinigung ist manuell.
+## Supply Chain
+
+Vertrauensstufe: `source trust: moderate`. Version, Release/Commit und verfügbare Hashes werden geprüft. Das Produkt behauptet keine eigene PKI-, Zertifikats- oder Signaturinfrastruktur.

@@ -1,56 +1,14 @@
 # Konfiguration
 
-## Companion-State
+## State
 
-`.squad/heroes.json` ist die einzige Companion-Metadaten-Datei. Schema v1 enthält
-Profilidentität, Branches, Sprache, Flow-Modelle, Repository, Ownership, Recovery
-und registrierte Extensions. Unbekannte Schlüssel, Modelle, Extension-Werte oder
-Typfehler stoppen fail-closed.
+`.squad/heroes.json` ist die einzige Companion-Metadaten-Datei. Schema v1 enthält den unveränderlichen Profilwert `001`, Repository, Branches, Sprache, Flow-Modelle, Ownership, Extensions und Recovery. Unbekannte Schlüssel, Werte oder Typfehler stoppen fail-closed. Ein vorhandener Wert `typescript-development` wird beim nächsten Plan einmalig zu `001` migriert.
 
-`recovery.targets` hält ausschließlich SHA-256-Baselines der zuletzt bestätigten
-verwalteten Ziele. So wird ein unveränderter Upstream-Stand automatisch
-aktualisierbar, während lokaler Drift bis zur expliziten Entscheidung als
-Konflikt bleibt. Entscheidungen liegen in derselben Recovery-Struktur; sie
-ersetzen niemals `.squad/plugins/*`.
+`recovery.targets` speichert SHA-256-Baselines und bestätigte Entscheidungen der aktiven Ziele. Diese Daten ersetzen nie `.squad/plugins/*`. Der Installer liest den State im Consumer; bei Updates erscheinen Bestandswerte sichtbar als Vorgaben.
 
-Der installierte Einstiegspunkt liest diesen Stand aus dem Consumer, nicht aus
-dem ursprünglichen Plugin-Checkout. Interaktive Updates zeigen Bestandswerte
-als beschriftete Vorgaben. Die drei Standardmodelle werden mit einem
-Pfeiltasten-Picker gewählt; CLI-Flags bleiben maßgeblich. Review-Baseline und
-Board-Konfiguration werden erneut validiert.
+## Profile
 
-## Modelle
-
-Der Installations-**Standard** jedes Flows wird als `Standardmodell für reqeng`,
-`work` oder `review` gewählt. Interaktiv bewegen Hoch/Runter oder `j`/`k`,
-Enter bestätigt und Escape/`q` bricht ab; Zifferneingabe wird ignoriert. Die
-Erkennung nutzt `copilot help config`. Ist sie nicht verfügbar, wird ein
-verifiziertes Ersatzmenü sichtbar angekündigt. Die Installationsflags heißen
-`--model-reqeng`, `--model-work` und
-`--model-review`.
-Es gibt keinen `auto`-, Cache-, Family-, Team-,
-Prompt- oder Cross-Flow-Fallback. Das Modell wird einmal aufgelöst und unverändert
-weitergegeben.
-Vor dem Start prüft das Companion-Profil die ID mit einer isolierten
-`copilot config model`-Abfrage gegen den autorisierten Host-Katalog. Credential-
-Werte werden dabei weder gelesen noch ausgegeben. Per Launcher-Aufruf darf
-`--model ID` weiterhin den konfigurierten Standard dieses Flows überschreiben.
-
-## Prompt-Layer
-
-Nur Pfade aus `.github/prompts/addon.config.json` werden geladen. Die Reihenfolge
-ist bindend. Gemeinsame Layer, Flow-Layer und expliziter Laufkontext bleiben
-additiv; Base-Gates dürfen nicht abgeschwächt werden. Symlinks, Traversal,
-Globs, ungültiges UTF-8 und Dateien über 256 KiB sind unzulässig.
-
-## Deployment-Branches
-
-Erlaubt sind exakt ein, zwei oder drei Namen. Nicht-interaktiv sind
-`--deployment-branches 1|2|3` und passend viele
-`--deployment-branch-N`-Argumente Pflicht. Namen werden nicht normalisiert oder
-geraten. Sie erscheinen in `heroes.json` und den fünf Consumer-Workflows.
-
-## Profil
+Die Menüanzeige für Profil 001 ist exakt `001 Typescript developer project`. Die versionierte lokale Quelle liegt unter `.squad/001/`; aktive Agenten liegen unter `.squad/agents/`.
 
 | Rolle | Agent |
 | --- | --- |
@@ -62,28 +20,26 @@ geraten. Sie erscheinen in `heroes.json` und den fünf Consumer-Workflows.
 | Frontend Engineer | Natasha |
 | DevOps Specialist | Nick |
 
+Agenten, Skills und typabhängige Overrides kommen aus 001. Die drei Flows bleiben gemeinsam und werden nicht unter `.squad/001/` dupliziert.
+
+## Modelle
+
+Installation und Defaults nutzen `--model-reqeng`, `--model-work` und `--model-review`. Interaktive Auswahl akzeptiert Pfeile oder `j`/`k`; Enter bestätigt, Escape/`q` bricht ab. Ziffern wählen nicht.
+
+Der Companion löst jedes Modell gegen den autorisierten Katalog auf und übergibt die ID unverändert. Es gibt keinen Cache-, Family-, Team-, Prompt- oder Cross-Flow-Fallback. `--model ID` überschreibt nur den aktuellen Launcher-Lauf. Discovery nutzt `copilot help config`; bei Fehler wird eine gekennzeichnete, verifizierte Ersatzliste angezeigt.
+
+## Deployment-Branches
+
+Erlaubt sind exakt ein bis drei Namen. Nicht-interaktiv gehören `--deployment-branches 1|2|3` und passend viele `--deployment-branch-N`-Argumente zusammen. Namen werden weder normalisiert noch geraten und erscheinen in State und fünf Workflows.
+
+## Prompt-Layer
+
+Nur Pfade aus `.github/prompts/addon.config.json` werden geladen. Ihre Reihenfolge und additive Kombination sind bindend; Basis-Gates dürfen nicht abgeschwächt werden. Symlinks, Traversal, Globs, ungültiges UTF-8 und Dateien über 256 KiB werden abgelehnt.
+
 ## Board-Sync
 
-Board-Sync ist nur mit kompletter, versionierter Extension-Konfiguration
-aktivierbar. Der Repository-Owner wird abgeleitet und nie geraten. Fehlen
-`--project-number` und gespeicherte Nummer, wählt eine lesende
-`gh project list`-Prüfung einen einzelnen Kandidaten automatisch, zeigt bei
-mehreren denselben Pfeiltasten-Picker und bietet bei null Companion-Anlage,
-manuelle Anlage oder Abbruch mit konkreter Einrichtungsanleitung.
-Das gewählte Project wird vor dem Plan mit `gh project view` und
-`viewerCanUpdate` verifiziert; eine explizite Nummer passiert dieselben Checks.
-Ohne Opt-in wird kein Board-Workflow installiert.
-Fehlerhafte Teilkonfiguration stoppt.
+Board-Sync benötigt vollständige Extension-Konfiguration. Der Owner wird aus dem Repository abgeleitet. Ein Project wird automatisch gewählt, mehrere über den Picker und null über Companion-Anlage, manuelle Anlage oder Abbruch. Das Project wird vor Planung und vor Mutation mit `viewerCanUpdate` geprüft. Explizite `--project-number`-Overrides bestehen dieselben Gates.
 
-## Konfiguration bei null Projects
+`--create-project` ist ein Freigabeflag ohne Boolean und benötigt in CI einen konkreten `--project-title`. Dry-run nutzt `PLANNED_CREATE` mit `{{PROJECT_NUMBER}}`; Apply erstellt einmal, löst die reale Nummer auf, konfiguriert Schema und Link idempotent und speichert sie.
 
-Der Product-Owner bleibt aus dem Repository abgeleitet. Account-Typ und GraphQL-Node-ID werden aufgelöst, nie geraten. `--create-project` ist ein Freigabe-Flag ohne Boolean-Wert und wird in CI mit einem sicheren, expliziten `--project-title` kombiniert. Generische, leer/Whitespace-gepolsterte, control- oder überlange Titel scheitern vor dem Plan. Ein-/Mehrfach-/Explizitnummer-Flows bleiben unverändert. Der Dry-run nutzt `PLANNED_CREATE` und `{{PROJECT_NUMBER}}` und stellt Schema-/Link-Abfragen zurück. Apply erstellt einmal, verifiziert die echte Nummer und speichert sie. Schema und Repository-Link sind idempotent.
-
-Die Workflows referenzieren fest `HEROES_PROJECT_TOKEN`: Project v2 benötigt
-einen klassischen PAT nur mit `project` oder einen fein abgestuften PAT mit
-Projects-Lese-/Schreibrecht; `repo` ist nicht erforderlich. Repository-Issue-/
-PR-Lesezugriffe bleiben bei `${{ github.token }}` mit deklarierter
-Workflow-Permission. Das repositorybezogene `GITHUB_TOKEN` kann die
-Benutzer-/Organisations-Project-Fähigkeit nicht erhalten. Der Installer
-rendert nur den festen Ausdruck und fragt, liest, speichert oder protokolliert
-keinen Token-Wert.
+Project-Workflows verwenden fest `HEROES_PROJECT_TOKEN`. Für Project v2 reicht ein klassischer PAT mit nur `project` oder ein fein abgestufter PAT mit Projects-Lese-/Schreibrecht. Repository-Issue-/PR-Zugriffe bleiben bei `${{ github.token }}`. Der Installer rendert nur den festen Secret-Ausdruck und speichert oder protokolliert keinen Tokenwert.

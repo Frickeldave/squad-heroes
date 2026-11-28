@@ -12,7 +12,13 @@ import {
   resolveBoardProject,
   resolveProjectOwnerForCreate,
 } from './preflight.mjs';
-import { buildHeroesConfig, validateHeroesConfig } from './config.mjs';
+import {
+  buildHeroesConfig,
+  migrateHeroesConfig,
+  PROFILE_ID,
+  PROFILE_NAME,
+  validateHeroesConfig,
+} from './config.mjs';
 import { classifyOperation, assertPlanSafe, summarizePlan, recoveryBaselines } from './plan.mjs';
 import { parseJsonFile, readUtf8, assertSafeTarget } from './io.mjs';
 import { HeroesError, fail } from './errors.mjs';
@@ -75,6 +81,7 @@ export function parseInstallArguments(argv) {
     else if (arg === '--repository') options.repository = argv[++index];
     else if (arg === '--expected-github-account') options.expectedAccount = argv[++index];
     else if (arg === '--profile') options.profile = argv[++index];
+    else if (arg === '--project-type') options.profile = argv[++index];
     else if (arg === '--language') options.language = argv[++index];
     else if (arg === '--target') options.target = argv[++index];
     else if (arg === '--deployment-branches') options.branchCount = Number(argv[++index]);
@@ -104,7 +111,7 @@ export function parseInstallArguments(argv) {
   if (options.branches && options.branchCount !== undefined && options.branches.length !== options.branchCount) {
     fail('branch_count', 'The branch count must match the number of branch values');
   }
-  if (options.profile === 'TypeScript Development') options.profile = 'typescript-development';
+  if (options.profile === PROFILE_NAME) options.profile = PROFILE_ID;
   return options;
 }
 
@@ -148,16 +155,48 @@ function operationsFromCatalog(repoRoot, config, baselines = {}) {
   });
 }
 
-function addAgentOperations(config, baselines = {}) {
-  const profile = parseJsonFile(path.join(ROOT, '.squad/heroes/profiles/typescript-development.json'));
+function addProfileOperations(config, baselines = {}) {
+  const profileRoot = '.squad/heroes/001';
+  const profile = parseJsonFile(path.join(ROOT, profileRoot, 'profile.json'));
   const operations = [];
+  const typeAssets = [
+    'profile.json',
+    ...profile.agents.flatMap((agent) => [`agents/${agent.id}.de.md`, `agents/${agent.id}.en.md`]),
+    'skills/humanizer/SKILL.md',
+    'skills/humanizer/de-DE.md',
+    'skills/humanizer/en-US.md',
+  ];
+  for (const relative of typeAssets) {
+    const target = `.squad/001/${relative}`;
+    operations.push({
+      id: `profile-001-${relative}`,
+      target,
+      source: `${profileRoot}/${relative}`,
+      rendered: readUtf8(path.join(ROOT, profileRoot, relative)),
+      owner: 'companion',
+      mode: 'whole-file',
+      baselineHash: baselines[target],
+    });
+  }
+  for (const file of ['SKILL.md', 'de-DE.md', 'en-US.md']) {
+    const target = `.github/skills/humanizer/${file}`;
+    operations.push({
+      id: `profile-skill-humanizer-${file}`,
+      target,
+      source: `${profileRoot}/skills/humanizer/${file}`,
+      rendered: readUtf8(path.join(ROOT, profileRoot, 'skills/humanizer', file)),
+      owner: 'companion',
+      mode: 'whole-file',
+      baselineHash: baselines[target],
+    });
+  }
   for (const agent of profile.agents) {
     for (const language of ['de', 'en']) {
-      const content = readUtf8(path.join(ROOT, `.squad/heroes/agents/${agent.id}.${language}.md`));
+      const content = readUtf8(path.join(ROOT, profileRoot, `agents/${agent.id}.${language}.md`));
       operations.push({
         id: `agent-${agent.id}-${language}`,
         target: `.squad/agents/${agent.id}/charter.${language}.md`,
-        source: `.squad/heroes/agents/${agent.id}.${language}.md`,
+        source: `${profileRoot}/agents/${agent.id}.${language}.md`,
         rendered: content,
         owner: 'companion',
         mode: 'managed-section',
@@ -166,12 +205,12 @@ function addAgentOperations(config, baselines = {}) {
       });
     }
     const selected = readUtf8(
-      path.join(ROOT, `.squad/heroes/agents/${agent.id}.${config.selectedLanguage ?? config.language}.md`)
+      path.join(ROOT, profileRoot, `agents/${agent.id}.${config.selectedLanguage ?? config.language}.md`)
     );
     operations.push({
       id: `agent-${agent.id}`,
       target: `.squad/agents/${agent.id}/charter.md`,
-      source: `.squad/heroes/agents/${agent.id}.${config.language}.md`,
+      source: `${profileRoot}/agents/${agent.id}.${config.language}.md`,
       rendered: selected,
       owner: 'companion',
       mode: 'managed-section',
@@ -198,7 +237,7 @@ export function buildInstallPlan(repoRoot, options = {}, injected = {}) {
 
   const configPath = path.join(repoRoot, '.squad/heroes.json');
   const stored = existsSync(configPath) ? parseJsonFile(configPath) : null;
-  const existing = stored ? structuredClone(stored) : null;
+  const existing = stored ? migrateHeroesConfig(structuredClone(stored)) : null;
   if (existing?.extensions?.['board-sync']) delete existing.extensions['board-sync'].secret;
   if (existing) validateHeroesConfig(existing);
   const accessRepository = options.repository ?? existing?.repository;
@@ -319,7 +358,7 @@ export function buildInstallPlan(repoRoot, options = {}, injected = {}) {
     injected
   );
   const selectedProfile = options.profile ?? existing?.profile;
-  if (!selectedProfile) fail('profile_missing', 'Choose --profile typescript-development for non-interactive installation');
+  if (!selectedProfile) fail('profile_missing', 'Choose --project-type 001 or --profile 001 for non-interactive installation');
   if (existing && selectedProfile !== existing.profile) {
     fail('profile_change', 'The selected profile is immutable; uninstall/reinstall before changing profile.');
   }
@@ -367,7 +406,7 @@ export function buildInstallPlan(repoRoot, options = {}, injected = {}) {
   };
   const operations = [
     ...operationsFromCatalog(repoRoot, config, existing?.recovery?.targets),
-    ...addAgentOperations(
+    ...addProfileOperations(
       { ...config, selectedLanguage: language },
       existing?.recovery?.targets
     ),

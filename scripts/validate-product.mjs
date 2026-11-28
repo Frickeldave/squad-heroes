@@ -10,7 +10,7 @@ const plugin = parseJsonFile(path.join(root, 'plugin.json'));
 if (plugin.id !== 'squad-heroes' || plugin.name !== 'squad-heroes') throw new Error('invalid product identity');
 validateManifest(root, parseJsonFile(path.join(root, '.squad/heroes/manifest.json')));
 validateMessageCatalogs();
-const profile = parseJsonFile(path.join(root, '.squad/heroes/profiles/typescript-development.json'));
+const profile = parseJsonFile(path.join(root, '.squad/heroes/001/profile.json'));
 if (profile.id !== PROFILE_ID || profile.agents.map(({ id }) => id).join(',') !== 'tony,pepper,bruce,clint,maria,natasha,nick') {
   throw new Error('profile matrix is invalid');
 }

@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildHeroesConfig, validateDeploymentBranches, validateHeroesConfig } from '../src/config.mjs';
+import {
+  buildHeroesConfig,
+  migrateHeroesConfig,
+  validateDeploymentBranches,
+  validateHeroesConfig,
+} from '../src/config.mjs';
 
 const valid = () => buildHeroesConfig({
   repository: 'owner/repository',
@@ -16,7 +21,7 @@ test('creates the minimal closed v1 companion config', () => {
     work: 'claude-sonnet-5.5',
     review: 'claude-opus-5.5',
   });
-  assert.equal(config.profile, 'typescript-development');
+  assert.equal(config.profile, '001');
 });
 
 test('rejects unknown state and model keys', () => {
@@ -33,6 +38,15 @@ test('rejects profile changes and auto model fallback', () => {
     ...valid(),
     modelDefaults: { ...valid().modelDefaults, work: 'auto' },
   }), /explicit model/);
+});
+
+test('migrates the legacy TypeScript profile once to profile 001', () => {
+  const legacy = { ...valid(), profile: 'typescript-development' };
+  const migrated = migrateHeroesConfig(legacy);
+  assert.equal(legacy.profile, 'typescript-development');
+  assert.equal(migrated.profile, '001');
+  assert.equal(migrateHeroesConfig(migrated).profile, '001');
+  assert.equal(validateHeroesConfig(migrated).profile, '001');
 });
 
 test('accepts exactly one to three distinct branch refs without normalization', () => {

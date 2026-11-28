@@ -21,7 +21,7 @@ import { EventEmitter } from 'node:events';
 const productRoot = path.resolve(import.meta.dirname, '..');
 const options = {
   repository: 'owner/repository',
-  profile: 'typescript-development',
+  profile: '001',
   language: 'en',
   branches: ['main'],
   models: { reqeng: 'mai-code-2', work: 'sonnet-code-2', review: 'opus-code-2' },
@@ -40,6 +40,12 @@ const injected = {
     return commandResult();
   },
 };
+
+test('project type parser preserves only explicit non-TTY input', () => {
+  assert.equal(parseInstallArguments(['--project-type', '001']).profile, '001');
+  assert.equal(parseInstallArguments([]).profile, null);
+  assert.equal(parseInstallArguments(['--project-type', 'unknown']).profile, 'unknown');
+});
 
 test('interactive Companion wizard collects required and opt-in configuration', async () => {
   const answers = new Map([
@@ -101,7 +107,7 @@ test('interactive Companion wizard collects required and opt-in configuration', 
       return commandResult();
     },
   });
-  assert.equal(completed.profile, 'typescript-development');
+  assert.equal(completed.profile, '001');
   assert.equal(completed.repository, 'owner/repository');
   assert.deepEqual(completed.branches, ['main', 'int']);
   assert.equal(completed.reviewBaseline, undefined);
@@ -112,22 +118,29 @@ test('interactive Companion wizard collects required and opt-in configuration', 
     statusMap: { 'go:yes': 'Ready', 'go:done': 'Done' },
   });
   assert.deepEqual(selected.slice(0, 3).map(({ label }) => label), [
+    'Project type',
+    'Default model for reqeng',
+    'Default model for work',
+  ]);
+  assert.deepEqual(selected.slice(1, 4).map(({ label }) => label), [
     'Default model for reqeng',
     'Default model for work',
     'Default model for review',
   ]);
-  assert.deepEqual(selected.slice(0, 3).map(({ current }) => current), [
+  assert.deepEqual(selected.slice(1, 4).map(({ current }) => current), [
     'mai-code-2',
     'claude-sonnet-5.5',
     'gpt-6.1-terra',
   ]);
-  assert.ok(selected.slice(0, 3).every(({ choices }) => choices.every((choice) => VERIFIED_MODEL_FALLBACK.includes(choice))));
-  assert.deepEqual(selected[3], {
+  assert.ok(selected.slice(1, 4).every(({ choices }) => choices.every((choice) => VERIFIED_MODEL_FALLBACK.includes(choice))));
+  assert.deepEqual(selected[4], {
     label: 'GitHub Project',
     choices: ['7 — Snake', '8 — Roadmap'],
     current: '7 — Snake',
   });
   assert.ok(!asked.some((label) => label.startsWith('Default model')));
+  assert.equal(events[0], 'choose:Project type');
+  assert.deepEqual(selected[0].choices, ['001 Typescript developer project']);
   assert.equal(completed.board.owner, 'owner');
   assert.ok(!asked.includes('Project owner'));
   assert.ok(!asked.includes('Project number'));
@@ -136,13 +149,17 @@ test('interactive Companion wizard collects required and opt-in configuration', 
   const promptAfterRepository = events.findIndex(
     (event, index) => index > firstPrompt && (event.startsWith('ask:') || event.startsWith('choose:'))
   );
-  assert.ok(events.findIndex((event) => event === 'run:gh auth status --hostname github.com') < firstPrompt);
-  assert.ok(events.findIndex((event) => event === 'run:gh api user --jq .login') < firstPrompt);
-  assert.equal(events[firstPrompt], 'ask:GitHub repository (owner/name)');
+  assert.equal(events[firstPrompt], 'choose:Project type');
+  assert.ok(events.findIndex((event) => event === 'run:gh api user --jq .login') > firstPrompt);
+  const repositoryPrompt = events.findIndex((event) => event === 'ask:GitHub repository (owner/name)');
+  assert.ok(repositoryPrompt > 0);
+  const nextPromptAfterRepository = events.findIndex(
+    (event, index) => index > repositoryPrompt && (event.startsWith('ask:') || event.startsWith('choose:'))
+  );
   assert.ok(events.findIndex((event) => event === 'run:gh api repos/owner/repository --jq .permissions')
-    < promptAfterRepository);
+    < nextPromptAfterRepository);
   assert.ok(events.findIndex((event) => event.startsWith('run:gh project list --owner owner'))
-    < promptAfterRepository);
+    < nextPromptAfterRepository);
   assert.equal(ghCalls.filter((call) => call.slice(1, 3).join(' ') === 'project list').length, 1);
 });
 
@@ -151,7 +168,7 @@ test('missing Project scope stops before any wizard prompt or menu', async () =>
   let menuCalls = 0;
   const calls = [];
   await assert.rejects(() => completeInteractiveOptions({
-    profile: 'typescript-development',
+    profile: '001',
     repository: 'owner/repository',
     language: 'en',
     branches: ['main'],
@@ -162,9 +179,9 @@ test('missing Project scope stops before any wizard prompt or menu', async () =>
   }, null, async () => {
     promptCalls += 1;
     return '';
-  }, async () => {
+  }, async (_label, choices) => {
     menuCalls += 1;
-    return '';
+    return choices[0];
   }, {
     spawn(command, args) {
       calls.push([command, ...args]);
@@ -180,7 +197,7 @@ test('missing Project scope stops before any wizard prompt or menu', async () =>
     },
   }), (error) => error.details.category === 'project_scope');
   assert.equal(promptCalls, 0);
-  assert.equal(menuCalls, 0);
+  assert.equal(menuCalls, 1);
   assert.deepEqual(calls.map((call) => call.slice(1, 3).join(' ')), [
     'auth status',
     'api user',
@@ -191,7 +208,7 @@ test('missing Project scope stops before any wizard prompt or menu', async () =>
 test('explicit full flags with board off preflight before the remaining prompt', async () => {
   const parsed = parseInstallArguments([
     '--repository', 'owner/repository',
-    '--profile', 'typescript-development',
+    '--profile', '001',
     '--language', 'en',
     '--deployment-branches', '1',
     '--deployment-branch-1', 'main',
@@ -204,9 +221,9 @@ test('explicit full flags with board off preflight before the remaining prompt',
   const completed = await completeInteractiveOptions(parsed, null, async (label, fallback) => {
     events.push(`ask:${label}`);
     return fallback;
-  }, async (label) => {
+  }, async (label, choices) => {
     events.push(`choose:${label}`);
-    throw new Error('explicit model flags must not render a menu');
+    return choices[0];
   }, {
     spawn(command, args) {
         if (args[0] === 'auth') return commandResult("- Token scopes: 'repo', 'project'\n");
@@ -222,7 +239,7 @@ test('explicit full flags with board off preflight before the remaining prompt',
   });
   assert.equal(completed.boardSync, false);
   assert.equal(events.some((event) => event === 'ask:Enable optional Project board sync (y/N)'), false);
-  assert.equal(events.some((event) => event.startsWith('choose:')), false);
+  assert.deepEqual(events.filter((event) => event.startsWith('choose:')), ['choose:Project type']);
   const projectProbe = events.findIndex((event) => event.startsWith('run:gh project list --owner owner'));
   assert.ok(projectProbe >= 0);
   assert.ok(projectProbe < events.findIndex((event) => event.startsWith('ask:')));
@@ -238,7 +255,7 @@ test('interactive German model labels and discovery fallback are explicit', asyn
   };
   try {
     await completeInteractiveOptions({
-      profile: 'typescript-development',
+      profile: '001',
       repository: 'owner/repository',
       language: 'de',
       branches: ['main'],
@@ -265,6 +282,7 @@ test('interactive German model labels and discovery fallback are explicit', asyn
     process.stdout.write = original;
   }
   assert.deepEqual(labels, [
+    'Project type',
     'Standardmodell für reqeng',
     'Standardmodell für work',
     'Standardmodell für review',
@@ -353,7 +371,7 @@ test('non-TTY startup performs repository preflight before model flag validation
     path.join(productRoot, 'scripts/install.mjs'),
     '--target', process.cwd(),
     '--repository', 'owner/repository',
-    '--profile', 'typescript-development',
+    '--profile', '001',
     '--language', 'en',
     '--deployment-branches', '1',
     '--deployment-branch-1', 'main',
@@ -434,7 +452,7 @@ test('board project resolution derives owner and handles one, many, zero and ina
 test('multiple discovered Projects are selected only through the interactive picker', async () => {
   const selections = [];
   const completed = await completeInteractiveOptions({
-    profile: 'typescript-development',
+    profile: '001',
     repository: 'owner/repository',
     language: 'en',
     branches: ['main'],
@@ -664,6 +682,11 @@ test('fresh dry-run plans plugin and companion separately without mutation', () 
     assert.ok(plan.operations.some((entry) => entry.target === 'scripts/start-work.mjs'));
     assert.ok(plan.operations.some((entry) => entry.target === 'scripts/check-release-label.mjs'));
     assert.ok(plan.operations.some((entry) => entry.target === '.squad/agents/clint/charter.md'));
+    assert.ok(plan.operations.some((entry) => entry.target === '.squad/001/profile.json'));
+    assert.ok(plan.operations.some((entry) => entry.target === '.squad/001/agents/tony.en.md'));
+    assert.ok(plan.operations.some((entry) => entry.target === '.squad/001/skills/humanizer/en-US.md'));
+    assert.equal(plan.operations.filter((entry) => entry.target === 'scripts/start-work.mjs').length, 1);
+    assert.equal(plan.operations.filter((entry) => entry.target.startsWith('.squad/001/scripts/')).length, 0);
     assert.ok(!plan.operations.some((entry) => entry.target.endsWith('heroes-sync-project-board.yml')));
     const result = applyPlan(root, plan, { dryRun: true }, injected);
     assert.equal(result.changed, 0);
@@ -701,6 +724,10 @@ test('installation materializes both languages and an identical second run is a 
     assert.ok(installed.changed > 20);
     assert.ok(existsSync(path.join(root, '.squad/agents/tony/charter.de.md')));
     assert.ok(existsSync(path.join(root, '.squad/agents/tony/charter.en.md')));
+    assert.ok(existsSync(path.join(root, '.squad/001/profile.json')));
+    assert.ok(existsSync(path.join(root, '.squad/001/agents/tony/charter.en.md')) === false);
+    assert.ok(existsSync(path.join(root, '.squad/001/agents/tony.en.md')));
+    assert.ok(existsSync(path.join(root, '.squad/001/skills/humanizer/en-US.md')));
     const installedScriptTargets = parseJsonFile(
       path.join(productRoot, '.squad/heroes/companion-targets.json')
     ).targets
@@ -710,9 +737,41 @@ test('installation materializes both languages and an identical second run is a 
       assert.ok(existsSync(path.join(root, target)), `missing installed script: ${target}`);
     }
     const state = JSON.parse(readFileSync(path.join(root, '.squad/heroes.json'), 'utf8'));
-    assert.equal(state.profile, 'typescript-development');
+    assert.equal(state.profile, '001');
     const rerun = applyPlan(root, buildInstallPlan(root, options, injected), {}, injected);
     assert.equal(rerun.changed, 0);
+  } finally {
+    cleanup(root);
+  }
+});
+
+test('existing legacy state migrates once to profile 001 without profile drift', () => {
+  const root = fixture();
+  try {
+    const legacy = {
+      schemaVersion: 1,
+      product: 'squad-heroes',
+      profile: 'typescript-development',
+      deploymentBranches: ['main'],
+      language: 'en',
+      modelDefaults: options.models,
+      repository: options.repository,
+      managed: 'squad-heroes',
+      recovery: { planVersion: 1, lastCompletedPlan: null },
+      extensions: {},
+    };
+    write(root, '.squad/heroes.json', `${JSON.stringify(legacy, null, 2)}\n`);
+    const plan = buildInstallPlan(root, {
+      ...options,
+      repository: legacy.repository,
+      profile: '001',
+      branches: legacy.deploymentBranches,
+      language: legacy.language,
+    }, injected);
+    assert.equal(plan.config.profile, '001');
+    const stateOperation = plan.operations.find(({ target }) => target === '.squad/heroes.json');
+    assert.match(stateOperation.content, /"profile": "001"/u);
+    assert.doesNotMatch(stateOperation.content, /typescript-development/u);
   } finally {
     cleanup(root);
   }

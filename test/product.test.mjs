@@ -29,9 +29,9 @@ test('manifest is static, checksummed and plugin files never target outside .squ
   assert.ok(marketplace.files.some(({ target }) =>
     target === 'templates/squad-heroes/companion/.squad/heroes/companion/workflows/heroes-ci.yml'));
   assert.ok(marketplace.files.some(({ target }) =>
-    target === 'templates/squad-heroes/companion/.squad/heroes/skills/humanizer/de-DE.md'));
+    target === 'templates/squad-heroes/companion/.squad/heroes/001/skills/humanizer/de-DE.md'));
   assert.ok(marketplace.files.some(({ target }) =>
-    target === 'templates/squad-heroes/companion/.squad/heroes/skills/humanizer/en-US.md'));
+    target === 'templates/squad-heroes/companion/.squad/heroes/001/skills/humanizer/en-US.md'));
   assert.ok(marketplace.files.some(({ target }) =>
     target === 'templates/squad-heroes/companion/resources/messages.en.json'));
   assert.ok(marketplace.files.some(({ target }) =>
@@ -53,7 +53,7 @@ test('companion targets are explicit, unique and board sync is separately gated'
 
 test('obsolete passive skill is absent from source, distribution and generated metadata', () => {
   const removedSkill = ['squad-heroes', 'flow', 'safety'].join('-');
-  const profile = parseJsonFile(path.join(root, '.squad/heroes/profiles/typescript-development.json'));
+  const profile = parseJsonFile(path.join(root, '.squad/heroes/001/profile.json'));
   const removedSource = path.join(root, '.squad/heroes/skills', removedSkill, 'SKILL.md');
   const sources = [
     readFileSync(path.join(root, 'plugin.manifest.json'), 'utf8'),
@@ -95,7 +95,7 @@ test('consumer workflow set is separate and least-privileged', () => {
   assert.ok(!sources.some((source) => source.includes('[self-hosted, craft]')));
 });
 
-test('documentation has parallel chapters and required root entry point', () => {
+test('documentation has parallel chapters and concise localized README entry points', () => {
   const pairs = [
     ['installation.md', 'installation.md'],
     ['konfiguration.md', 'configuration.md'],
@@ -110,12 +110,34 @@ test('documentation has parallel chapters and required root entry point', () => 
     const english = readFileSync(path.join(root, 'docs/en', en), 'utf8');
     assert.equal((german.match(/^## /gmu) ?? []).length, (english.match(/^## /gmu) ?? []).length, `${de}/${en}`);
   }
-  const readme = readFileSync(path.join(root, 'README.md'), 'utf8');
-  assert.match(readme, /docs\/de\/installation\.md/);
-  assert.match(readme, /docs\/en\/installation\.md/);
-  assert.match(readme, /squad plugin dry-run[\s\S]*companion\/scripts\/install[\s\S]*--dry-run/u);
-  assert.match(readme, /zwei getrennte Pläne/u);
-  assert.match(readme, /vollständige versionierte Distribution/u);
+  const rootReadme = readFileSync(path.join(root, 'README.md'), 'utf8');
+  const germanReadme = readFileSync(path.join(root, 'README-de.md'), 'utf8');
+  const englishReadme = readFileSync(path.join(root, 'README-en.md'), 'utf8');
+  assert.match(rootReadme, /\[Vollständige deutsche Dokumentation\]\(README-de\.md\)/u);
+  assert.match(rootReadme, /\[Full American English documentation\]\(README-en\.md\)/u);
+  assert.ok(rootReadme.length < 700, 'root README must stay an entry point');
+  for (const [readme, language, installation] of [
+    [germanReadme, 'de', 'installation.md'],
+    [englishReadme, 'en', 'installation.md'],
+  ]) {
+    assert.match(readme, new RegExp(`docs/${language}/${installation}`, 'u'));
+    assert.match(readme, /squad plugin dry-run[\s\S]*companion\/scripts\/install[\s\S]*--dry-run/u);
+    assert.match(readme, /templates\/squad-heroes\/companion\//u);
+  }
+  assert.equal(
+    (germanReadme.match(/^## /gmu) ?? []).length,
+    (englishReadme.match(/^## /gmu) ?? []).length,
+    'localized READMEs need matching sections'
+  );
+  assert.match(rootReadme, /BEGIN GENERATED BADGES/u);
+  assert.doesNotMatch(germanReadme, /BEGIN GENERATED BADGES/u);
+  assert.doesNotMatch(englishReadme, /BEGIN GENERATED BADGES/u);
+  assert.match(germanReadme, /001 Typescript developer project/u);
+  assert.match(englishReadme, /001 Typescript developer project/u);
+  assert.match(germanReadme, /--project-type 001/u);
+  assert.match(englishReadme, /--project-type 001/u);
+  assert.match(germanReadme, /\.squad\/001\//u);
+  assert.match(englishReadme, /\.squad\/001\//u);
 });
 
 test('installation docs and test plans distinguish plugin and Companion dry-runs', () => {
@@ -138,7 +160,8 @@ test('installation docs and test plans distinguish plugin and Companion dry-runs
 
 test('documentation and runtime copy describe two separate installation phases', () => {
   const files = [
-    'README.md',
+    'README-de.md',
+    'README-en.md',
     'docs/de/installation.md',
     'docs/de/recovery.md',
     'docs/de/sicherheit.md',
@@ -165,7 +188,7 @@ test('documentation and runtime copy describe two separate installation phases',
   assert.match(content, /\.squad\/heroes\/companion\/workflows\/heroes-ci\.yml/u);
 });
 
-test('Snake issue bodies are parallel and linked with ordered flow handoffs', () => {
+test('Snake runbooks stay executable and use supplied issue bodies', () => {
   const pairs = [
     ['docs/de/testplan-snake.md', 'docs/de/testplan-snake-issue.md'],
     ['docs/en/testplan-snake.md', 'docs/en/testplan-snake-issue.md'],
@@ -175,6 +198,17 @@ test('Snake issue bodies are parallel and linked with ordered flow handoffs', ()
     const plan = readFileSync(path.join(root, planFile), 'utf8');
     const issue = readFileSync(path.join(root, issueFile), 'utf8');
     assert.match(plan, new RegExp(path.basename(issueFile).replaceAll('.', '\\.'), 'u'));
+    const language = planFile.includes('/de/') ? 'de' : 'en';
+    assert.match(
+      plan,
+      new RegExp(`--body-file \\{heroes-dir\\}/docs/${language}/testplan-snake-issue\\.md`, 'u')
+    );
+    assert.doesNotMatch(plan, /evidence\/snake-issue\.md/u);
+    assert.match(plan, /001 Typescript developer project/u);
+    assert.match(plan, /--project-type 001/u);
+    assert.match(plan, /\.squad\/001\/profile\.json/u);
+    assert.equal((plan.match(/scripts\/start-work\.mjs/gu) ?? []).length > 0, true);
+    assert.ok(plan.length < 16000, `${planFile} must remain a short runbook`);
     assert.ok((issue.match(/^## /gmu) ?? []).length >= expectedHeadings);
     assert.match(plan, /start-reqeng\.mjs --issue/u);
     assert.match(plan, /start-work\.mjs --issue/u);
@@ -197,7 +231,7 @@ test('plugin preflight points directly to the Companion dry-run', () => {
     assert.match(result.stdout, /templates\/squad-heroes\/companion\//u);
     assert.match(result.stdout, /copied Companion/u);
     assert.match(result.stdout, /templates\/squad-heroes\/companion\/scripts\/install/u);
-    assert.match(result.stdout, /--profile typescript-development/u);
+    assert.match(result.stdout, /--project-type 001/u);
     assert.match(result.stdout, /--dry-run/u);
   } finally {
     cleanup(target);

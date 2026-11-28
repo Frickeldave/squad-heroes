@@ -75,6 +75,7 @@ verwenden.
 
 ## Technische Rahmenbedingungen
 
+- Der Squad-Consumer wählt zuerst `001 Typescript developer project` und persistiert Profil `001`; die gemeinsamen ReqEng-/Work-/Review-Flows bleiben unverändert.
 - Verwende die im Consumer-Repository etablierte Frontend-/Build-Struktur.
   Es gibt keine neue Backend-Abhängigkeit.
 - Ergänze minimale, verständliche Start- und Testkommandos in der README.
