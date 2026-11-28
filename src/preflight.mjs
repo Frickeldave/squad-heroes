@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { HeroesError, INCOMPATIBLE_SQUAD_EXIT, fail } from './errors.mjs';
 import { readUtf8 } from './io.mjs';
-import { supportedLanguage, translate } from './messages.mjs';
+import { resolveLanguage, translate } from './messages.mjs';
 
 export const SQUAD_MIN_VERSION = '2.0.0';
 export const SQUAD_AGENT_PATH = '.github/agents/squad.agent.md';
@@ -46,16 +46,14 @@ export function detectSquadVersion(repoRoot) {
   return stableSemVer(value) ? value : 'invalid';
 }
 
-export function assertSquadCompatibility(repoRoot) {
+export function assertSquadCompatibility(repoRoot, options = {}) {
   const detected = detectSquadVersion(repoRoot);
   const version = stableSemVer(detected);
   if (version && compareVersions(version, stableSemVer(SQUAD_MIN_VERSION)) >= 0) return detected;
   throw new HeroesError(
     'squad_version',
-    `ERROR: squad-heroes minimum Squad version 2.0.0 is required; detected "${detected}". ` +
-    'Installation aborted before mutation. Run `squad upgrade --self` as your normal user; if a root-owned global npm install fails with EACCES or EPERM, repair it with `sudo sh -c \'umask 022 && exec npm install -g --allow-scripts=@bradygaster/squad-cli,node-pty,koffi,protobufjs @bradygaster/squad-cli@latest\'`, not by running Squad itself under sudo. ' +
-    'Restart the terminal, run `command -v squad`, `ls -l "$(command -v squad)"`, and `squad --version`, then run `squad upgrade` in the target repository and verify its marker before retrying.',
-    { detected, exitCode: INCOMPATIBLE_SQUAD_EXIT }
+    translate(language(options), 'squad_incompatible', { detected }).text,
+    { detected, exitCode: INCOMPATIBLE_SQUAD_EXIT, localized: true }
   );
 }
 
@@ -80,7 +78,7 @@ function repositoryOwner(repository) {
 }
 
 function language(options) {
-  return supportedLanguage(options.language ?? options.locale ?? process.env.LANG) ?? 'en';
+  return resolveLanguage(options.language, null, options.locale ?? process.env).language;
 }
 
 function diagnostic(options, id, values) {
@@ -105,12 +103,13 @@ function parseAuthScopes(output, account) {
     .filter((scope, index, scopes) => scopes.indexOf(scope) === index);
 }
 
-function scopeStatus(scopes) {
+function scopeStatus(scopes, options = {}) {
   const status = [];
-  if (scopes.includes('project')) status.push('project granted');
-  if (scopes.includes('read:project')) status.push('read:project granted');
-  if (!status.length) status.push(scopes.length ? 'project scopes absent' : 'project scope unverified');
-  return status.join('; ');
+  if (scopes.includes('project')) status.push(translate(language(options), 'scope_project_granted').text);
+  if (scopes.includes('read:project')) status.push(translate(language(options), 'scope_read_project_granted').text);
+  if (!status.length) status.push(translate(language(options),
+    scopes.length ? 'scope_project_absent' : 'scope_project_unverified').text);
+  return status.join(language(options) === 'de' ? '; ' : '; ');
 }
 
 function safeStatusSummary(result) {
@@ -129,6 +128,7 @@ function stop(category, options, id, values, details = {}) {
   fail(`gh_${category}`, diagnostic(options, id, values), {
     category,
     host: GITHUB_HOST,
+    localized: true,
     ...details,
   });
 }
@@ -164,7 +164,7 @@ export function assertGithubAuthentication(options = {}) {
     fail(
       'gh_account_mismatch',
       diagnostic(options, 'gh_account_invalid', { active: login }),
-      { category: 'account_mismatch', host: GITHUB_HOST, activeAccount: login }
+      { category: 'account_mismatch', host: GITHUB_HOST, activeAccount: login, localized: true }
     );
   }
   if (expectedAccount && expectedAccount.toLowerCase() !== login.toLowerCase()) {
@@ -173,7 +173,7 @@ export function assertGithubAuthentication(options = {}) {
       expected: expectedAccount,
       repository: options.repository ?? 'not selected yet',
       host: GITHUB_HOST,
-    }), { category: 'account_mismatch', host: GITHUB_HOST, activeAccount: login, expectedAccount });
+    }), { category: 'account_mismatch', host: GITHUB_HOST, activeAccount: login, expectedAccount, localized: true });
   }
   const scopes = parseAuthScopes(`${auth.stdout ?? ''}\n${auth.stderr ?? ''}`, login);
   return {
@@ -181,7 +181,7 @@ export function assertGithubAuthentication(options = {}) {
     host: GITHUB_HOST,
     projectScope: scopes.includes('project'),
     scopes,
-    scopeStatus: scopeStatus(scopes),
+    scopeStatus: scopeStatus(scopes, options),
   };
 }
 

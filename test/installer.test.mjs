@@ -55,6 +55,29 @@ test('project type parser preserves only explicit non-TTY input', () => {
   assert.equal(parseInstallArguments(['--plan-json', 'plan.json']).planJsonPath, 'plan.json');
 });
 
+test('localized help honors explicit language before stored config and locale', () => {
+  const script = path.join(productRoot, 'scripts/install.mjs');
+  const locale = {
+    encoding: 'utf8',
+    env: { ...process.env, LANG: 'en_US.UTF-8', LC_ALL: 'en_US.UTF-8', LANGUAGE: 'en_US:en' },
+  };
+  const de = spawnSync(process.execPath, [script, '--help', '--language', 'de'], locale);
+  assert.equal(de.status, 0);
+  assert.match(de.stdout, /Verwendung:/u);
+  assert.match(de.stdout, /--language de oder --language en/u);
+  assert.doesNotMatch(de.stdout, /^Usage:/u);
+  const en = spawnSync(process.execPath, [script, '--language', 'en', '--help'], locale);
+  assert.equal(en.status, 0);
+  assert.match(en.stdout, /^Usage:/u);
+  assert.doesNotMatch(en.stdout, /Verwendung:/u);
+  const unsupported = spawnSync(process.execPath, [script, '--help'], {
+    encoding: 'utf8',
+    env: { LANG: 'fr_FR.UTF-8', LC_ALL: 'fr_FR.UTF-8', LANGUAGE: 'fr_FR:fr' },
+  });
+  assert.notEqual(unsupported.status, 0);
+  assert.match(unsupported.stderr, /--language de or --language en/u);
+});
+
 test('interactive Companion wizard collects required and opt-in configuration', async () => {
   const answers = new Map([
     ['GitHub repository (owner/name)', 'owner/repository'],
@@ -290,7 +313,7 @@ test('interactive German model labels and discovery fallback are explicit', asyn
     process.stdout.write = original;
   }
   assert.deepEqual(labels, [
-    'Project type',
+    'Projekttyp',
     'Standardmodell für reqeng',
     'Standardmodell für work',
     'Standardmodell für review',
@@ -715,13 +738,11 @@ test('fresh dry-run plans plugin and companion separately without mutation', () 
       process.stdout.write = originalWrite;
     }
     const output = writes.join('');
-    assert.match(output, /activation plan/u);
-    assert.match(output, /complete versioned distribution/u);
     assert.match(output, /scripts\/start-work\.mjs/u);
     assert.match(output, /\.github\/workflows\/heroes-ci\.yml/u);
-    assert.match(output, /Dry-run: no files or remote resources changed/u);
-    assert.match(output, /Files to add \(\d+\)/u);
-    assert.match(output, /Existing files to merge/u);
+    assert.match(output, /Plan: 82 add/u);
+    assert.match(output, /Dry run: .+; no changes/u);
+    assert.equal((output.match(/^  - /gmu) ?? []).length, 0);
     assert.doesNotMatch(output, /\[\s*\n\s*\{/u);
     assert.doesNotMatch(output, /\\n/u);
     assert.doesNotMatch(output, /actionDetails|owner/u);
@@ -881,8 +902,8 @@ test('interactive picker resolves fresh markerless team and routing, then safely
       '.squad/team.md': 'merge',
       '.squad/routing.md': 'merge',
     });
-    assert.equal(selected.filter((entry) => entry.startsWith('Selected ')).length, 2);
-    assert.ok(selected.some((entry) => entry.includes('Recommended: merge')));
+    assert.equal(selected.filter((entry) => entry.startsWith('Decided for ')).length, 2);
+    assert.ok(selected.some((entry) => entry.includes('Recommended: insert the')));
     assert.ok(selected.some((entry) => entry.includes('Merge — recommended: add to the existing file')));
     assert.ok(selected.some((entry) => entry.includes('Show details / diff')));
     assert.ok(selected.some((entry) => entry.endsWith(':Merge — recommended: add to the existing file')));
@@ -952,11 +973,60 @@ test('German conflict help is natural, recommends merge, and bounds opt-in detai
   const rendered = output.join('');
   assert.deepEqual(decisions, { '.squad/team.md': 'merge' });
   assert.match(rendered, /In \.squad\/team\.md ist noch keine verwaltete Squad-Heroes-Teamsektion vorhanden/u);
-  assert.match(rendered, /Agenten Tony/u);
-  assert.match(rendered, /Empfehlung: Zusammenführen – empfohlen/u);
+  assert.match(rendered, /sieben Agenten/u);
+  assert.match(rendered, /Empfohlen wird/u);
+  assert.match(rendered, /Entschieden für/u);
+  assert.doesNotMatch(rendered, /In \.squad\/team\.md, no managed|I want|Recommended|Selected|Resolved|Apply:/u);
   assert.match(rendered, /Basis: 0 Zeilen/u);
   assert.doesNotMatch(rendered, /actionDetails|owner|\\n/u);
   assert.ok(rendered.length < 2500);
+});
+
+test('full dry-run conflict output stays in exactly one installer language', async () => {
+  const forbidden = {
+    de: [
+      'Files to add', 'Existing files to merge', 'Recommended', 'No files changed',
+      'In .squad/team.md, no managed', 'I want', 'Selected ', 'Resolved ', 'Apply:',
+      'Enable optional Project board sync', 'Review baseline commit',
+    ],
+    en: [
+      'Dateien zum Hinzufügen', 'Vorhandene Dateien zum Zusammenführen',
+      'Empfohlen', 'keine Änderungen', 'Entschieden', 'Zusammenführen',
+      'Review-Baseline', 'aktivieren',
+    ],
+  };
+  for (const language of ['de', 'en']) {
+    const root = fixture();
+    try {
+      write(root, '.squad/team.md', 'local roster\n');
+      write(root, '.squad/routing.md', 'local routing\n');
+      const localizedPlan = buildInstallPlan(root, { ...options, language }, injected);
+      const chunks = [];
+      const originalWrite = process.stdout.write;
+      process.stdout.write = (chunk) => {
+        chunks.push(String(chunk));
+        return true;
+      };
+      try {
+        printPlan(localizedPlan, language, { dryRun: true });
+      } finally {
+        process.stdout.write = originalWrite;
+      }
+      const decisions = await resolveConflictDecisions(localizedPlan, async (_label, choices, current) => current, {
+        language,
+        output: { write: (chunk) => chunks.push(String(chunk)) },
+      });
+      const output = chunks.join('');
+      for (const fragment of forbidden[language]) assert.ok(!output.includes(fragment), fragment);
+      assert.ok(output.length < 5000);
+      assert.ok((output.match(/\.squad\/agents\/.*charter/gmu) ?? []).length <= 3);
+      const resolvedPlan = buildInstallPlan(root, { ...options, language, decisions }, injected);
+      assert.equal(applyPlan(root, resolvedPlan, { dryRun: true }, injected).changed, 0);
+      assert.doesNotThrow(() => machinePlan(localizedPlan));
+    } finally {
+      cleanup(root);
+    }
+  }
 });
 
 test('unsupported version changed between plan and write aborts before mutation', () => {

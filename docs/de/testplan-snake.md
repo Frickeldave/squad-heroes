@@ -2,7 +2,9 @@
 
 Prüfe `{heroes-dir}`, einen freigegebenen GitHub-Owner `{owner}` und den leeren Consumer-Checkout `{snake-dir}`. Speichere Evidenz außerhalb beider Repositories. Tokens oder PATs nie in Commands, Dateien oder Protokollen ausgeben.
 
-Startgate: Im TTY muss die Companion-Installation als allererste Interaktion das Menü „Project type“ mit genau `001 Typescript developer project` zeigen. Im Non-TTY muss `--project-type 001` explizit gesetzt sein; fehlendes Flag bricht ab.
+Startgate: Im TTY muss die Companion-Installation als allererste Interaktion das Menü „Projekttyp“ mit genau `001 Typescript developer project` zeigen. Im Non-TTY muss `--project-type 001` explizit gesetzt sein; fehlendes Flag bricht ab.
+
+Sprachgate: Die Priorität `--language de|en` > `.squad/heroes.json` > `LC_ALL` > `LC_MESSAGES` > `LANG` > `LANGUAGE` muss in beiden Sprachen geprüft werden. Ein expliziter Wert darf den vorhandenen Wert überschreiben. Nicht unterstützte oder mehrdeutige Locale-Werte müssen mit der klaren Aufforderung `--language de|en` abbrechen; es gibt keinen English-Fallback. Vollständige deutsche und englische Dry-runs mit Team-/Routing-Konflikten dürfen keine Prosa der jeweils anderen Sprache enthalten; technische Pfade, Modell-IDs und Optionsschlüssel werden explizit whitelistet. Der normale Plan enthält höchstens drei repräsentative Pfade, während `--plan-json` vollständig bleibt.
 
 ## Voraussetzungen
 

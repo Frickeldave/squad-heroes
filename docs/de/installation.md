@@ -10,7 +10,13 @@
 
 Der Companion prüft diese Gates vor Menüs und Writes. Er fragt niemals Token an.
 
-Die TTY-Installation beginnt vor allen Auth- und Konfigurationsfragen mit dem Pfeiltastenmenü „Project type“. Derzeit ist genau `001 Typescript developer project` auswählbar. Non-TTY benötigt ausdrücklich `--project-type 001`; es gibt keinen impliziten Standard.
+Die TTY-Installation beginnt vor allen Auth- und Konfigurationsfragen mit dem Pfeiltastenmenü „Projekttyp“. Derzeit ist genau `001 Typescript developer project` auswählbar. Non-TTY benötigt ausdrücklich `--project-type 001`; es gibt keinen impliziten Standard.
+
+## Installationssprache
+
+Die exakte Priorität ist: explizites `--language de|en` > Sprache in vorhandener `.squad/heroes.json` > normalisiertes System-Locale (`LC_ALL`, danach `LC_MESSAGES`, danach `LANG`, danach `LANGUAGE`). Unterstützt werden nur `de` und `en`; Locale-Schreibweisen wie `de_DE.UTF-8` werden ausschließlich auf `de` normalisiert. Explizite und gespeicherte Werte müssen exakt `de` oder `en` sein. Nicht unterstützte oder mehrdeutige Werte brechen klar ab. Es gibt keinen stillen Sprachmix, keine Teilübersetzung und keinen Englisch-Fallback. Fehlt eine nutzbare Quelle, den Aufruf mit `--language de` oder `--language en` wiederholen. Die Sprache externer Squad- oder GitHub-CLI-Ausgabe ist nicht Teil dieses Vertrags.
+
+Hilfe ist kein Sonderfall: `--language de --help` und `--help --language de` liefern deutsche Companion-Hilfe; entsprechendes gilt für `en`. Die Companion-Hilfe übernimmt nie die Sprache einer externen `ls --help`-, `gh help`- oder ähnlichen Ausgabe.
 
 ## Plugin installieren
 
@@ -36,18 +42,12 @@ node .squad/templates/squad-heroes/companion/scripts/install \
 Der separate **Companion-Aktivierungsplan** ist eine kompakte Zusammenfassung statt eines rohen JSON-Dumps. Er gruppiert neue Dateien, vorhandene Dateien zum Zusammenführen, Project-Aktionen, unveränderte Dateien und Gesamtsummen:
 
 ```text
-Dateien zum Hinzufügen (82)
-  - scripts/start-work.mjs
-  - .github/workflows/heroes-ci.yml
-  - .squad/agents/tony/charter.md
-  ... und 79 weitere
-
-Vorhandene Dateien zum Zusammenführen (2)
-  - .squad/team.md: lokale Inhalte erhalten und Teamsektion ergänzen
-  - .squad/routing.md: vorhandene Regeln erhalten und Routing-Zeilen ergänzen
-
-Dry-run: Es wurden keine Dateien oder Remote-Ressourcen geändert.
+Plan: 82 neu, 2 zusammenführen, 0 unverändert, 0 Project-Aktionen, 0 Konflikte; Project-Status: aus.
+Beispiele: scripts/start-work.mjs, .github/workflows/heroes-ci.yml, .github/prompts/startwork.prompt.md.
+Dry-run: 82 neu, 2 zusammenführen, 0 unverändert, 0 Project-Aktionen, 0 Konflikte; keine Änderungen.
 ```
+
+Die normale Ausgabe zeigt höchstens drei repräsentative Pfade und niemals die vollständige Ziel-Liste. `--plan-json plan.json` enthält weiterhin jeden technischen Eintrag; dieser Detailmodus muss ausdrücklich gewählt werden.
 
 Prüfe ihn und führe denselben Befehl ohne `--dry-run` aus. Erst dieser Schritt schreibt. Unveränderte Wiederholung ist ein No-op. Mit `--plan-json plan.json` wird der maschinenlesbare Plan in eine Datei geschrieben; `--json-plan` gibt ausdrücklich JSON auf stdout aus.
 
@@ -68,7 +68,7 @@ node .squad/templates/squad-heroes/companion/scripts/install \
   --dry-run
 ```
 
-Konflikte stoppen vor Writes. Bei `.squad/team.md` erklärt der Installer, dass noch keine verwaltete Squad-Heroes-Teamsektion vorhanden ist, nennt die Agenten und empfiehlt das Zusammenführen. Im Picker ist `Zusammenführen – empfohlen: vorhandene Datei ergänzen` vorausgewählt. Die weiteren Optionen beschreiben eingehende Fassung, lokalen Stand und Abbrechen. `Details / Diff anzeigen` ist optional und anfangs nicht gewählt; angezeigt werden begrenzte Zeilenzahlen und der eingehende markierte Block, nicht vollständige Dateiinhalte.
+Konflikte stoppen vor Writes. Pro Ziel erscheinen höchstens zwei bis drei kurze Sätze, dann der Picker und eine Abschlusszeile. Beispiel: `Für .squad/team.md fehlt noch ein markierter Squad-Heroes-Bereich. Empfohlen wird, sieben Agenten einzufügen und alle vorhandenen Inhalte unverändert zu erhalten.` Danach ist `Zusammenführen – empfohlen: vorhandene Datei ergänzen` vorausgewählt; nach der Wahl folgt nur `Entschieden: zusammenführen; lokale Inhalte bleiben erhalten.` Dasselbe knappe Muster gilt für Routing. `Details / Diff anzeigen` ist optional, begrenzt und anfangs nicht gewählt.
 
 CI übergibt die internen Entscheidungswerte mit `--decisions`:
 

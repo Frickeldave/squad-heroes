@@ -12,30 +12,56 @@ export function supportedLanguage(value) {
   return normalized === 'de' || normalized === 'en' ? normalized : null;
 }
 
-export function resolveLanguage(cli, config, locale = process.env.LANG) {
-  for (const [source, candidate] of [['cli', cli], ['config', config], ['locale', locale]]) {
-    if (candidate === undefined || candidate === null || candidate === '') continue;
-    const normalized = supportedLanguage(candidate);
-    if (!normalized) throw new Error(`unsupported language from ${source}: ${String(candidate)}`);
-    return { language: normalized, source };
+function localeValue(locale) {
+  if (locale && typeof locale === 'object') {
+    const candidate = ['LC_ALL', 'LC_MESSAGES', 'LANG', 'LANGUAGE']
+      .map((key) => locale[key])
+      .find((value) => value !== undefined && value !== null && value !== '');
+    if (candidate === undefined) return null;
+    return candidate;
   }
-  throw new Error('language could not be determined; pass --language de or --language en');
+  return locale;
+}
+
+export function resolveLanguage(cli, config, locale = process.env) {
+  for (const [source, candidate] of [
+    ['cli', cli],
+    ['config', config],
+    ['locale', localeValue(locale)],
+  ]) {
+    if (candidate === undefined || candidate === null || candidate === '') continue;
+    const candidates = String(candidate).split(':').filter(Boolean);
+    const normalized = candidates.map(supportedLanguage);
+    if (normalized.some((value) => value === null)) {
+      throw new Error(
+        `Unsupported installer language from ${source}: "${String(candidate)}". Pass --language de or --language en.`
+      );
+    }
+    if (new Set(normalized).size > 1) {
+      throw new Error(
+        `Ambiguous installer language from ${source}: "${String(candidate)}". Pass --language de or --language en.`
+      );
+    }
+    const value = normalized[0];
+    if (source !== 'locale' && String(candidate) !== value) {
+      throw new Error(
+        `Unsupported installer language from ${source}: "${String(candidate)}". Use exactly --language de or --language en.`
+      );
+    }
+    return { language: value, source };
+  }
+  throw new Error('Installer language could not be determined. Pass --language de or --language en.');
 }
 
 export function translate(language, id, values = {}) {
   if (!catalogs[language]) throw new Error(`unsupported language: ${language}`);
-  const fallback = language === 'de' ? 'en' : 'de';
-  if (!catalogs[language][id] && !catalogs[fallback][id]) {
-    throw new Error(`missing message ID in all languages: ${id}`);
-  }
-  const used = catalogs[language][id] ? language : fallback;
-  if (!catalogs[used][id]) throw new Error(`missing message: ${id}`);
+  if (!catalogs[language][id]) throw new Error(`missing message for ${language}: ${id}`);
   return {
-    language: used,
-    fallback: used !== language,
+    language,
+    fallback: false,
     text: Object.entries(values).reduce(
       (message, [key, value]) => message.replaceAll(`{${key}}`, String(value)),
-      catalogs[used][id]
+      catalogs[language][id]
     ),
   };
 }

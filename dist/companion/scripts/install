@@ -18,55 +18,10 @@ import {
   preflightGithubAccess,
   resolveBoardProject,
 } from '../src/preflight';
-import { resolveLanguage, supportedLanguage, translate } from '../src/messages';
+import { resolveLanguage, translate } from '../src/messages';
 import { PROFILE_ID, PROFILE_NAME } from '../src/config';
 import { createInterface } from 'node:readline/promises';
 import { emitKeypressEvents } from 'node:readline';
-
-const HELP = `Usage:
-  node .squad/templates/squad-heroes/companion/scripts/install --target /path/to/repository --repository owner/name --project-type 001 --deployment-branches N \\
-    --deployment-branch-1 main [--deployment-branch-2 int ...] [--language de|en] [--expected-github-account ACCOUNT] [--dry-run] [--plan-json FILE | --json-plan]
-
-Squad 2.0.0 or higher must be installed in the target repository. The installer
-is human-triggered, performs two version checks, never calls plugin installation
-as a substitute for companion materialization, and does not ask for credentials.
-
-This is the Companion plan for active scripts, prompts, workflows, and agent
-targets. \`squad plugin dry-run <squad-heroes-dir>\` is a separate Squad lifecycle
-command that lists the complete versioned Companion distribution below
-templates/squad-heroes/companion/. It does not directly target active consumer
-paths.
-
-Interactive model and Project selection use an in-place arrow-key picker
-(Up/Down or j/k, Enter, Escape/q). CI must supply noninteractive flags, including
---model-reqeng/--model-work/--model-review. The runtime --model override remains
-available.
-
-After the first plan render, unresolved local conflicts also use that picker.
-For a fresh markerless Squad file, merge is the visibly recommended default;
-it preserves the local bytes and inserts the incoming managed section. Labels
-describe the outcome instead of exposing internal identifiers. A "Show details /
-diff" option provides a bounded summary; details are hidden by default. CI must
-resolve every conflict with a JSON object passed through --decisions. Machine
-plans are opt-in with --plan-json <file> or --json-plan.
-
-With --enable-board-sync, Project owner is derived from --repository. The
-write-capable project scope is proved from the active account's sanitized
-gh auth status output. Owner type from gh project output is reused when present;
-otherwise a non-mutating identity query resolves User versus Organization before
-the Project API probe. CI may use
---project-number for a deterministic validated override. Use --disable-board-sync
-to make the board-off choice explicit without a prompt. When no Project exists,
-interactive use offers explicit Companion creation or cancellation. CI must use
-both --create-project and --project-title; the former is the explicit apply
-approval and never accepts a boolean value. The normal rendered dry-run describes
-creation and every follow-up schema/link operation in natural language, and
-makes no external mutation. Explicit machine output may retain internal
-placeholders. A separate "create manually" choice and cancellation both
-print concrete recovery steps; apply failures report possible partial external
-state and never disclose secrets. The scope and API gates remain required for
-dry-run. No token is accepted.
-`;
 
 function existingOptions(target) {
   const configPath = resolve(target ?? process.cwd(), '.squad/heroes.json');
@@ -78,48 +33,54 @@ function wizardText(language, id) {
   return translate(language, id).text;
 }
 
+function localizedFailure(message) {
+  const error = new Error(message);
+  error.localized = true;
+  return error;
+}
+
 export async function completeInteractiveOptions(options, existing, ask, choose, injected = {}) {
-  if (!choose) throw new Error('Interactive selection requires a menu implementation');
+  const resolved = resolveLanguage(options.language, existing?.language, process.env);
+  const language = resolved.language;
+  if (!choose) throw localizedFailure(wizardText(language, 'menu_required'));
+  options.language = language;
   const selectedProfile = await choose(
-    'Project type',
+    wizardText(language, 'project_type_prompt'),
     [PROFILE_NAME],
     PROFILE_NAME
   );
   options.profile = selectedProfile;
   if (![PROFILE_ID, PROFILE_NAME].includes(options.profile)) {
-    throw new Error(`Only ${PROFILE_NAME} is available`);
+    throw localizedFailure(wizardText(language, 'profile_only'));
   }
   if (options.profile === PROFILE_NAME) options.profile = PROFILE_ID;
-  const preliminaryLanguage = supportedLanguage(
-    options.language ?? existing?.language ?? process.env.LANG
-  ) ?? 'en';
   const authentication = assertGithubAuthentication({
     ...injected,
-    language: preliminaryLanguage,
+    language,
     repository: options.repository ?? existing?.repository,
     expectedAccount: options.expectedAccount ?? injected.expectedAccount,
   });
-  options.repository ??= await ask('GitHub repository (owner/name)', existing?.repository ?? '');
+  options.repository ??= await ask(wizardText(language, 'repository_prompt'), existing?.repository ?? '');
   const repositoryAccess = preflightGithubAccess(options.repository, {
     ...injected,
-    language: preliminaryLanguage,
+    language,
     authentication,
     expectedAccount: options.expectedAccount ?? injected.expectedAccount,
   });
   options.githubPreflight = repositoryAccess;
-  process.stdout.write(`${wizardText(preliminaryLanguage, 'github_access_verified')
+  process.stdout.write(`${wizardText(language, 'github_access_verified')
     .replace('{account}', repositoryAccess.account)
     .replace('{owner}', repositoryAccess.owner)}\n`);
 
-  options.language ??= await ask('Language (de|en)', existing?.language ?? 'en');
-  const language = resolveLanguage(options.language, existing?.language, process.env.LANG).language;
-
   if (!options.branches && !existing?.deploymentBranches) {
-    const count = Number(await ask('Deployment branch count (1-3)', '1'));
-    if (![1, 2, 3].includes(count)) throw new Error('Deployment branch count must be 1, 2 or 3');
+    const count = Number(await ask(wizardText(language, 'deployment_branch_count'), '1'));
+    if (![1, 2, 3].includes(count)) throw localizedFailure(wizardText(language, 'deployment_branch_invalid'));
     options.branches = [];
     for (let index = 0; index < count; index += 1) {
-      options.branches.push(await ask(`Deployment branch ${index + 1}`, index === 0 ? 'main' : ''));
+      options.branches.push(await ask(
+        translate(language, 'deployment_branch_prompt', { number: index + 1 }).text,
+        index === 0 ? 'main' : ''
+      ));
     }
   }
 
@@ -134,15 +95,15 @@ export async function completeInteractiveOptions(options, existing, ask, choose,
     }
   }
   options.reviewBaseline ??= await ask(
-    'Review baseline commit (optional; blank keeps the configured value)',
+    wizardText(language, 'review_baseline_prompt'),
     existing?.reviewBaseline ?? ''
   ) || undefined;
   options.reviewBaseline = assertReviewBaseline(resolve(options.target ?? process.cwd()), options.reviewBaseline, injected);
 
   if (!options.boardSync && !options.boardSyncExplicit) {
     const current = existing?.extensions?.['board-sync'];
-    const enable = (await ask('Enable optional Project board sync (y/N)', current ? 'y' : 'N')).toLowerCase();
-    options.boardSync = ['y', 'yes'].includes(enable);
+    const enable = (await ask(wizardText(language, 'board_sync_prompt'), current ? 'y' : 'N')).toLowerCase();
+    options.boardSync = ['y', 'yes', 'j', 'ja'].includes(enable);
     options.boardSyncExplicit = true;
   }
   if (options.boardSync) {
@@ -169,10 +130,12 @@ export async function completeInteractiveOptions(options, existing, ask, choose,
             createLabel
           );
         } catch (error) {
-          throw new Error(`${manual}\n\n${error instanceof Error ? error.message : String(error)}`);
+          throw localizedFailure(error?.localized
+            ? `${manual}\n\n${error.message}`
+            : manual);
         }
         if (selection !== createLabel) {
-          throw new Error(manual);
+          throw localizedFailure(manual);
         }
         options.projectTitle = await ask(
           wizardText(language, 'github_project_title_prompt'),
@@ -185,8 +148,8 @@ export async function completeInteractiveOptions(options, existing, ask, choose,
             .replace('{title}', options.projectTitle),
           'N'
         );
-        if (!['y', 'yes'].includes(String(ownerConfirmation).trim().toLowerCase())) {
-          throw new Error(wizardText(language, 'github_project_cancelled'));
+        if (!['y', 'yes', 'j', 'ja'].includes(String(ownerConfirmation).trim().toLowerCase())) {
+          throw localizedFailure(wizardText(language, 'github_project_cancelled'));
         }
         options.createProject = true;
         options.createProjectApproved = false;
@@ -212,9 +175,12 @@ export async function completeInteractiveOptions(options, existing, ask, choose,
         projectCatalog: repositoryAccess.projects,
       });
     }
-    options.board.statusField ??= await ask('Project status field', current?.statusField ?? 'Status');
+    options.board.statusField ??= await ask(
+      wizardText(language, 'project_status_field_prompt'),
+      current?.statusField ?? 'Status'
+    );
     options.board.statusMap ??= JSON.parse(await ask(
-      'Project status map JSON',
+      wizardText(language, 'project_status_map_prompt'),
       JSON.stringify(current?.statusMap ?? { 'go:yes': 'Ready', 'go:done': 'Done' })
     ));
     // Project V2 is outside the repository-scoped GITHUB_TOKEN permission model.
@@ -243,9 +209,9 @@ export function selectWithArrowKeys(label, choices, current = '', options = {}) 
   const emitKeypressEventsFn = options.emitKeypressEventsFn ?? emitKeypressEvents;
   const values = [...new Set(choices.filter(Boolean))];
   if (current && !values.includes(current)) values.unshift(current);
-  if (values.length === 0) throw new Error(`No choices are available for ${label}`);
+  if (values.length === 0) throw localizedFailure(translate(language, 'picker_no_choices', { label }).text);
   if (!supportsArrowKeyPicker({ input, output })) {
-    throw new Error(wizardText(language, 'picker_tty_required'));
+    throw localizedFailure(wizardText(language, 'picker_tty_required'));
   }
 
   const currentIndex = values.indexOf(current);
@@ -298,7 +264,7 @@ export function selectWithArrowKeys(label, choices, current = '', options = {}) 
       const name = String(key.name ?? '').toLowerCase();
       const character = String(value ?? '').toLowerCase();
       if (name === 'escape' || name === 'q' || character === 'q') {
-        finish(null, new Error(wizardText(language, 'picker_cancelled')));
+        finish(null, localizedFailure(wizardText(language, 'picker_cancelled')));
       } else if (name === 'up' || name === 'k' || character === 'k') {
         selectedIndex = (selectedIndex - 1 + values.length) % values.length;
         render();
@@ -308,7 +274,7 @@ export function selectWithArrowKeys(label, choices, current = '', options = {}) 
       } else if (name === 'return' || name === 'enter') {
         finish(values[selectedIndex]);
       } else if (key.ctrl && name === 'c') {
-        finish(null, new Error(wizardText(language, 'picker_cancelled')));
+        finish(null, localizedFailure(wizardText(language, 'picker_cancelled')));
       }
       // Digits and other printable characters are deliberately ignored.
     };
@@ -449,12 +415,11 @@ export async function resolveConflictDecisions(plan, choose, { language = 'en', 
     output.write(`${conflictExplanation(conflict, language).join('\n')}\n`);
     const recommended = conflict.recommendation ?? 'merge';
     if (recommended === 'merge' && !managedBlock(conflict.before, conflict.section)) {
-      output.write(`${translate(language, 'conflict_recommended').text}\n`);
+      // The recommendation is included in the concise explanation below.
     }
     const { order, labels, choices } = choiceLabels(conflict, language);
-    output.write(`${translate(language, 'conflict_recommendation', {
-      recommendation: labels.get(recommended),
-    }).text}\n`);
+    const recommendation = labels.get(recommended);
+    if (!recommendation) throw localizedFailure(wizardText(language, 'conflict_invalid_recommendation'));
     const details = translate(language, 'conflict_choice_details').text;
     let selected;
     while (true) {
@@ -471,27 +436,18 @@ export async function resolveConflictDecisions(plan, choose, { language = 'en', 
       }
       selected = order.find((value) => labels.get(value) === selection || value === selection);
       if (selected) break;
-      throw new Error(translate(language, 'conflict_invalid_selection', {
+      throw localizedFailure(translate(language, 'conflict_invalid_selection', {
         selection,
         target: conflict.target,
       }).text);
     }
     decisions[conflict.target] = selected;
-    output.write(`${translate(language, 'conflict_selected', {
+    output.write(`${translate(language, 'conflict_decided', {
       target: conflict.target,
-      decision: labels.get(selected),
-    }).text}\n`);
-    output.write(`${translate(language, 'conflict_resolution', {
-      target: conflict.target,
-      decision: labels.get(selected),
-      effect: translate(language, selected === 'merge' && !managedBlock(conflict.before, conflict.section)
-        ? 'conflict_resolution_merge_missing'
-        : `conflict_resolution_${selected}`).text,
+      decision: translate(language, `conflict_decision_${selected}`).text,
+      effect: translate(language, `conflict_effect_${selected}`).text,
     }).text}\n`);
   }
-  output.write(`${translate(language, 'conflicts_resolved', {
-    count: plan.conflicts.length,
-  }).text}\n`);
   return decisions;
 }
 
@@ -503,7 +459,7 @@ async function wizard(options) {
     return (await prompt.question(`${label}${suffix}: `)).trim() || fallback;
   };
   const choose = async (label, choices, current = '') => {
-    const language = supportedLanguage(options.language ?? existing?.language ?? process.env.LANG) ?? 'en';
+    const language = resolveLanguage(options.language, existing?.language, process.env).language;
     prompt.pause();
     try {
       return await selectWithArrowKeys(label, choices, current, { language });
@@ -522,14 +478,17 @@ export async function main() {
   try {
     const options = parseInstallArguments(process.argv.slice(2));
     if (options.help) {
-      process.stdout.write(HELP);
+      const existing = existingOptions(options.target);
+      const language = resolveLanguage(options.language, existing?.language, process.env).language;
+      process.stdout.write(`${translate(language, 'help_text').text}\n`);
       return;
     }
     if (supportsArrowKeyPicker()) {
       await wizard(options);
     } else {
       const existing = existingOptions(options.target);
-      const language = supportedLanguage(options.language ?? process.env.LANG) ?? 'en';
+      const language = resolveLanguage(options.language, existing?.language, process.env).language;
+      options.language = language;
       const authentication = assertGithubAuthentication({
         language,
         repository: options.repository ?? existing?.repository,
@@ -537,7 +496,7 @@ export async function main() {
       });
       const accessRepository = options.repository ?? existing?.repository;
       if (!accessRepository) {
-        throw new Error('--repository owner/name is required for noninteractive installation.');
+        throw localizedFailure(wizardText(language, 'repository_required'));
       }
       options.githubPreflight = preflightGithubAccess(accessRepository, {
         language,
@@ -549,14 +508,14 @@ export async function main() {
           .replace('{account}', options.githubPreflight.account)
           .replace('{owner}', options.githubPreflight.owner)}\n`);
       }
-      assertSquadCompatibility(resolve(options.target ?? process.cwd()));
+      assertSquadCompatibility(resolve(options.target ?? process.cwd()), { language });
       const missingModelFlags = !existing && ['reqeng', 'work', 'review']
         .some((flow) => !options.explicitModels[flow]);
       if (missingModelFlags) {
-        throw new Error(wizardText(language, 'picker_tty_required'));
+        throw localizedFailure(wizardText(language, 'picker_tty_required'));
       }
       if (!existing && options.profile !== PROFILE_ID) {
-        throw new Error(`--project-type ${PROFILE_ID} is required for noninteractive installation.`);
+        throw localizedFailure(wizardText(language, 'project_type_required'));
       }
     }
     const repoRoot = resolve(options.target ?? process.cwd());
@@ -587,7 +546,7 @@ export async function main() {
       resolvedConflicts = true;
     }
     if (resolvedConflicts && plan.conflicts.length > 0) {
-      throw new Error(translate(plan.config.language, 'resolved_plan_conflicts', {
+      throw localizedFailure(translate(plan.config.language, 'resolved_plan_conflicts', {
         count: plan.conflicts.length,
       }).text);
     }
@@ -598,8 +557,8 @@ export async function main() {
           plan.config.language,
           'resolved_apply_approval'
         )}: `)).trim().toLowerCase();
-        if (!['y', 'yes'].includes(approval)) {
-          throw new Error(wizardText(plan.config.language, 'resolved_plan_not_approved'));
+        if (!['y', 'yes', 'j', 'ja'].includes(approval)) {
+          throw localizedFailure(wizardText(plan.config.language, 'resolved_plan_not_approved'));
         }
       } finally {
         prompt.close();
@@ -611,10 +570,10 @@ export async function main() {
         const approval = (await prompt.question(
           wizardText(plan.config.language, 'github_project_apply_approval')
             .replace('{owner}', plan.projectCreate.owner)
-            .replace('{title}', plan.projectCreate.title) + ' (y/N): '
+            .replace('{title}', plan.projectCreate.title) + ': '
         )).trim().toLowerCase();
-        if (!['y', 'yes'].includes(approval)) {
-          throw new Error(wizardText(plan.config.language, 'github_project_cancelled'));
+        if (!['y', 'yes', 'j', 'ja'].includes(approval)) {
+          throw localizedFailure(wizardText(plan.config.language, 'github_project_cancelled'));
         }
         plan.projectCreate.approved = true;
       } finally {
@@ -622,14 +581,48 @@ export async function main() {
       }
     }
     const result = applyPlan(repoRoot, plan, options);
-    if (!options.jsonPlan) {
-      const message = options.dryRun
-        ? wizardText(plan.config.language, 'dry_run_complete')
-        : translate(plan.config.language, 'apply_complete_result', { count: result.changed }).text;
+    if (!options.jsonPlan && !options.dryRun) {
+      const message = translate(plan.config.language, 'apply_complete_result', { count: result.changed }).text;
       process.stdout.write(`${message}\n`);
     }
   } catch (error) {
-    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+    let message = error instanceof Error ? error.message : String(error);
+    let language = null;
+    let parsed = null;
+    try {
+      parsed = parseInstallArguments(process.argv.slice(2));
+    } catch {
+      parsed = {
+        language: process.argv.includes('--language')
+          ? process.argv[process.argv.indexOf('--language') + 1]
+          : null,
+        target: process.argv.includes('--target')
+          ? process.argv[process.argv.indexOf('--target') + 1]
+          : undefined,
+      };
+    }
+    try {
+      let existing = null;
+      try {
+        existing = existingOptions(parsed.target);
+      } catch {
+        // Keep the raw parse failure out of the user-facing diagnostic.
+      }
+      language = resolveLanguage(parsed.language, existing?.language, process.env).language;
+    } catch {
+      // An invalid or missing language decision is itself the actionable error.
+    }
+    if (
+      language &&
+      !(error instanceof HeroesError && error.details?.localized === true) &&
+      !error?.localized &&
+      !/^Unsupported installer language|^Ambiguous installer language|^Installer language/u.test(message)
+    ) {
+      message = translate(language, 'install_failed', {
+        category: error instanceof HeroesError ? error.code : 'unerwartet',
+      }).text;
+    }
+    process.stderr.write(`${message}\n`);
     process.exitCode = error instanceof HeroesError && error.code === 'squad_version'
       ? INCOMPATIBLE_SQUAD_EXIT
       : 1;

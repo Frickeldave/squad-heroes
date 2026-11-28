@@ -245,7 +245,7 @@ test('zero Project menu offers concrete manual and cancel recovery without mutat
           createProject: false,
           createProjectApproved: false,
         }, null, async (_label, fallback) => fallback, async (label, choices) => {
-          if (label === 'Project type') return choices[0];
+          if (label === 'Project type' || label === 'Projekttyp') return choices[0];
           assert.equal(choices.length, 3);
           assert.match(choices[1], /manuell|manually/iu);
           return choices[selectedIndex];

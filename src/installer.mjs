@@ -37,6 +37,15 @@ export function projectManualInstructions(language, { owner, title, active }) {
   }).text;
 }
 
+function safeTechnicalError(language, error) {
+  if (error instanceof HeroesError && error.details?.localized === true) {
+    return error.message;
+  }
+  return translate(language, 'technical_error_summary', {
+    category: error instanceof HeroesError ? error.code : 'unexpected',
+  }).text;
+}
+
 export function parseInstallArguments(argv) {
   const options = {
     dryRun: false,
@@ -237,7 +246,6 @@ function addProfileOperations(config, baselines = {}) {
 }
 
 export function buildInstallPlan(repoRoot, options = {}, injected = {}) {
-  assertSquadCompatibility(repoRoot);
   validateMessageCatalogs();
   const manifest = parseJsonFile(path.join(ROOT, '.squad/heroes/manifest.json'));
   validateManifest(ROOT, manifest);
@@ -246,14 +254,15 @@ export function buildInstallPlan(repoRoot, options = {}, injected = {}) {
   const stored = existsSync(configPath) ? parseJsonFile(configPath) : null;
   const existing = stored ? migrateHeroesConfig(structuredClone(stored)) : null;
   if (existing?.extensions?.['board-sync']) delete existing.extensions['board-sync'].secret;
-  if (existing) validateHeroesConfig(existing);
   const accessRepository = options.repository ?? existing?.repository;
   if (!accessRepository) fail('repository_missing', '--repository owner/name is required for initial installation');
   const language = resolveLanguage(
     options.language,
     existing?.language,
-    options.locale ?? process.env.LANG
+    options.locale ?? process.env
   ).language;
+  if (existing) validateHeroesConfig({ ...existing, language });
+  assertSquadCompatibility(repoRoot, { language });
   const cachedAccess = injected.githubPreflight?.repository === accessRepository
     ? injected.githubPreflight
     : null;
@@ -307,12 +316,9 @@ export function buildInstallPlan(repoRoot, options = {}, injected = {}) {
           account: access.account,
         });
       } catch (error) {
-        const original = error instanceof Error ? error.message : String(error);
         throw new HeroesError(
           error instanceof HeroesError ? error.code : 'gh_project_create',
-          original.includes(`gh project create --owner ${access.owner}`)
-            ? original
-            : `${original}\n\n${manual}`,
+          `${safeTechnicalError(language, error)}\n\n${manual}`,
           {
             category: 'project_recovery',
             owner: access.owner,
@@ -375,6 +381,7 @@ export function buildInstallPlan(repoRoot, options = {}, injected = {}) {
   const config = existing
     ? validateHeroesConfig({
         ...existing,
+        language,
         modelDefaults: {
           ...existing.modelDefaults,
           ...Object.fromEntries(Object.keys(options.explicitModels ?? {}).map((flow) => [flow, options.models[flow]])),
@@ -383,7 +390,7 @@ export function buildInstallPlan(repoRoot, options = {}, injected = {}) {
         extensions: options.boardSync
           ? buildHeroesConfig({
               repository: existing.repository,
-              language: existing.language,
+              language,
               modelDefaults: existing.modelDefaults,
               branches: options.branches ?? existing.deploymentBranches,
               boardSync: true,
@@ -543,7 +550,7 @@ export function applyPlan(
   if (plan.projectCreate && plan.projectCreate.approved !== true) {
     fail('project_create_approval', 'Project creation is visible and irreversible-ish. Review and explicitly approve the rendered plan before apply.');
   }
-  assertSquadCompatibility(repoRoot);
+  assertSquadCompatibility(repoRoot, { language: plan.config.language });
   const access = plan.config.repository
     ? preflightGithubAccess(plan.config.repository, {
         ...injected,
@@ -616,14 +623,11 @@ export function applyPlan(
         phase,
         owner: plan.projectCreate.owner,
       }).text;
-      const original = error instanceof Error ? error.message : String(error);
       const includeManualCreate = !projectEstablished &&
         error?.details?.existingProject !== true;
       throw new HeroesError(
         error instanceof HeroesError ? error.code : 'gh_project_apply_failed',
-        original.includes(`gh project create --owner ${plan.projectCreate.owner}`)
-          ? `${original}\n\n${recovery}`
-          : `${original}\n\n${recovery}${includeManualCreate ? `\n\n${manual}` : ''}`,
+        `${safeTechnicalError(plan.config.language, error)}\n\n${recovery}${includeManualCreate ? `\n\n${manual}` : ''}`,
         {
           category: 'project_recovery',
           owner: plan.projectCreate.owner,
@@ -703,8 +707,7 @@ function projectActionText(operation, language) {
   return translate(language, 'plan_project_existing').text;
 }
 
-function boundedPaths(operations, language, withReasons = false) {
-  const limit = 8;
+function boundedPaths(operations, limit = 3) {
   const representatives = [
     /^scripts\/start-work\.mjs$/u,
     /^\.github\/workflows\/heroes-ci\.yml$/u,
@@ -715,23 +718,15 @@ function boundedPaths(operations, language, withReasons = false) {
     /^\.squad\/001\/profile\.json$/u,
   ];
   const selected = [];
-  if (!withReasons) {
-    for (const pattern of representatives) {
-      const operation = operations.find((item) => pattern.test(item.target));
-      if (operation && !selected.includes(operation)) selected.push(operation);
-    }
+  for (const pattern of representatives) {
+    const operation = operations.find((item) => pattern.test(item.target));
+    if (operation && !selected.includes(operation)) selected.push(operation);
   }
   for (const operation of operations) {
     if (selected.length >= limit) break;
     if (!selected.includes(operation)) selected.push(operation);
   }
-  const visible = selected.map((operation) => withReasons
-    ? `  - ${operation.target}: ${operationReason(operation, language)}`
-    : `  - ${operation.target}`);
-  if (operations.length > limit) {
-    visible.push(`  ${translate(language, 'plan_more', { count: operations.length - limit }).text}`);
-  }
-  return visible;
+  return selected.slice(0, limit).map((operation) => operation.target);
 }
 
 export function machinePlan(plan) {
@@ -748,31 +743,30 @@ export function printPlan(plan, language = 'en', { dryRun = false } = {}) {
   const unchanged = plan.operations.filter(({ action, mode }) =>
     mode !== 'external' && action === 'noop');
   const project = plan.operations.filter(({ mode }) => mode === 'external');
-  const lines = [scope, '', heading];
-
-  lines.push(translate(language, 'plan_files_add', { count: additions.length }).text);
-  lines.push(...boundedPaths(additions, language));
-  if (existing.length > 0) {
-    lines.push('', translate(language, 'plan_files_merge', { count: existing.length }).text);
-    lines.push(...boundedPaths(existing, language, true));
-  }
-  if (project.length > 0) {
-    lines.push('', translate(language, 'plan_project_actions').text);
-    lines.push(...project.map((operation) => `  - ${projectActionText(operation, language)}`));
-  }
-  if (unchanged.length > 0) {
-    lines.push('', translate(language, 'plan_files_unchanged', { count: unchanged.length }).text);
-  }
-  lines.push(
-    '',
-    translate(language, 'plan_totals', {
+  const representatives = boundedPaths([...additions, ...existing]);
+  const lines = [
+    translate(language, 'plan_compact', {
       add: additions.length,
       merge: existing.length,
       unchanged: unchanged.length,
       project: project.length,
       conflicts: plan.conflicts.length,
-    }).text
-  );
-  if (dryRun) lines.push(translate(language, 'plan_dry_run').text);
+      projectState: plan.projectState ?? translate(language, 'project_state_off').text,
+    }).text,
+  ];
+  if (representatives.length) {
+    lines.push(translate(language, 'plan_examples', {
+      paths: representatives.join(', '),
+    }).text);
+  }
+  if (dryRun) {
+    lines.push(translate(language, 'plan_dry_run_short', {
+      add: additions.length,
+      merge: existing.length,
+      unchanged: unchanged.length,
+      project: project.length,
+      conflicts: plan.conflicts.length,
+    }).text);
+  }
   process.stdout.write(`${lines.join('\n')}\n`);
 }

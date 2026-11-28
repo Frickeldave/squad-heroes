@@ -4,6 +4,8 @@ Validate `{heroes-dir}`, an approved GitHub owner `{owner}`, and an empty consum
 
 Start gate: in a TTY, Companion installation must first show the "Project type" menu with exactly `001 Typescript developer project`. Non-TTY runs must pass `--project-type 001` explicitly; omission fails.
 
+Language gate: verify the priority `--language de|en` > `.squad/heroes.json` > `LC_ALL` > `LC_MESSAGES` > `LANG` > `LANGUAGE` in both languages. An explicit value must override the stored value. Unsupported or ambiguous locale values must fail with a clear `--language de|en` instruction; no English fallback is allowed. Complete German and English dry-runs with team/routing conflicts must contain no prose from the opposite language; whitelist technical paths, model IDs, and option keys explicitly. The normal plan contains at most three representative paths, while `--plan-json` remains complete.
+
 ## Prerequisites
 
 - Linux, Node.js 20+, npm, `git`, `gh`, Squad, and a TTY for interactive cases.

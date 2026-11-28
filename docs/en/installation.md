@@ -12,6 +12,12 @@ The Companion checks these gates before menus and writes. It never asks for toke
 
 TTY installation starts before auth or configuration prompts with the "Project type" arrow-key menu. It currently contains exactly `001 Typescript developer project`. Non-TTY operation must explicitly pass `--project-type 001`; no implicit default replaces the menu.
 
+## Installer language
+
+The exact priority is explicit `--language de|en` > the language in an existing `.squad/heroes.json` > normalized system locale (`LC_ALL`, then `LC_MESSAGES`, then `LANG`, then `LANGUAGE`). Only `de` and `en` are supported; locale forms such as `en_US.UTF-8` normalize only to `en`. Explicit and stored values must be exactly `de` or `en`. Unsupported or ambiguous values fail clearly. There is no silent language mix, partial translation, or English fallback. If no usable source exists, rerun with `--language de` or `--language en`. External Squad/GitHub CLI language is outside this product contract.
+
+Help is not a special case: `--language de --help` and `--help --language de` produce German Companion help; the equivalent applies to `en`. Companion help never adopts the language of external `ls --help`, `gh help`, or similar output.
+
 ## Install the plugin
 
 ```bash
@@ -36,18 +42,12 @@ node .squad/templates/squad-heroes/companion/scripts/install \
 The separate **Companion activation plan** is a concise summary, not a raw JSON dump. It groups files to add, existing files to merge, Project actions, unchanged files, and totals:
 
 ```text
-Files to add (82)
-  - scripts/start-work.mjs
-  - .github/workflows/heroes-ci.yml
-  - .squad/agents/tony/charter.md
-  ... and 79 more
-
-Existing files to merge (2)
-  - .squad/team.md: preserve local content and add the marked team section
-  - .squad/routing.md: preserve existing rules and add routing rows
-
-Dry-run: no files or remote resources changed.
+Plan: 82 add, 2 merge, 0 unchanged, 0 Project actions, 0 conflicts; Project state: off.
+Examples: scripts/start-work.mjs, .github/workflows/heroes-ci.yml, .github/prompts/startwork.prompt.md.
+Dry run: 82 add, 2 merge, 0 unchanged, 0 Project actions, 0 conflicts; no changes.
 ```
+
+Normal output shows at most three representative paths and never the complete target list. `--plan-json plan.json` retains every technical entry; that detail mode must be selected explicitly.
 
 Review it, then run the same command without `--dry-run`. Only that step writes. Repeating unchanged input is a no-op. Use `--plan-json plan.json` to write the machine-readable plan to a file, or `--json-plan` for explicit JSON on stdout.
 
@@ -68,7 +68,7 @@ node .squad/templates/squad-heroes/companion/scripts/install \
   --dry-run
 ```
 
-Conflicts stop before writes. For `.squad/team.md`, the installer explains that no managed Squad Heroes team section exists yet, names the agents to add, and recommends merge. The picker starts on `Merge — recommended: add to the existing file`. The other choices use direct descriptions for incoming, local, and cancel. `Show details / diff` is available but not selected by default; it shows bounded line counts and an incoming marked block, not complete file bodies.
+Conflicts stop before writes. Each target gets at most two or three short sentences, then the picker and one completion line. For `.squad/team.md`, the installer states that the managed Squad Heroes section is absent and recommends inserting seven agents while preserving existing content. The picker starts on `Merge — recommended: add to the existing file`; after selection, it prints one completion line. Routing follows the same compact pattern. `Show details / diff` remains optional and bounded, and is not selected by default.
 
 CI passes the internal decision values through `--decisions`:
 

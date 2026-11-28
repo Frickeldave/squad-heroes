@@ -56,6 +56,8 @@ node .squad/templates/squad-heroes/companion/scripts/install \
 
 ## Verhalten
 
+- **Installationssprache:** `--language de|en` hat Vorrang vor einer vorhandenen `.squad/heroes.json`; danach gilt das normalisierte System-Locale (`LC_ALL`, dann `LC_MESSAGES`, dann `LANG`, dann `LANGUAGE`). Unterstützt werden ausschließlich Deutsch und American English. Werte werden nur auf `de` beziehungsweise `en` normalisiert. Nicht unterstützte oder mehrdeutige Werte führen zu einem Fehler; es gibt keinen stillen Mix oder Englisch-Fallback. Fehlt eine nutzbare Quelle, erneut mit `--language de` oder `--language en` starten. Externe Squad-/GitHub-CLI-Ausgaben können englisch sein; sämtliche Companion-Eigenmeldungen folgen diesem Vertrag.
+- `--help` wird ebenfalls nach derselben Vertragsregel lokalisiert. Sowohl `--language de --help` als auch `--help --language de` werden unterstützt. Die Installer-Hilfe leitet ihre Sprache nie aus der Hilfe anderer CLI-Tools ab.
 - Der Companion verlangt genau einen stabilen `<!-- version: X.Y.Z -->`-Marker in `.github/agents/squad.agent.md`, mindestens 2.0.0.
 - Vor Menüs prüft er `gh`, Host-Authentifizierung, Account, Repository-Rechte und den lesenden Project-API-Zugriff. Der schreibfähige Scope `project` ist auch im Dry-run Pflicht, selbst ohne Board-Sync.
 - Profile, Sprache, Branches und optionale Review-Baseline bleiben explizit. Die Baseline muss zu einem lokalen Commit auflösen.

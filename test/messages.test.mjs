@@ -10,8 +10,10 @@ test('language priority is CLI then project config then locale', () => {
   assert.equal(resolveLanguage('de', 'en', 'en_US').language, 'de');
   assert.equal(resolveLanguage(null, 'en', 'de_DE').language, 'en');
   assert.equal(resolveLanguage(null, null, 'de_DE').source, 'locale');
-  assert.throws(() => resolveLanguage('fr', 'en'), /unsupported language/);
-  assert.throws(() => resolveLanguage(null, null, 'it_IT'), /unsupported language/);
+  assert.throws(() => resolveLanguage('fr', 'en'), /Unsupported installer language/);
+  assert.throws(() => resolveLanguage(null, null, 'it_IT'), /Unsupported installer language/);
+  assert.throws(() => resolveLanguage(null, null, 'de:en'), /Ambiguous installer language/);
+  assert.equal(resolveLanguage('de', 'invalid', 'fr_FR').language, 'de');
 });
 
 test('single-message fallback is explicit', () => {
@@ -19,5 +21,5 @@ test('single-message fallback is explicit', () => {
   assert.equal(result.language, 'de');
   assert.equal(result.fallback, false);
   assert.match(result.text, /2/);
-  assert.throws(() => translate('de', 'does-not-exist'), /missing message ID/);
+  assert.throws(() => translate('de', 'does-not-exist'), /missing message for de/);
 });

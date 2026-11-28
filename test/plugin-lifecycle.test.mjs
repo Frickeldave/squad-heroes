@@ -131,7 +131,9 @@ exit 0
     assert.match(companionDryRun.stdout, /scripts\/start-work\.mjs/u);
     assert.match(companionDryRun.stdout, /\.github\/prompts\/startwork\.prompt\.md/u);
     assert.match(companionDryRun.stdout, /\.github\/workflows\/heroes-ci\.yml/u);
-    assert.match(companionDryRun.stdout, /\.squad\/agents\/tony\/charter\.md/u);
+    assert.doesNotMatch(companionDryRun.stdout, /\.squad\/agents\/tony\/charter\.md/u);
+    assert.match(companionDryRun.stdout, /Plan: 82 add, 1 merge/u);
+    assert.equal((companionDryRun.stdout.match(/Examples: [^\n]+\n/u)?.[0].match(/,/gu) ?? []).length, 2);
     assert.doesNotMatch(companionDryRun.stdout, /actionDetails|owner|"preview"/u);
     assert.equal(existsSync(activeScript), false);
 
@@ -141,7 +143,7 @@ exit 0
 
     const planFile = path.join(root, 'heroes-plan.json');
     const fileJsonDryRun = mustRunCompanion(root, ['--dry-run', '--plan-json', planFile]);
-    assert.match(fileJsonDryRun.stdout, /Files to add/u);
+    assert.match(fileJsonDryRun.stdout, /Plan: 82 add/u);
     assert.ok(JSON.parse(readFileSync(planFile, 'utf8')).length > 0);
 
     const applied = mustRunCompanion(root);
