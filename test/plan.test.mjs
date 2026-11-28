@@ -25,6 +25,40 @@ test('ambiguous markers are conflicts, never whole-file writes', () => {
     });
     assert.equal(operation.action, 'conflict');
     assert.deepEqual(operation.options, ['use', 'keep', 'merge', 'abort']);
+    assert.equal(operation.recommendation, 'merge');
+  } finally {
+    cleanup(root);
+  }
+});
+
+test('markerless managed-section decisions preserve fresh Squad bytes according to choice', () => {
+  const root = fixture();
+  try {
+    const local = 'fresh Squad local bytes\r\n';
+    const incoming = '<!-- squad-heroes:team:begin -->\nmanaged\n<!-- squad-heroes:team:end -->\n';
+    write(root, '.squad/team.md', local);
+    const base = {
+      id: 'team',
+      target: '.squad/team.md',
+      rendered: incoming,
+      mode: 'managed-section',
+      section: 'team',
+    };
+
+    const merged = classifyOperation(root, base, { '.squad/team.md': 'merge' });
+    assert.ok(merged.content.startsWith(local));
+    assert.match(merged.content, /squad-heroes:team:begin/u);
+
+    const kept = classifyOperation(root, base, { '.squad/team.md': 'keep' });
+    assert.equal(kept.action, 'noop');
+    assert.equal(kept.content, local);
+
+    const used = classifyOperation(root, base, { '.squad/team.md': 'use' });
+    assert.equal(used.content, incoming);
+    assert.throws(
+      () => classifyOperation(root, base, { '.squad/team.md': 'abort' }),
+      /Conflict aborted/u
+    );
   } finally {
     cleanup(root);
   }

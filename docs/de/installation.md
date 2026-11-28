@@ -78,6 +78,18 @@ Launcher-Override `--model` bleibt pro Lauf verfügbar. Die optionale
 Review-Baseline ist eindeutig beschriftet und muss im Ziel als Commit auflösbar
 sein.
 
+Der erste Aktivierungsplan wird vor jedem Write ausgegeben. Enthält er lokale
+Konflikte, werden pro Ziel Abschnitt sowie kompakte lokale/eingehende Vorschau
+gezeigt und danach eine Pfeiltasten-Auswahl geöffnet. `use`, `keep`, `merge`
+oder `abort` wählen und mit Enter bestätigen. Nur bei einer **frischen
+Squad-2.0-Datei ohne verwalteten Marker** wird `merge` ausdrücklich empfohlen:
+Der eingehende verwaltete Abschnitt wird hinter allen vorhandenen lokalen Bytes
+eingefügt. Diese Empfehlung gilt nicht pauschal für Dateien mit Markern oder
+sonstige uneindeutige Inhalte. Danach baut Companion den Plan neu und zeigt ihn
+erneut an. Der Dry-run endet anschließend mit `changed: 0`; ein Apply schreibt
+erst nach Freigabe dieses aufgelösten Plans. Die exakten Entscheidungen werden
+für Recovery in `.squad/heroes.json` gespeichert.
+
 Beim Board-Opt-in werden Owner und Nummer nicht eingegeben: Der Owner wird stets
 aus `--repository` abgeleitet, Projects werden lesend über `gh` erkannt. Ein
 Project wird automatisch gewählt, mehrere erscheinen in derselben Pfeiltasten-Auswahl, keines stoppt
@@ -100,8 +112,23 @@ node .squad/templates/squad-heroes/companion/scripts/install \
   --model-reqeng mai-code-2 \
   --model-work claude-sonnet-5.5 \
   --model-review gpt-6.1-terra \
+  --decisions .squad/heroes-decisions.json \
   --dry-run
 ```
+
+CI übergibt `--decisions` nur, wenn der erste Plan ungeklärte Konflikte
+meldet. Die Datei ist ein JSON-Objekt mit exakten Zielpfaden als Schlüsseln:
+
+```json
+{
+  ".squad/team.md": "merge",
+  ".squad/routing.md": "merge"
+}
+```
+
+Als Werte sind ausschließlich `use`, `keep`, `merge` oder `abort` erlaubt. CI
+erhält keine TTY-Abfrage und stoppt vor lokalen oder Project-Writes, wenn eine
+benötigte Entscheidung fehlt.
 
 Das ist der separate **Companion-Aktivierungsplan**. Er zeigt aktive Ziele wie
 `scripts/start-work.mjs`, `.github/prompts/`,

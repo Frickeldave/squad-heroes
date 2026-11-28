@@ -36,9 +36,17 @@ function managedChecksum(source, key) {
 export function mergeManagedSection(existing, incoming, key, decision) {
   const current = managedSection(existing, key);
   const next = managedSection(incoming, key);
-  if (!current || !next) fail('section_marker', `Managed section markers are missing or ambiguous for ${key}`);
+  if (!next) fail('section_marker', `Incoming managed section markers are missing or ambiguous for ${key}`);
   if (decision === 'keep') return existing;
   if (decision === 'abort') fail('conflict_aborted', `Conflict aborted for ${key}`);
+  if (!current) {
+    if (decision === 'use') return incoming;
+    if (decision === 'merge') {
+      const separator = existing.length > 0 && !existing.endsWith('\n') ? '\n' : '';
+      return `${existing}${separator}${next.content}${incoming.endsWith('\n') ? '\n' : ''}`;
+    }
+    fail('decision', `Invalid conflict decision for ${key}`);
+  }
   if (decision === 'merge') {
     const retained = existing.slice(0, current.startIndex) + next.content + existing.slice(current.endIndex);
     if (!managedSection(retained, key)) fail('merge_invalid', `Merged section is invalid for ${key}`);
@@ -102,14 +110,20 @@ export function classifyOperation(repoRoot, item, decisions = {}) {
   }
   if (item.mode === 'managed-section') {
     let local = null;
+    let ambiguousLocal = false;
     try {
       local = managedSection(before, item.section);
     } catch {
-      local = null;
+      ambiguousLocal = true;
     }
     const next = managedSection(incoming, item.section);
     if (!next) fail('section_marker', `Incoming managed section markers are missing or ambiguous for ${item.section}`);
-    if (item.baselineHash && managedChecksum(before, item.section) === item.baselineHash) {
+    const unchangedBaseline = item.baselineHash && (
+      local
+        ? managedChecksum(before, item.section) === item.baselineHash
+        : sha256(before) === item.baselineHash
+    );
+    if (unchangedBaseline) {
       return {
         ...item,
         action: 'merge',
@@ -127,6 +141,10 @@ export function classifyOperation(repoRoot, item, decisions = {}) {
         base: item.baseline ?? '',
         incoming,
         options: [...DECISIONS],
+        ...(local || ambiguousLocal ? {} : {
+          recommendation: 'merge',
+          recommendationReason: 'managed-section marker is absent; merge inserts the incoming section and preserves every local byte',
+        }),
       };
     }
     if (!DECISIONS.has(decision)) fail('decision', `Invalid decision ${decision} for ${item.target}`);
@@ -155,12 +173,30 @@ export function classifyOperation(repoRoot, item, decisions = {}) {
 }
 
 export function summarizePlan(operations) {
-  return operations.map(({ target, action, owner, options, base, before, incoming, section, externalAction, actionDetails }) => ({
+  return operations.map(({
+    target,
+    action,
+    owner,
+    options,
+    base,
+    before,
+    incoming,
+    section,
+    externalAction,
+    actionDetails,
+    recommendation,
+    recommendationReason,
+  }) => ({
     target,
     action,
     owner,
     ...(externalAction ? { operation: externalAction, details: actionDetails } : {}),
-    ...(options ? { options, section, preview: { base, local: before, incoming } } : {}),
+    ...(options ? {
+      options,
+      section,
+      ...(recommendation ? { recommendation, recommendationReason } : {}),
+      preview: { base, local: before, incoming },
+    } : {}),
   }));
 }
 
@@ -170,7 +206,9 @@ export function recoveryBaselines(operations) {
     if (operation.mode === 'external') continue;
     if (operation.action === 'conflict' || operation.target === '.squad/heroes.json') continue;
     if (operation.mode === 'managed-section') {
-      targets[operation.target] = managedChecksum(operation.content, operation.section);
+      targets[operation.target] = managedSection(operation.content, operation.section)
+        ? managedChecksum(operation.content, operation.section)
+        : sha256(operation.content);
     } else {
       targets[operation.target] = sha256(operation.content);
     }

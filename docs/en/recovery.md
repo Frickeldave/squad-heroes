@@ -24,8 +24,17 @@ separately to review its activation plan and update those active targets.
 Plugin uninstall intentionally leaves active targets and `.squad/heroes.json`
 in place.
 
-The copied Companion's `--dry-run` shows every active operation and conflict.
-Record one decision per active target in JSON and pass it with `--decisions`:
+The copied Companion's first `--dry-run` shows every active operation and
+conflict. On a TTY, each conflict then appears with the target, managed section
+and concise local/incoming previews. Use the Up/Down or `j`/`k` arrows and
+Enter to choose `use`, `keep`, `merge`, or `abort`; Escape/`q` cancels. For a
+fresh markerless Squad file only, Companion labels `merge` as recommended and
+shows it as the default selection: merge appends the incoming managed section
+without replacing any preexisting local bytes. All choices are explicit; the
+plan is rebuilt and rerendered, then dry-run can finish with `changed: 0`.
+
+Without a TTY, record one decision per active target in a JSON object and pass
+it with `--decisions`. Missing decisions still fail before mutation:
 
 ```json
 {
@@ -35,7 +44,8 @@ Record one decision per active target in JSON and pass it with `--decisions`:
 ```
 
 Only `use`, `keep`, `merge`, `abort` are accepted. `merge` is revalidated for
-markers and UTF-8 before write.
+markers and UTF-8 before write. Apply persists the exact map in
+`.squad/heroes.json` recovery state and must use the same resolved plan.
 
 ## Common errors
 

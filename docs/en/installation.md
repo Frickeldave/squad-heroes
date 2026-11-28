@@ -74,6 +74,17 @@ verified fallback list is used. The launcher runtime `--model` override remains
 independent. The optional review baseline is clearly labeled and must resolve
 to a commit in the target repository.
 
+The first activation plan is rendered before any write. If it contains local
+conflicts, each target is shown with its section and concise local/incoming
+previews, followed by an arrow-key decision picker. Select `use`, `keep`,
+`merge`, or `abort` and confirm with Enter. For a **fresh Squad 2.0 file with
+no managed marker**, `merge` is clearly recommended because it inserts the
+incoming managed section after all existing local bytes; do not assume that
+recommendation for marker-bearing or otherwise ambiguous files. After the
+choices, Companion rebuilds and renders the resolved plan. A dry-run then
+finishes with `changed: 0`; apply writes only after this resolved plan is
+approved. The exact decisions are stored in `.squad/heroes.json` for recovery.
+
 Project board opt-in never asks for owner or number. Owner is always derived
 from `--repository`; the available Projects are read through `gh`. One Project
 is selected automatically, multiple Projects use the same arrow-key picker, and zero opens the explicit Companion-create, manual-create, and cancel menu. Manual selection and cancellation both print the recovery steps below. Explicit `--project-number` (and a
@@ -93,8 +104,23 @@ node .squad/templates/squad-heroes/companion/scripts/install \
   --model-reqeng mai-code-2 \
   --model-work claude-sonnet-5.5 \
   --model-review gpt-6.1-terra \
+  --decisions .squad/heroes-decisions.json \
   --dry-run
 ```
+
+CI supplies `--decisions` only when the first plan reports unresolved
+conflicts. The file is a JSON object keyed by exact target paths, for example:
+
+```json
+{
+  ".squad/team.md": "merge",
+  ".squad/routing.md": "merge"
+}
+```
+
+Values are exactly `use`, `keep`, `merge`, or `abort`. CI never receives a
+TTY prompt and fails before local or Project writes when a required decision is
+missing.
 
 This is the **Companion activation plan**. It must separately include active
 `scripts/start-work.mjs`, `.github/prompts/`, `.github/workflows/heroes-ci.yml`

@@ -397,3 +397,41 @@ node .squad/templates/squad-heroes/companion/scripts/install --target "$PWD" --d
 
 `cmp` must succeed, proving byte equality between current source and the
 reinstalled Companion rather than relying on a version workaround.
+
+## After the runbook: Snake issue and installed flows
+
+The fully written, copy-ready issue template is in
+[testplan-snake-issue.md](testplan-snake-issue.md). Use that file unchanged as
+the issue body; do not link development history or internal evidence. In the
+consumer repository:
+
+```bash
+cd {snake-dir}
+gh issue create --repo github.com:{owner}/squad-heroes-snake \
+  --title "Implement a browser-based Snake game" \
+  --body-file {heroes-dir}/docs/en/testplan-snake-issue.md
+gh issue list --repo github.com:{owner}/squad-heroes-snake --state open
+```
+
+Record the created number as `{snake-issue}`, then start the installed flows
+in exactly this order:
+
+```bash
+node scripts/start-reqeng.mjs --issue {snake-issue}
+node scripts/start-work.mjs --issue {snake-issue}
+```
+
+ReqEng must produce clarified requirements and a handoff to Work with no
+blocking questions. Work must create the branch/worktree, implementation,
+checks, and a PR containing `Closes #{snake-issue}`. Record its number as
+`{snake-pr}`. Only after that PR actually exists, start the Review flow:
+
+```bash
+gh pr view {snake-pr} --repo github.com:{owner}/squad-heroes-snake
+node scripts/start-review.mjs --pr {snake-pr}
+```
+
+Review receives a real PR and valid baseline precedence (run override,
+configured baseline, then PR base; never PR head). Expected gates: ReqEng
+questions closed, Work tests/build/check green, PR open, and no review blocker.
+Do not mark ready or merge early.

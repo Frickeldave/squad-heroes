@@ -40,6 +40,11 @@ Interactive model and Project selection use an in-place arrow-key picker
 --model-reqeng/--model-work/--model-review. The runtime --model override remains
 available.
 
+After the first plan render, unresolved local conflicts also use that picker.
+For a fresh markerless Squad file, merge is the visibly recommended default;
+it preserves the local bytes and inserts the incoming managed section. CI must
+resolve every conflict with a JSON object passed through --decisions.
+
 With --enable-board-sync, Project owner is derived from --repository. The
 write-capable project scope is proved from the active account's sanitized
 gh auth status output. Owner type from gh project output is reused when present;
@@ -311,6 +316,37 @@ export function selectWithArrowKeys(label, choices, current = '', options = {}) 
   });
 }
 
+function concisePreview(value) {
+  const normalized = String(value ?? '').replaceAll('\r', '\\r').replaceAll('\n', '\\n');
+  return normalized.length > 180 ? `${normalized.slice(0, 177)}...` : normalized;
+}
+
+export async function resolveConflictDecisions(plan, choose, { language = 'en', output = process.stdout } = {}) {
+  const decisions = { ...(plan.config.recovery?.decisions ?? {}) };
+  for (const conflict of plan.conflicts) {
+    const section = conflict.section ? `; section: ${conflict.section}` : '';
+    output.write(
+      `Conflict: ${conflict.target}${section}\n` +
+      `  Local: ${concisePreview(conflict.before)}\n` +
+      `  Incoming: ${concisePreview(conflict.incoming)}\n`
+    );
+    if (conflict.recommendation === 'merge') {
+      output.write(`${wizardText(language, 'conflict_recommended')}\n`);
+    }
+    const selection = await choose(
+      wizardText(language, 'conflict_picker_label').replace('{target}', conflict.target),
+      conflict.options,
+      conflict.recommendation ?? ''
+    );
+    if (!conflict.options.includes(selection)) {
+      throw new Error(`Invalid conflict decision "${selection}" for ${conflict.target}`);
+    }
+    decisions[conflict.target] = selection;
+    output.write(`Selected ${conflict.target}: ${selection}\n`);
+  }
+  return decisions;
+}
+
 async function wizard(options) {
   const existing = existingOptions(options.target);
   const prompt = createInterface({ input: process.stdin, output: process.stdout });
@@ -371,10 +407,35 @@ export async function main() {
       }
     }
     const repoRoot = resolve(options.target ?? process.cwd());
-    const plan = buildInstallPlan(repoRoot, options, {
+    let plan = buildInstallPlan(repoRoot, options, {
       githubPreflight: options.githubPreflight,
     });
     printPlan(plan, plan.config.language);
+    let resolvedConflicts = false;
+    if (plan.conflicts.length > 0 && supportsArrowKeyPicker()) {
+      const decisions = await resolveConflictDecisions(plan, (label, choices, current) =>
+        selectWithArrowKeys(label, choices, current, { language: plan.config.language })
+      );
+      options.decisions = decisions;
+      plan = buildInstallPlan(repoRoot, options, {
+        githubPreflight: options.githubPreflight,
+      });
+      resolvedConflicts = true;
+      process.stdout.write('\nResolved plan:\n');
+      printPlan(plan, plan.config.language);
+    }
+    if (resolvedConflicts && plan.conflicts.length > 0) {
+      throw new Error(`Resolved plan still has ${plan.conflicts.length} unresolved conflicts.`);
+    }
+    if (resolvedConflicts && !options.dryRun) {
+      const prompt = createInterface({ input: process.stdin, output: process.stdout });
+      try {
+        const approval = (await prompt.question('Approve the resolved rendered plan for apply (y/N): ')).trim().toLowerCase();
+        if (!['y', 'yes'].includes(approval)) throw new Error('Resolved plan was not approved; no mutation started.');
+      } finally {
+        prompt.close();
+      }
+    }
     if (plan.projectCreate && options.renderedProjectApprovalRequired && !options.dryRun) {
       const prompt = createInterface({ input: process.stdin, output: process.stdout });
       try {

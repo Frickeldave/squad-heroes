@@ -25,9 +25,19 @@ Companion separat erneut ausführen und seinen Aktivierungsplan prüfen. Ein
 Plugin-Uninstall lässt aktive Ziele und `.squad/heroes.json` absichtlich
 bestehen.
 
-Der `--dry-run` des kopierten Companions zeigt alle aktiven Operationen und
-Konflikte. Entscheidungen werden in einer JSON-Datei je aktivem Zielpfad
-dokumentiert und mit `--decisions` übergeben:
+Der erste `--dry-run` des kopierten Companions zeigt alle aktiven Operationen
+und Konflikte. An einem TTY erscheinen danach pro Konflikt Ziel, verwalteter
+Abschnitt und kompakte lokale/eingehende Vorschau. Mit Hoch/Runter oder
+`j`/`k` und Enter wird `use`, `keep`, `merge` oder `abort` gewählt; Escape/`q`
+bricht ab. Nur bei einer frischen Datei ohne Marker kennzeichnet Companion
+`merge` ausdrücklich als empfohlen und wählt es vor: Der eingehende
+verwaltete Abschnitt wird ergänzt, ohne vorhandene lokale Bytes zu ersetzen.
+Jede Wahl erfolgt explizit. Anschließend wird der Plan neu gebaut und angezeigt;
+der Dry-run kann dann mit `changed: 0` enden.
+
+Ohne TTY werden Entscheidungen je aktivem Zielpfad in einer JSON-Datei
+dokumentiert und mit `--decisions` übergeben. Fehlende Entscheidungen stoppen
+weiterhin vor jeder Mutation:
 
 ```json
 {
@@ -36,9 +46,10 @@ dokumentiert und mit `--decisions` übergeben:
 }
 ```
 
-Erlaubt sind `use`, `keep`, `merge`, `abort` (deutsche Entsprechungen:
-verwenden, behalten, zusammenführen, abbrechen). `merge` wird vor dem Write
-erneut auf Marker und UTF-8 validiert.
+Erlaubt sind ausschließlich `use`, `keep`, `merge`, `abort`. `merge` wird vor
+dem Write erneut auf Marker und UTF-8 validiert. Apply speichert die exakte
+Map im Recovery-State `.squad/heroes.json` und verwendet denselben
+aufgelösten Plan.
 
 ## Typische Fehler
 

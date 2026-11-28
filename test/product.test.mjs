@@ -165,6 +165,25 @@ test('documentation and runtime copy describe two separate installation phases',
   assert.match(content, /\.squad\/heroes\/companion\/workflows\/heroes-ci\.yml/u);
 });
 
+test('Snake issue bodies are parallel and linked with ordered flow handoffs', () => {
+  const pairs = [
+    ['docs/de/testplan-snake.md', 'docs/de/testplan-snake-issue.md'],
+    ['docs/en/testplan-snake.md', 'docs/en/testplan-snake-issue.md'],
+  ];
+  const expectedHeadings = 10;
+  for (const [planFile, issueFile] of pairs) {
+    const plan = readFileSync(path.join(root, planFile), 'utf8');
+    const issue = readFileSync(path.join(root, issueFile), 'utf8');
+    assert.match(plan, new RegExp(path.basename(issueFile).replaceAll('.', '\\.'), 'u'));
+    assert.ok((issue.match(/^## /gmu) ?? []).length >= expectedHeadings);
+    assert.match(plan, /start-reqeng\.mjs --issue/u);
+    assert.match(plan, /start-work\.mjs --issue/u);
+    assert.match(plan, /start-review\.mjs --pr/u);
+    assert.match(plan, /Closes #\{snake-issue\}/u);
+    assert.doesNotMatch(issue, /\/commit\/|\/pull\/|git (?:log|show)/iu);
+  }
+});
+
 test('plugin preflight points directly to the Companion dry-run', () => {
   const target = fixture();
   try {

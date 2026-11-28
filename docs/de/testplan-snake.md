@@ -414,3 +414,42 @@ node .squad/templates/squad-heroes/companion/scripts/install --target "$PWD" --d
 `cmp` muss erfolgreich enden. Damit wird die aktuelle Quelle bytegleich mit
 dem neu installierten Companion verifiziert, nicht durch einen Versions-Hack
 angenommen.
+
+## Nach dem Runbook: Snake-Issue und installierte Flows
+
+Die vollständig ausformulierte, kopierbare Issue-Vorlage steht in
+[testplan-snake-issue.md](testplan-snake-issue.md). Diese Datei unverändert als
+Issue-Body verwenden; keine Entwicklungs-Historie oder interne Evidenz
+verlinken. Im Consumer-Repository:
+
+```bash
+cd {snake-dir}
+gh issue create --repo github.com:{owner}/squad-heroes-snake \
+  --title "Browserbasiertes Snake-Spiel implementieren" \
+  --body-file {heroes-dir}/docs/de/testplan-snake-issue.md
+gh issue list --repo github.com:{owner}/squad-heroes-snake --state open
+```
+
+Die erzeugte Nummer als `{snake-issue}` erfassen und danach die installierten
+Flows exakt in dieser Reihenfolge starten:
+
+```bash
+node scripts/start-reqeng.mjs --issue {snake-issue}
+node scripts/start-work.mjs --issue {snake-issue}
+```
+
+ReqEng muss geklärte Anforderungen und blocking-freie Übergabe an Work
+erzeugen. Work muss Branch/Worktree, Implementierung, Checks und schließlich
+eine PR mit `Closes #{snake-issue}` liefern. Die PR-Nummer als `{snake-pr}`
+erfassen. Erst jetzt, nachdem die PR tatsächlich existiert, den Review-Flow
+starten:
+
+```bash
+gh pr view {snake-pr} --repo github.com:{owner}/squad-heroes-snake
+node scripts/start-review.mjs --pr {snake-pr}
+```
+
+Review erhält eine echte PR und den gültigen Baseline-Vorrang (Run-Override,
+konfigurierte Baseline, dann PR-Base; niemals PR-Head). Erwartete Gates:
+ReqEng-Fragen geschlossen, Work-Tests/Build/Check grün, PR geöffnet,
+Review ohne blocker. Nicht vorzeitig als ready markieren oder mergen.

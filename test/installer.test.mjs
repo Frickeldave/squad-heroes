@@ -10,7 +10,11 @@ import {
   VERIFIED_MODEL_FALLBACK,
 } from '../src/preflight.mjs';
 import { parseJsonFile } from '../src/io.mjs';
-import { completeInteractiveOptions, selectWithArrowKeys } from '../scripts/install.mjs';
+import {
+  completeInteractiveOptions,
+  resolveConflictDecisions,
+  selectWithArrowKeys,
+} from '../scripts/install.mjs';
 import { cleanup, commandResult, fixture, write } from './helpers.mjs';
 import { EventEmitter } from 'node:events';
 
@@ -720,8 +724,114 @@ test('conflicting local team blocks installation before its first write', () => 
     write(root, '.squad/team.md', 'local roster\n');
     const plan = buildInstallPlan(root, options, injected);
     assert.ok(plan.conflicts.some((entry) => entry.target === '.squad/team.md'));
-    assert.throws(() => applyPlan(root, plan, {}, injected), /unresolved conflicts/);
+    assert.throws(() => applyPlan(root, plan, {}, injected), /unresolved conflicts.*--decisions/u);
     assert.equal(existsSync(path.join(root, '.squad/heroes.json')), false);
+  } finally {
+    cleanup(root);
+  }
+});
+
+test('interactive picker resolves fresh markerless team and routing, then safely replans Project #3', async () => {
+  const root = fixture();
+  try {
+    const originalTeam = '# Local Squad team\r\nAlice owns this roster.\r\n';
+    const originalRouting = '# Local routing\nKeep this exact routing preface.\n';
+    write(root, '.squad/team.md', originalTeam);
+    write(root, '.squad/routing.md', originalRouting);
+    const projectCalls = [];
+    const boardInjected = {
+      spawn(command, args) {
+        if (args[0] === 'auth') return commandResult("- Token scopes: 'repo', 'project'\n");
+        if (args[0] === 'api' && args[1] === 'user') return commandResult('octocat\n');
+        if (args[0] === 'api' && args[1].startsWith('repos/')) {
+          return commandResult('{"pull":true,"push":true,"admin":false}\n');
+        }
+        if (args[0] === 'project' && args[1] === 'list') {
+          return commandResult('{"projects":[{"number":3,"title":"Heroes","owner":{"type":"User"}}]}\n');
+        }
+        if (args[0] === 'project' && args[1] === 'view') {
+          return commandResult('{"number":3,"title":"Heroes"}\n');
+        }
+        if (args[0] === 'project' && args[1] === 'field-list') {
+          return commandResult('{"fields":[{"id":"F3","name":"Status","options":[{"id":"O1","name":"Ready"},{"id":"O2","name":"Done"}]}]}\n');
+        }
+        if (args[0] === 'api' && args[1] === 'graphql') {
+          projectCalls.push([command, ...args]);
+          const query = args.find((arg) => arg.startsWith('query=')) ?? args[2] ?? '';
+          if (query.includes('repositoryOwner(login:')) {
+            return commandResult('{"data":{"repositoryOwner":{"id":"O1","login":"owner","__typename":"User","isViewer":true}}}\n');
+          }
+          if (query.includes('repository(owner:')) {
+            return commandResult('{"data":{"repository":{"id":"R1"}}}\n');
+          }
+          if (query.includes('repositories(first:100)')) {
+            return commandResult('{"data":{"node":{"repositories":{"nodes":[{"id":"R1"}]}}}}\n');
+          }
+          return commandResult('{"data":{"user":{"projectV2":{"id":"P3","number":3,"viewerCanUpdate":true}}}}\n');
+        }
+        return commandResult();
+      },
+    };
+    const boardOptions = {
+      ...options,
+      boardSync: true,
+      board: {
+        owner: 'owner',
+        number: 3,
+        statusField: 'Status',
+        statusMap: { 'go:yes': 'Ready', 'go:done': 'Done' },
+      },
+    };
+    const first = buildInstallPlan(root, boardOptions, boardInjected);
+    assert.deepEqual(first.conflicts.map(({ target }) => target), [
+      '.squad/team.md',
+      '.squad/routing.md',
+    ]);
+    assert.ok(first.conflicts.every(({ recommendation }) => recommendation === 'merge'));
+    assert.ok(first.operations.some(({ target, externalAction, actionDetails }) =>
+      target === 'github-project:owner/#3' &&
+      externalAction === 'configure-project-schema' &&
+      actionDetails.number === 3
+    ));
+
+    const selected = [];
+    const output = { write: (chunk) => {
+      selected.push(String(chunk));
+      return true;
+    } };
+    const decisions = await resolveConflictDecisions(first, async (label, choices, current) => {
+      selected.push(`${label}:${choices.join(',')}:${current}`);
+      return 'merge';
+    }, { language: 'en', output });
+    assert.deepEqual(decisions, {
+      '.squad/team.md': 'merge',
+      '.squad/routing.md': 'merge',
+    });
+    assert.equal(selected.filter((entry) => entry.startsWith('Selected ')).length, 2);
+    assert.ok(selected.some((entry) => entry.includes('Recommended: merge')));
+
+    const resolved = buildInstallPlan(
+      root,
+      { ...boardOptions, decisions },
+      boardInjected
+    );
+    assert.equal(resolved.conflicts.length, 0);
+    assert.deepEqual(resolved.config.recovery.decisions, decisions);
+    assert.equal(applyPlan(root, resolved, { dryRun: true }, boardInjected).changed, 0);
+    assert.equal(readFileSync(path.join(root, '.squad/team.md'), 'utf8'), originalTeam);
+    assert.equal(existsSync(path.join(root, '.squad/heroes.json')), false);
+    assert.equal(projectCalls.some((call) => call.join(' ').match(/\b(link|mutation)\b/u) && !call.join(' ').includes('repositories(first:100)')), false);
+
+    applyPlan(root, resolved, {}, boardInjected);
+    const installedTeam = readFileSync(path.join(root, '.squad/team.md'), 'utf8');
+    const installedRouting = readFileSync(path.join(root, '.squad/routing.md'), 'utf8');
+    assert.ok(installedTeam.startsWith(originalTeam));
+    assert.ok(installedRouting.startsWith(originalRouting));
+    assert.match(installedTeam, /<!-- squad-heroes:team:begin/u);
+    assert.match(installedRouting, /<!-- squad-heroes:routing:begin/u);
+    const state = JSON.parse(readFileSync(path.join(root, '.squad/heroes.json'), 'utf8'));
+    assert.equal(state.extensions['board-sync'].number, 3);
+    assert.deepEqual(state.recovery.decisions, decisions);
   } finally {
     cleanup(root);
   }

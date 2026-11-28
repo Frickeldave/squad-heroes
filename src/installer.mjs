@@ -357,7 +357,14 @@ export function buildInstallPlan(repoRoot, options = {}, injected = {}) {
         reviewBaseline,
         allowProjectPlaceholder: Boolean(projectCreation),
       });
-  const decisions = options.decisionFile ? parseJsonFile(path.resolve(options.decisionFile)) : {};
+  const fileDecisions = options.decisionFile ? parseJsonFile(path.resolve(options.decisionFile)) : {};
+  if (!fileDecisions || Array.isArray(fileDecisions) || typeof fileDecisions !== 'object') {
+    fail('decisions', '--decisions must point to a JSON object keyed by target path');
+  }
+  const decisions = {
+    ...fileDecisions,
+    ...(options.decisions ?? {}),
+  };
   const operations = [
     ...operationsFromCatalog(repoRoot, config, existing?.recovery?.targets),
     ...addAgentOperations(
@@ -478,7 +485,11 @@ export function applyPlan(
   const conflicts = plan.conflicts;
   if (conflicts.length) {
     const list = summarizePlan(plan.operations);
-    fail('conflicts', `Installation stopped: ${conflicts.length} unresolved conflicts. ${JSON.stringify(list)}`);
+    fail(
+      'conflicts',
+      `Installation stopped: ${conflicts.length} unresolved conflicts. ` +
+      `Use an interactive TTY to select each decision, or pass --decisions <json-file>. ${JSON.stringify(list)}`
+    );
   }
   if (verify || dryRun) return { changed: 0, plan: summarizePlan(plan.operations) };
   if (plan.projectCreate && plan.projectCreate.approved !== true) {

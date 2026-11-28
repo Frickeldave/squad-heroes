@@ -16,6 +16,8 @@
   "picker_current": "(current)",
   "picker_cancelled": "Selection cancelled; no changes were made.",
   "picker_tty_required": "Interactive selection requires a TTY. For noninteractive use pass all installation flags, including --model-reqeng, --model-work, --model-review, and either --project-number or both --create-project and --project-title when board sync is enabled.",
+  "conflict_picker_label": "Resolve conflict for {target}",
+  "conflict_recommended": "Recommended: merge — this fresh Squad file has no managed marker. Merge inserts the incoming managed section and preserves every existing local byte.",
   "github_access_verified": "GitHub host authentication, repository permissions, Project scope, and non-mutating Project API access verified. Active account: {account}. Derived Project owner: {owner}. Safe scope status: project granted.",
   "github_project": "GitHub Project",
   "gh_cli_missing": "GitHub preflight failed. Host: {host}. Active gh account: unavailable. `gh` is missing. Install GitHub CLI, then run `gh auth login --hostname github.com --web` and retry. Verification begins with `gh auth status --hostname github.com`. No mutation started.",
